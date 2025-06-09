@@ -1,0 +1,45 @@
+{
+    "name": "code-indexer",
+    "version": "0.0.1",
+    "description": "A powerful code indexing tool with multi-platform support",
+    "private": true,
+    "scripts": {
+        "build": "pnpm -r build",
+        "build:core": "pnpm --filter @code-indexer/core build",
+        "build:vscode": "pnpm --filter @code-indexer/vscode-extension compile",
+        "build:chrome": "pnpm --filter @code-indexer/chrome-extension build",
+        "build:mcp": "pnpm --filter @code-indexer/mcp build",
+        "dev": "pnpm -r dev",
+        "dev:core": "pnpm --filter @code-indexer/core dev",
+        "dev:vscode": "pnpm --filter @code-indexer/vscode-extension watch",
+        "dev:chrome": "pnpm --filter @code-indexer/chrome-extension dev",
+        "dev:mcp": "pnpm --filter @code-indexer/mcp dev",
+        "clean": "pnpm -r clean",
+        "lint": "pnpm -r lint",
+        "lint:fix": "pnpm -r run lint:fix",
+        "typecheck": "pnpm -r run typecheck",
+        "package:vscode": "pnpm --filter @code-indexer/vscode-extension package",
+        "package:chrome": "pnpm --filter @code-indexer/chrome-extension build && cd packages/chrome-extension && zip -r code-indexer-chrome.zip dist/*",
+        "release:npm": "pnpm build && pnpm --filter @code-indexer/core publish --access public && pnpm --filter @code-indexer/mcp publish --access public",
+        "release:vscode": "pnpm package:vscode && echo 'Upload .vsix file to VSCode Marketplace'",
+        "release:chrome": "pnpm package:chrome && echo 'Upload .zip file to Chrome Web Store'",
+        "example:basic": "pnpm --filter codeindexer-basic-example start"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "typescript": "^5.8.3",
+        "eslint": "^9.25.1",
+        "@typescript-eslint/eslint-plugin": "^8.31.1",
+        "@typescript-eslint/parser": "^8.31.1"
+    },
+    "engines": {
+        "node": ">=18.0.0",
+        "pnpm": ">=8.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zilliztech/CodeIndexer.git"
+    },
+    "license": "MIT",
+    "author": "Cheney Zhang <277584121@qq.com>"
+}

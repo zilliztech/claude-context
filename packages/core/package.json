@@ -1,0 +1,37 @@
+{
+    "name": "@code-indexer/core",
+    "version": "0.0.1",
+    "description": "Core indexing engine for CodeIndexer",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc --build",
+        "dev": "tsc --watch",
+        "clean": "rm -rf dist",
+        "lint": "eslint src --ext .ts",
+        "lint:fix": "eslint src --ext .ts --fix",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@zilliz/milvus2-sdk-node": "^2.5.10",
+        "fs-extra": "^11.0.0",
+        "glob": "^10.0.0",
+        "langchain": "^0.3.27",
+        "openai": "^5.1.1",
+        "typescript": "^5.0.0",
+        "voyageai": "^0.0.4"
+    },
+    "devDependencies": {
+        "@types/fs-extra": "^11.0.0"
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zilliztech/CodeIndexer.git",
+        "directory": "packages/core"
+    },
+    "license": "MIT"
+}
