@@ -1,0 +1,127 @@
+{
+    "name": "@code-indexer/vscode-extension",
+    "displayName": "CodeIndexer",
+    "publisher": "zilliz",
+    "description": "Intelligent code indexing and search for VSCode",
+    "version": "0.0.1",
+    "private": true,
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "code",
+        "indexer",
+        "search",
+        "navigation",
+        "symbols"
+    ],
+    "icon": "resources/icon.png",
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "codeIndexer.semanticSearch",
+                "title": "Semantic Search",
+                "category": "CodeIndexer"
+            },
+            {
+                "command": "codeIndexer.search",
+                "title": "Search Code",
+                "category": "CodeIndexer"
+            },
+            {
+                "command": "codeIndexer.indexCodebase",
+                "title": "Index Codebase",
+                "category": "CodeIndexer"
+            },
+            {
+                "command": "codeIndexer.clearIndex",
+                "title": "Clear Index",
+                "category": "CodeIndexer"
+            },
+            {
+                "command": "codeIndexer.indexStats",
+                "title": "Show Index Statistics",
+                "category": "CodeIndexer"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "codeIndexer.semanticSearch",
+                "key": "ctrl+shift+f",
+                "mac": "cmd+shift+f"
+            },
+            {
+                "command": "codeIndexer.search",
+                "key": "ctrl+shift+s",
+                "mac": "cmd+shift+s"
+            },
+            {
+                "command": "codeIndexer.indexCodebase",
+                "key": "ctrl+shift+i",
+                "mac": "cmd+shift+i"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "codeIndexer.semanticSearch",
+                    "when": "editorHasSelection",
+                    "group": "navigation@100"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "codeIndexerSidebar",
+                    "title": "CodeIndexer",
+                    "icon": "$(search)"
+                }
+            ]
+        },
+        "views": {
+            "codeIndexerSidebar": [
+                {
+                    "id": "semanticSearchView",
+                    "name": "Semantic Search",
+                    "type": "webview"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "pnpm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "clean": "rm -rf dist",
+        "lint": "eslint src",
+        "lint:fix": "eslint src --fix",
+        "typecheck": "tsc --noEmit",
+        "package": "vsce package"
+    },
+    "dependencies": {
+        "@code-indexer/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.100.0",
+        "@types/node": "20.x",
+        "@typescript-eslint/eslint-plugin": "^8.31.1",
+        "@typescript-eslint/parser": "^8.31.1",
+        "eslint": "^9.25.1",
+        "typescript": "^5.8.3",
+        "vsce": "^2.15.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zilliztech/CodeIndexer.git",
+        "directory": "packages/vscode-extension"
+    },
+    "license": "MIT"
+}
