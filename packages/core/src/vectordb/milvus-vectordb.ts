@@ -20,6 +20,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     constructor(config: MilvusConfig) {
         this.config = config;
+        console.log('🔌 Connecting to vector database at: ', config.address);
         this.client = new MilvusClient({
             address: config.address,
             username: config.username,

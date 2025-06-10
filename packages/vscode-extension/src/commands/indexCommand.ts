@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
-import { SearchService } from '@code-indexer/core';
+import { CodeIndexer } from '@code-indexer/core';
 
 export class IndexCommand {
-    private searchService: SearchService;
+    private codeIndexer: CodeIndexer;
 
-    constructor() {
-        this.searchService = new SearchService();
+    constructor(codeIndexer: CodeIndexer) {
+        this.codeIndexer = codeIndexer;
     }
 
     async execute(): Promise<void> {
@@ -46,6 +46,8 @@ export class IndexCommand {
         }
 
         try {
+            let indexStats: { indexedFiles: number; totalChunks: number } | undefined;
+
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Indexing Codebase',
@@ -54,22 +56,21 @@ export class IndexCommand {
                 progress.report({ increment: 0, message: 'Starting indexing process...' });
 
                 // Clear existing index first
-                await this.searchService.clearIndex();
+                await this.codeIndexer.clearIndex(selectedFolder.uri.fsPath);
                 progress.report({ increment: 10, message: 'Cleared existing index...' });
 
                 // Start indexing
-                await this.searchService.indexCodebase(selectedFolder.uri.fsPath);
+                indexStats = await this.codeIndexer.indexCodebase(selectedFolder.uri.fsPath);
                 progress.report({ increment: 90, message: 'Indexing complete!' });
 
-                // Get statistics information
-                const stats = this.searchService.getStats();
-                progress.report({ increment: 100, message: `Indexed ${stats.indexedFiles} files with ${stats.totalChunks} chunks` });
+                progress.report({ increment: 100, message: `Indexed ${indexStats.indexedFiles} files with ${indexStats.totalChunks} chunks` });
             });
 
-            const stats = this.searchService.getStats();
-            vscode.window.showInformationMessage(
-                `✅ Indexing complete!\n\nIndexed ${stats.indexedFiles} files with ${stats.totalChunks} code chunks.\n\nYou can now use semantic search.`
-            );
+            if (indexStats) {
+                vscode.window.showInformationMessage(
+                    `✅ Indexing complete!\n\nIndexed ${indexStats.indexedFiles} files with ${indexStats.totalChunks} code chunks.\n\nYou can now use semantic search.`
+                );
+            }
 
         } catch (error) {
             console.error('Indexing failed:', error);
@@ -89,7 +90,13 @@ export class IndexCommand {
         }
 
         try {
-            await this.searchService.clearIndex();
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                vscode.window.showErrorMessage('No workspace folder found. Please open a folder first.');
+                return;
+            }
+
+            await this.codeIndexer.clearIndex(workspaceFolders[0].uri.fsPath);
             vscode.window.showInformationMessage('✅ Index cleared successfully');
         } catch (error) {
             console.error('Failed to clear index:', error);
@@ -98,9 +105,8 @@ export class IndexCommand {
     }
 
     getIndexStats(): void {
-        const stats = this.searchService.getStats();
         vscode.window.showInformationMessage(
-            `📊 Index Statistics:\n\nIndexed Files: ${stats.indexedFiles}\nCode Chunks: ${stats.totalChunks}`
+            `📊 Index Statistics:\n\nStatistics are only available after indexing. Please run "Index Current Codebase" first.`
         );
     }
 } 
