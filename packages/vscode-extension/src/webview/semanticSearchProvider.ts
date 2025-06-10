@@ -1,14 +1,16 @@
 import * as vscode from 'vscode';
 import { WebviewHelper } from './webviewHelper';
-import { SearchService } from '@code-indexer/core';
-import { SearchQuery } from '@code-indexer/core';
+import { SearchCommand } from '../commands/searchCommand';
+import { IndexCommand } from '../commands/indexCommand';
 
 export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
-    private searchService: SearchService;
+    private searchCommand: SearchCommand;
+    private indexCommand: IndexCommand;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {
-        this.searchService = new SearchService();
+    constructor(private readonly _extensionUri: vscode.Uri, searchCommand: SearchCommand, indexCommand: IndexCommand) {
+        this.searchCommand = searchCommand;
+        this.indexCommand = indexCommand;
     }
 
     resolveWebviewView(
@@ -34,25 +36,51 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             async message => {
                 switch (message.command) {
                     case 'search':
-                        // Use semantic search service
-                        const searchQuery: SearchQuery = {
-                            term: message.text,
-                            limit: 50
-                        };
+                        try {
+                            // Use search command
+                            const searchResults = await this.searchCommand.executeForWebview(
+                                message.text,
+                                50
+                            );
 
-                        const searchResults = await this.searchService.search(searchQuery);
+                            // Convert SemanticSearchResult[] to webview format
+                            const results = this.convertSearchResultsToWebviewFormat(searchResults);
 
-                        // Convert SearchResult[] to webview format
-                        const results = this.convertSearchResultsToWebviewFormat(searchResults);
+                            // Send results back to webview
+                            webviewView.webview.postMessage({
+                                command: 'showResults',
+                                results: results,
+                                query: message.text
+                            });
 
-                        // Send results back to webview
-                        webviewView.webview.postMessage({
-                            command: 'showResults',
-                            results: results,
-                            query: message.text
-                        });
+                            vscode.window.showInformationMessage(`Found ${results.length} results for: "${message.text}"`);
+                        } catch (error) {
+                            console.error('Search failed:', error);
+                            vscode.window.showErrorMessage(`Search failed: ${error}`);
+                            // Send empty results to webview
+                            webviewView.webview.postMessage({
+                                command: 'showResults',
+                                results: [],
+                                query: message.text
+                            });
+                        }
+                        return;
 
-                        vscode.window.showInformationMessage(`Found ${results.length} results for: "${message.text}"`);
+                    case 'index':
+                        // Handle index command
+                        try {
+                            await this.indexCommand.execute();
+                            // Notify webview that indexing is complete
+                            webviewView.webview.postMessage({
+                                command: 'indexComplete'
+                            });
+                        } catch (error) {
+                            console.error('Indexing error:', error);
+                            // Still notify webview to reset button state
+                            webviewView.webview.postMessage({
+                                command: 'indexComplete'
+                            });
+                        }
                         return;
 
                     case 'openFile':
@@ -62,8 +90,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                             const document = await vscode.workspace.openTextDocument(uri);
                             const editor = await vscode.window.showTextDocument(document);
 
-                            // Jump to specific line if provided
-                            if (message.line !== undefined) {
+                            // Select range from startLine to endLine if provided, otherwise just jump to line
+                            if (message.startLine !== undefined && message.endLine !== undefined) {
+                                const startLine = Math.max(0, message.startLine - 1); // Convert to 0-based
+                                const endLine = Math.max(0, message.endLine - 1); // Convert to 0-based
+                                const range = new vscode.Range(startLine, 0, endLine, Number.MAX_SAFE_INTEGER);
+                                editor.selection = new vscode.Selection(range.start, range.end);
+                                editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+                            } else if (message.line !== undefined) {
                                 const line = Math.max(0, message.line - 1); // Convert to 0-based
                                 const range = new vscode.Range(line, 0, line, 0);
                                 editor.selection = new vscode.Selection(range.start, range.end);
@@ -81,7 +115,7 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Convert SearchResult[] from core to webview format
+     * Convert SemanticSearchResult[] from core to webview format
      */
     private convertSearchResultsToWebviewFormat(searchResults: any[]): any[] {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -89,38 +123,38 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
         return searchResults.map(result => {
             // Determine the correct file path
-            let filePath = result.file.path;
+            let filePath = result.filePath;
 
-            // If result.file.path is not an absolute path, concatenate with workspace path
-            if (!result.file.path.startsWith('/') && !result.file.path.includes(':')) {
-                filePath = `${baseWorkspacePath}/${result.file.path}`;
+            // If result.filePath is not an absolute path, concatenate with workspace path
+            if (!result.filePath.startsWith('/') && !result.filePath.includes(':')) {
+                filePath = `${baseWorkspacePath}/${result.filePath}`;
             }
 
-            if (result.symbol) {
-                return {
-                    file: result.file.path,
-                    filePath: filePath,
-                    line: result.symbol.location.line,
-                    preview: result.symbol.signature,
-                    context: `${result.symbol.type} in ${result.file.path}`
-                };
-            } else if (result.matches && result.matches.length > 0) {
-                return {
-                    file: result.file.path,
-                    filePath: filePath,
-                    line: result.matches[0].line,
-                    preview: result.matches[0].context,
-                    context: `${result.matches.length} matches in ${result.file.path}`
-                };
-            } else {
-                return {
-                    file: result.file.path,
-                    filePath: filePath,
-                    line: 1,
-                    preview: result.file.path,
-                    context: 'File match'
-                };
+            // Calculate relative display path from workspace root
+            let displayPath = result.filePath;
+            if (baseWorkspacePath && result.filePath.startsWith(baseWorkspacePath)) {
+                displayPath = result.filePath.substring(baseWorkspacePath.length);
+                // Remove leading slash if present
+                if (displayPath.startsWith('/') || displayPath.startsWith('\\')) {
+                    displayPath = displayPath.substring(1);
+                }
             }
+
+            // Truncate content for display
+            const truncatedContent = result.content.length <= 150
+                ? result.content
+                : result.content.substring(0, 150) + '...';
+
+            return {
+                file: displayPath,
+                filePath: filePath,
+                line: result.startLine,
+                preview: truncatedContent,
+                context: `1 match in ${displayPath}`,
+                score: result.score,
+                startLine: result.startLine,
+                endLine: result.endLine
+            };
         });
     }
 } 

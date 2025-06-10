@@ -14,8 +14,10 @@ import {
     VectorSearchResult,
     MilvusVectorDatabase
 } from './vectordb';
+import { SemanticSearchResult } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 export interface CodeIndexerConfig {
     embeddingService?: Embedding;
@@ -23,27 +25,16 @@ export interface CodeIndexerConfig {
     codeSplitter?: CodeSplitter;
     chunkSize?: number;
     chunkOverlap?: number;
-    collectionName?: string;
     supportedExtensions?: string[];
 }
 
-export interface SemanticSearchResult {
-    content: string;
-    filePath: string;
-    startLine: number;
-    endLine: number;
-    language: string;
-    score: number;
-}
+
 
 export class CodeIndexer {
     private embeddingService: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: CodeSplitter;
-    private collectionName: string;
     private supportedExtensions: string[];
-    private indexedFiles: Set<string> = new Set();
-    private totalChunks: number = 0;
 
     constructor(config: CodeIndexerConfig = {}) {
         // Initialize services
@@ -61,7 +52,7 @@ export class CodeIndexer {
             config.chunkOverlap || 200
         );
 
-        this.collectionName = config.collectionName || 'code_chunks';
+
 
         this.supportedExtensions = config.supportedExtensions || [
             '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
@@ -70,48 +61,66 @@ export class CodeIndexer {
     }
 
     /**
+     * Generate collection name based on codebase path
+     */
+    private getCollectionName(codebasePath: string): string {
+        const normalizedPath = path.resolve(codebasePath);
+        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+        return `code_chunks_${hash.substring(0, 8)}`;
+    }
+
+    /**
      * Index entire codebase
      * @param codebasePath Codebase path
+     * @returns Indexing statistics
      */
-    async indexCodebase(codebasePath: string): Promise<void> {
+    async indexCodebase(codebasePath: string): Promise<{ indexedFiles: number; totalChunks: number }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
 
         // 1. Check and prepare vector collection
-        await this.prepareCollection();
+        await this.prepareCollection(codebasePath);
 
         // 2. Recursively traverse codebase to get all supported files
         const codeFiles = await this.getCodeFiles(codebasePath);
         console.log(`📁 Found ${codeFiles.length} code files`);
 
         // 3. Process each file
-        let processedFiles = 0;
+        const indexedFiles = new Set<string>();
+        let totalChunks = 0;
         const batchSize = 10; // Batch processing to avoid excessive memory usage
 
         for (let i = 0; i < codeFiles.length; i += batchSize) {
             const batch = codeFiles.slice(i, i + batchSize);
-            await this.processBatch(batch);
-            processedFiles += batch.length;
-            console.log(`📊 Processed ${processedFiles}/${codeFiles.length} files`);
+            const batchStats = await this.processBatch(batch, codebasePath);
+            batchStats.processedFiles.forEach(file => indexedFiles.add(file));
+            totalChunks += batchStats.chunksGenerated;
+            console.log(`📊 Processed ${indexedFiles.size}/${codeFiles.length} files`);
         }
 
-        console.log(`✅ Codebase indexing completed! Processed ${processedFiles} files in total, generated ${this.totalChunks} code chunks`);
+        console.log(`✅ Codebase indexing completed! Processed ${indexedFiles.size} files in total, generated ${totalChunks} code chunks`);
+
+        return {
+            indexedFiles: indexedFiles.size,
+            totalChunks: totalChunks
+        };
     }
 
     /**
      * Semantic search
+     * @param codebasePath Codebase path to search in
      * @param query Search query
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
-    async semanticSearch(query: string, topK: number = 5, threshold: number = 0.5): Promise<SemanticSearchResult[]> {
-        console.log(`🔍 Executing semantic search: "${query}"`);
+    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5): Promise<SemanticSearchResult[]> {
+        console.log(`🔍 Executing semantic search: "${query}" in ${codebasePath}`);
 
         // 1. Generate query vector
         const queryEmbedding: EmbeddingVector = await this.embeddingService.embed(query);
 
         // 2. Search in vector database
         const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
-            this.collectionName,
+            this.getCollectionName(codebasePath),
             queryEmbedding.vector,
             { topK, threshold }
         );
@@ -131,45 +140,36 @@ export class CodeIndexer {
     }
 
     /**
-     * Get index statistics
-     */
-    getStats(): { indexedFiles: number; totalChunks: number } {
-        return {
-            indexedFiles: this.indexedFiles.size,
-            totalChunks: this.totalChunks
-        };
-    }
-
-    /**
      * Clear index
+     * @param codebasePath Codebase path to clear index for
      */
-    async clearIndex(): Promise<void> {
-        console.log('🧹 Cleaning index data...');
+    async clearIndex(codebasePath: string): Promise<void> {
+        console.log(`🧹 Cleaning index data for ${codebasePath}...`);
 
-        const collectionExists = await this.vectorDatabase.hasCollection(this.collectionName);
+        const collectionName = this.getCollectionName(codebasePath);
+        const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
         if (collectionExists) {
-            await this.vectorDatabase.dropCollection(this.collectionName);
+            await this.vectorDatabase.dropCollection(collectionName);
         }
 
-        this.indexedFiles.clear();
-        this.totalChunks = 0;
         console.log('✅ Index data cleaned');
     }
 
     /**
      * Prepare vector collection
      */
-    private async prepareCollection(): Promise<void> {
+    private async prepareCollection(codebasePath: string): Promise<void> {
         // Create new collection
+        const collectionName = this.getCollectionName(codebasePath);
         const dimension = this.embeddingService.getDimension();
-        await this.vectorDatabase.createCollection(this.collectionName, dimension, 'Code chunk vector storage collection');
-        console.log(`✅ Collection ${this.collectionName} created successfully (dimension: ${dimension})`);
+        await this.vectorDatabase.createCollection(collectionName, dimension, 'Code chunk vector storage collection');
+        console.log(`✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
     }
 
     /**
      * Recursively get all code files in the codebase
      */
-    private async getCodeFiles(dirPath: string): Promise<string[]> {
+    private async getCodeFiles(codebasePath: string): Promise<string[]> {
         const files: string[] = [];
 
         const traverseDirectory = async (currentPath: string) => {
@@ -192,7 +192,7 @@ export class CodeIndexer {
             }
         };
 
-        await traverseDirectory(dirPath);
+        await traverseDirectory(codebasePath);
         return files;
     }
 
@@ -211,8 +211,9 @@ export class CodeIndexer {
     /**
      * Process files in batch
      */
-    private async processBatch(filePaths: string[]): Promise<void> {
+    private async processBatch(filePaths: string[], codebasePath: string): Promise<{ processedFiles: string[]; chunksGenerated: number }> {
         const allChunks: CodeChunk[] = [];
+        const processedFiles: string[] = [];
 
         // 1. Read and split files in parallel
         for (const filePath of filePaths) {
@@ -222,14 +223,14 @@ export class CodeIndexer {
                 const chunks = await this.codeSplitter.split(content, language, filePath);
 
                 allChunks.push(...chunks);
-                this.indexedFiles.add(filePath);
+                processedFiles.push(filePath);
             } catch (error) {
                 console.warn(`⚠️  Skipping file ${filePath}: ${error}`);
             }
         }
 
         if (allChunks.length === 0) {
-            return;
+            return { processedFiles, chunksGenerated: 0 };
         }
 
         // 2. Generate embedding vectors
@@ -249,8 +250,9 @@ export class CodeIndexer {
         }));
 
         // 4. Store to vector database
-        await this.vectorDatabase.insert(this.collectionName, documents);
-        this.totalChunks += documents.length;
+        await this.vectorDatabase.insert(this.getCollectionName(codebasePath), documents);
+
+        return { processedFiles, chunksGenerated: documents.length };
     }
 
     /**

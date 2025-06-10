@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { SemanticSearchViewProvider } from './webview/semanticSearchProvider';
 import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
+import { CodeIndexer } from '@code-indexer/core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;
@@ -10,10 +11,13 @@ let indexCommand: IndexCommand;
 export async function activate(context: vscode.ExtensionContext) {
     console.log('CodeIndexer extension is now active!');
 
+    // Initialize shared codeIndexer instance
+    const codeIndexer = new CodeIndexer();
+
     // Initialize providers and commands
-    semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri);
-    searchCommand = new SearchCommand();
-    indexCommand = new IndexCommand();
+    searchCommand = new SearchCommand(codeIndexer);
+    indexCommand = new IndexCommand(codeIndexer);
+    semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri, searchCommand, indexCommand);
 
     // Register command handlers
     const disposables = [
