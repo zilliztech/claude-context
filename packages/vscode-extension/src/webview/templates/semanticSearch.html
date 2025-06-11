@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Search</title>
+    <link rel="stylesheet" href="{{styleUri}}">
+</head>
+
+<body>
+    <!-- Search View -->
+    <div id="searchView" class="view">
+        <div class="search-container">
+            <div class="header-section">
+                <h3>Semantic Code Search</h3>
+                <button id="settingsButton" class="settings-button" title="Settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path
+                            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                </button>
+            </div>
+            <input type="text" id="searchInput" class="search-input"
+                placeholder="Enter your semantic search query..." />
+            <button id="searchButton" class="search-button">Search</button>
+            <button id="indexButton" class="search-button"
+                style="margin-top: 4px; background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">
+                Index Current Codebase
+            </button>
+        </div>
+
+        <div id="resultsContainer" class="results-container" style="display: none;">
+            <div id="resultsHeader" class="results-header"></div>
+            <div id="resultsList"></div>
+        </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settingsView" class="view" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <div class="header-section">
+                    <h2>CodeIndexer Settings</h2>
+                    <button id="backButton" class="settings-button" title="Back to Search">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="subtitle">Configure your embedding provider to get started</p>
+            </div>
+
+            <form id="configForm">
+                <div class="form-group">
+                    <label for="provider">Embedding Provider</label>
+                    <select id="provider" required>
+                        <option value="">Please select...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="modelGroup" style="display: none;">
+                    <label for="model">Model</label>
+                    <select id="model" required>
+                        <option value="">Please select...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="apiKeyGroup" style="display: none;">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" required>
+                </div>
+
+                <div class="form-group" id="baseUrlGroup" style="display: none;">
+                    <label for="baseUrl">Base URL (optional)</label>
+                    <input type="url" id="baseUrl" placeholder="https://api.openai.com/v1">
+                </div>
+
+                <div class="button-group">
+                    <button type="button" id="testBtn" class="secondary-btn" disabled>Test Embedding</button>
+                </div>
+
+                <div class="form-separator"></div>
+
+                <h3>Vector Database Configuration</h3>
+                <p class="subtitle">Configure your Milvus vector database connection</p>
+
+                <div class="form-group">
+                    <label for="milvusAddress">Milvus Address</label>
+                    <input type="url" id="milvusAddress" placeholder="http://localhost:19530" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="milvusToken">Milvus Token (optional)</label>
+                    <input type="password" id="milvusToken" placeholder="">
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" id="saveBtn" class="primary-btn" disabled>Save Configuration</button>
+                </div>
+            </form>
+
+            <div id="status" class="status-message" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script src="{{scriptUri}}"></script>
+</body>
+
+</html>

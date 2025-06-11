@@ -2,12 +2,12 @@ import OpenAI from 'openai';
 import { Embedding, EmbeddingVector } from './index';
 
 export interface OpenAIEmbeddingConfig {
+    model: string;
     apiKey: string;
-    model?: string;
-    baseURL?: string;
+    baseURL?: string; // OpenAI supports custom baseURL
 }
 
-export class OpenAIEmbeddingService implements Embedding {
+export class OpenAIEmbedding implements Embedding {
     private client: OpenAI;
     private config: OpenAIEmbeddingConfig;
     private dimension: number = 1536; // Default dimension for text-embedding-3-small

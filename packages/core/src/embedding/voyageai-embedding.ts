@@ -2,12 +2,11 @@ import { VoyageAIClient } from 'voyageai';
 import { Embedding, EmbeddingVector } from './index';
 
 export interface VoyageAIEmbeddingConfig {
+    model: string;
     apiKey: string;
-    model?: string;
-    baseURL?: string;
 }
 
-export class VoyageAIEmbeddingService implements Embedding {
+export class VoyageAIEmbedding implements Embedding {
     private client: VoyageAIClient;
     private config: VoyageAIEmbeddingConfig;
     private dimension: number = 1024; // Default dimension for voyage-code-3
@@ -24,7 +23,7 @@ export class VoyageAIEmbeddingService implements Embedding {
     }
 
     private updateDimensionForModel(model: string): void {
-        const supportedModels = VoyageAIEmbeddingService.getSupportedModels();
+        const supportedModels = VoyageAIEmbedding.getSupportedModels();
         const modelInfo = supportedModels[model];
 
         if (modelInfo) {

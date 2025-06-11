@@ -17,7 +17,6 @@ async function main() {
         const indexer = new CodeIndexer({
             chunkSize: 1000,
             chunkOverlap: 200,
-            collectionName: 'my_codebase',
             // Can customize supported file extensions
             supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp']
         });
@@ -25,11 +24,12 @@ async function main() {
         // 2. Index codebase
         console.log('\n📖 Starting to index codebase...');
         const codebasePath = path.join(__dirname, '../..'); // Index entire project
-        await indexer.indexCodebase(codebasePath);
 
-        // 3. Get indexing statistics
-        const stats = indexer.getStats();
-        console.log(`\n📊 Indexing stats: ${stats.indexedFiles} files, ${stats.totalChunks} code chunks`);
+        // Index with progress tracking
+        const indexStats = await indexer.indexCodebase(codebasePath);
+
+        // 3. Show indexing statistics
+        console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
 
         // 4. Perform semantic search
         console.log('\n🔍 Performing semantic search...');
@@ -43,7 +43,7 @@ async function main() {
 
         for (const query of queries) {
             console.log(`\n🔎 Search: "${query}"`);
-            const results = await indexer.semanticSearch(query, 3, 0.3);
+            const results = await indexer.semanticSearch(codebasePath, query, 3, 0.3);
 
             if (results.length > 0) {
                 results.forEach((result, index) => {
