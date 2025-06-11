@@ -2,26 +2,29 @@
     "name": "@code-indexer/mcp",
     "version": "0.0.1",
     "description": "Model Context Protocol integration for CodeIndexer",
+    "type": "module",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
-    "bin": {
-        "code-indexer-mcp": "dist/index.js"
-    },
+    "bin": "dist/index.js",
     "scripts": {
-        "build": "tsc",
-        "dev": "tsc --watch",
+        "build": "tsc --build",
+        "dev": "tsx --watch src/index.ts",
         "clean": "rm -rf dist",
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
         "typecheck": "tsc --noEmit",
-        "start": "node dist/index.js"
+        "start": "tsx src/index.ts",
+        "start:with-env": "OPENAI_API_KEY=${OPENAI_API_KEY:your-api-key-here} MILVUS_ADDRESS=${MILVUS_ADDRESS:localhost:19530} tsx src/index.ts",
+        "prepublishOnly": "pnpm build"
     },
     "dependencies": {
-        "@code-indexer/core": "workspace:*",
-        "@modelcontextprotocol/sdk": "^0.5.0"
+        "@code-indexer/core": "^0.0.1",
+        "@modelcontextprotocol/sdk": "^1.12.1",
+        "zod": "^3.25.55"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
+        "tsx": "^4.19.4",
         "typescript": "^5.0.0"
     },
     "files": [
