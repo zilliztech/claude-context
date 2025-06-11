@@ -5,11 +5,11 @@ import * as path from 'path';
 export class WebviewHelper {
 
     /**
-     * Read HTML template file
+     * Read HTML template file with support for external resources
      * @param extensionUri Extension root directory URI
      * @param templatePath Template file relative path
      * @param webview webview instance
-     * @returns HTML content
+     * @returns HTML content with resolved resource URIs
      */
     static getHtmlContent(extensionUri: vscode.Uri, templatePath: string, webview: vscode.Webview): string {
         const htmlPath = path.join(extensionUri.fsPath, templatePath);
@@ -17,8 +17,21 @@ export class WebviewHelper {
         try {
             let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
-            // Here we can do some template replacements, such as replacing resource paths
-            // For now, return the original content directly
+            // Check if template needs resource URI replacement (modular templates)
+            if (htmlContent.includes('{{styleUri}}') || htmlContent.includes('{{scriptUri}}')) {
+                // Create URIs for external resources
+                const styleUri = webview.asWebviewUri(
+                    vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'styles', 'semanticSearch.css')
+                );
+                const scriptUri = webview.asWebviewUri(
+                    vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'scripts', 'semanticSearch.js')
+                );
+
+                // Replace template placeholders
+                htmlContent = htmlContent
+                    .replace('{{styleUri}}', styleUri.toString())
+                    .replace('{{scriptUri}}', scriptUri.toString());
+            }
 
             return htmlContent;
         } catch (error) {

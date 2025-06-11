@@ -8,6 +8,13 @@ export class SearchCommand {
         this.codeIndexer = codeIndexer;
     }
 
+    /**
+     * Update the CodeIndexer instance (used when configuration changes)
+     */
+    updateCodeIndexer(codeIndexer: CodeIndexer): void {
+        this.codeIndexer = codeIndexer;
+    }
+
     async execute(): Promise<void> {
         const searchTerm = await vscode.window.showInputBox({
             placeHolder: 'Enter search term...',
@@ -141,6 +148,13 @@ export class SearchCommand {
             limit,
             0.3 // similarity threshold
         );
+    }
+
+    /**
+     * Check if index exists for the given codebase path
+     */
+    async hasIndex(codebasePath: string): Promise<boolean> {
+        return await this.codeIndexer.hasIndex(codebasePath);
     }
 
     /**

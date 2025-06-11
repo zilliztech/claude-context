@@ -8,6 +8,13 @@ export class IndexCommand {
         this.codeIndexer = codeIndexer;
     }
 
+    /**
+     * Update the CodeIndexer instance (used when configuration changes)
+     */
+    updateCodeIndexer(codeIndexer: CodeIndexer): void {
+        this.codeIndexer = codeIndexer;
+    }
+
     async execute(): Promise<void> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -53,17 +60,31 @@ export class IndexCommand {
                 title: 'Indexing Codebase',
                 cancellable: false
             }, async (progress) => {
-                progress.report({ increment: 0, message: 'Starting indexing process...' });
+                let lastPercentage = 0;
 
                 // Clear existing index first
-                await this.codeIndexer.clearIndex(selectedFolder.uri.fsPath);
-                progress.report({ increment: 10, message: 'Cleared existing index...' });
+                await this.codeIndexer.clearIndex(
+                    selectedFolder.uri.fsPath,
+                    (progressInfo) => {
+                        // Clear index progress is usually fast, just show the message
+                        progress.report({ increment: 0, message: progressInfo.phase });
+                    }
+                );
 
-                // Start indexing
-                indexStats = await this.codeIndexer.indexCodebase(selectedFolder.uri.fsPath);
-                progress.report({ increment: 90, message: 'Indexing complete!' });
+                // Start indexing with progress callback
+                indexStats = await this.codeIndexer.indexCodebase(
+                    selectedFolder.uri.fsPath,
+                    (progressInfo) => {
+                        // Calculate increment from last reported percentage
+                        const increment = progressInfo.percentage - lastPercentage;
+                        lastPercentage = progressInfo.percentage;
 
-                progress.report({ increment: 100, message: `Indexed ${indexStats.indexedFiles} files with ${indexStats.totalChunks} chunks` });
+                        progress.report({
+                            increment: increment,
+                            message: progressInfo.phase
+                        });
+                    }
+                );
             });
 
             if (indexStats) {
@@ -96,7 +117,22 @@ export class IndexCommand {
                 return;
             }
 
-            await this.codeIndexer.clearIndex(workspaceFolders[0].uri.fsPath);
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Clearing Index',
+                cancellable: false
+            }, async (progress) => {
+                await this.codeIndexer.clearIndex(
+                    workspaceFolders[0].uri.fsPath,
+                    (progressInfo) => {
+                        progress.report({
+                            increment: progressInfo.percentage,
+                            message: progressInfo.phase
+                        });
+                    }
+                );
+            });
+
             vscode.window.showInformationMessage('✅ Index cleared successfully');
         } catch (error) {
             console.error('Failed to clear index:', error);
@@ -104,9 +140,5 @@ export class IndexCommand {
         }
     }
 
-    getIndexStats(): void {
-        vscode.window.showInformationMessage(
-            `📊 Index Statistics:\n\nStatistics are only available after indexing. Please run "Index Current Codebase" first.`
-        );
-    }
+
 } 

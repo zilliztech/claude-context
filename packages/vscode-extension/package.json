@@ -31,11 +31,6 @@
                 "category": "CodeIndexer"
             },
             {
-                "command": "codeIndexer.search",
-                "title": "Search Code",
-                "category": "CodeIndexer"
-            },
-            {
                 "command": "codeIndexer.indexCodebase",
                 "title": "Index Codebase",
                 "category": "CodeIndexer"
@@ -46,8 +41,18 @@
                 "category": "CodeIndexer"
             },
             {
-                "command": "codeIndexer.indexStats",
-                "title": "Show Index Statistics",
+                "command": "codeIndexer.openSettings",
+                "title": "Open Settings",
+                "category": "CodeIndexer"
+            },
+            {
+                "command": "codeIndexer.refreshConfig",
+                "title": "Refresh Configuration",
+                "category": "CodeIndexer"
+            },
+            {
+                "command": "codeIndexer.focusSemanticSearchView",
+                "title": "Focus Semantic Search View",
                 "category": "CodeIndexer"
             }
         ],
@@ -56,11 +61,6 @@
                 "command": "codeIndexer.semanticSearch",
                 "key": "ctrl+shift+f",
                 "mac": "cmd+shift+f"
-            },
-            {
-                "command": "codeIndexer.search",
-                "key": "ctrl+shift+s",
-                "mac": "cmd+shift+s"
             },
             {
                 "command": "codeIndexer.indexCodebase",
@@ -94,11 +94,44 @@
                     "type": "webview"
                 }
             ]
+        },
+        "configuration": {
+            "title": "CodeIndexer",
+            "properties": {
+                "codeIndexer.embeddingProvider.provider": {
+                    "type": "string",
+                    "enum": [
+                        "OpenAI",
+                        "VoyageAI"
+                    ],
+                    "description": "Embedding service provider"
+                },
+                "codeIndexer.embeddingProvider.model": {
+                    "type": "string",
+                    "description": "Embedding model to use"
+                },
+                "codeIndexer.embeddingProvider.apiKey": {
+                    "type": "string",
+                    "description": "API key for the embedding provider"
+                },
+                "codeIndexer.embeddingProvider.baseURL": {
+                    "type": "string",
+                    "description": "Custom API endpoint URL (optional)"
+                },
+                "codeIndexer.milvus.address": {
+                    "type": "string",
+                    "description": "Milvus server address (e.g., http://localhost:19530)"
+                },
+                "codeIndexer.milvus.token": {
+                    "type": "string",
+                    "description": "Milvus authentication token (optional)"
+                }
+            }
         }
     },
     "scripts": {
         "vscode:prepublish": "pnpm run compile",
-        "compile": "tsc -p ./",
+        "compile": "tsc --build && node copy-assets.js",
         "watch": "tsc -watch -p ./",
         "clean": "rm -rf dist",
         "lint": "eslint src",

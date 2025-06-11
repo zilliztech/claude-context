@@ -2,13 +2,24 @@ import * as vscode from 'vscode';
 import { WebviewHelper } from './webviewHelper';
 import { SearchCommand } from '../commands/searchCommand';
 import { IndexCommand } from '../commands/indexCommand';
+import { ConfigManager, EmbeddingProviderConfig } from '../config/configManager';
 
 export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
     private searchCommand: SearchCommand;
     private indexCommand: IndexCommand;
+    private configManager: ConfigManager;
 
-    constructor(private readonly _extensionUri: vscode.Uri, searchCommand: SearchCommand, indexCommand: IndexCommand) {
+    constructor(private readonly _extensionUri: vscode.Uri, searchCommand: SearchCommand, indexCommand: IndexCommand, configManager: ConfigManager) {
+        this.searchCommand = searchCommand;
+        this.indexCommand = indexCommand;
+        this.configManager = configManager;
+    }
+
+    /**
+     * Update the command instances (used when configuration changes)
+     */
+    updateCommands(searchCommand: SearchCommand, indexCommand: IndexCommand): void {
         this.searchCommand = searchCommand;
         this.indexCommand = indexCommand;
     }
@@ -27,14 +38,36 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = WebviewHelper.getHtmlContent(
             this._extensionUri,
-            'src/webview/semanticSearch.html',
+            'src/webview/templates/semanticSearch.html',
             webviewView.webview
         );
+
+        // Check index status on load
+        this.checkIndexStatusAndUpdateWebview(webviewView.webview);
 
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(
             async message => {
                 switch (message.command) {
+                    case 'checkIndex':
+                        // Handle index status check
+                        await this.checkIndexStatusAndUpdateWebview(webviewView.webview);
+                        return;
+
+                    case 'getConfig':
+                        this.sendCurrentConfig(webviewView.webview);
+                        return;
+
+                    case 'saveConfig':
+                        await this.saveConfig(message.config, webviewView.webview);
+                        return;
+
+                    case 'testEmbedding':
+                        await this.testEmbedding(message.config, webviewView.webview);
+                        return;
+
+
+
                     case 'search':
                         try {
                             // Use search command
@@ -70,10 +103,12 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         // Handle index command
                         try {
                             await this.indexCommand.execute();
-                            // Notify webview that indexing is complete
+                            // Notify webview that indexing is complete and check index status
                             webviewView.webview.postMessage({
                                 command: 'indexComplete'
                             });
+                            // Update index status after completion
+                            await this.checkIndexStatusAndUpdateWebview(webviewView.webview);
                         } catch (error) {
                             console.error('Indexing error:', error);
                             // Still notify webview to reset button state
@@ -157,4 +192,107 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             };
         });
     }
+
+    /**
+     * Check index status and update webview accordingly
+     */
+    private async checkIndexStatusAndUpdateWebview(webview: vscode.Webview): Promise<void> {
+        try {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                webview.postMessage({
+                    command: 'updateIndexStatus',
+                    hasIndex: false
+                });
+                return;
+            }
+
+            const codebasePath = workspaceFolders[0].uri.fsPath;
+            const hasIndex = await this.searchCommand.hasIndex(codebasePath);
+
+            webview.postMessage({
+                command: 'updateIndexStatus',
+                hasIndex: hasIndex
+            });
+        } catch (error) {
+            console.error('Failed to check index status:', error);
+            webview.postMessage({
+                command: 'updateIndexStatus',
+                hasIndex: false
+            });
+        }
+    }
+
+    private sendCurrentConfig(webview: vscode.Webview) {
+        const config = this.configManager.getEmbeddingProviderConfig();
+        const milvusConfig = this.configManager.getMilvusConfig();
+        const supportedProviders = ConfigManager.getSupportedProviders();
+
+        webview.postMessage({
+            command: 'configData',
+            config: config,
+            milvusConfig: milvusConfig,
+            supportedProviders: supportedProviders
+        });
+    }
+
+    private async saveConfig(configData: any, webview: vscode.Webview) {
+        try {
+            // Save embedding provider config
+            const embeddingConfig: EmbeddingProviderConfig = {
+                provider: configData.provider,
+                config: configData.config
+            };
+            await this.configManager.saveEmbeddingProviderConfig(embeddingConfig);
+
+            // Save Milvus config
+            if (configData.milvusConfig) {
+                await this.configManager.saveMilvusConfig(configData.milvusConfig);
+            }
+
+            this.configManager.markFirstLaunchComplete();
+
+            // Add a small delay to ensure configuration is fully saved
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Notify extension to recreate CodeIndexer with new config
+            vscode.commands.executeCommand('codeIndexer.refreshConfig');
+
+            webview.postMessage({
+                command: 'saveResult',
+                success: true,
+                message: 'Configuration saved successfully!'
+            });
+
+            vscode.window.showInformationMessage('CodeIndexer configuration saved successfully!');
+        } catch (error) {
+            webview.postMessage({
+                command: 'saveResult',
+                success: false,
+                message: `Save failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            });
+        }
+    }
+
+    private async testEmbedding(embeddingConfig: any, webview: vscode.Webview) {
+        try {
+            // Test only embedding connection
+            const embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
+            await embedding.embed('test embedding connection');
+
+            webview.postMessage({
+                command: 'testResult',
+                success: true,
+                message: 'Embedding connection test successful!'
+            });
+        } catch (error) {
+            webview.postMessage({
+                command: 'testResult',
+                success: false,
+                message: `Embedding connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            });
+        }
+    }
+
+
 } 

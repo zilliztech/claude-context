@@ -6,7 +6,7 @@ import {
 import {
     Embedding,
     EmbeddingVector,
-    OpenAIEmbeddingService
+    OpenAIEmbedding
 } from './embedding';
 import {
     VectorDatabase,
@@ -20,7 +20,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 
 export interface CodeIndexerConfig {
-    embeddingService?: Embedding;
+    embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
     codeSplitter?: CodeSplitter;
     chunkSize?: number;
@@ -31,14 +31,14 @@ export interface CodeIndexerConfig {
 
 
 export class CodeIndexer {
-    private embeddingService: Embedding;
+    private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: CodeSplitter;
     private supportedExtensions: string[];
 
     constructor(config: CodeIndexerConfig = {}) {
         // Initialize services
-        this.embeddingService = config.embeddingService || new OpenAIEmbeddingService({
+        this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
             model: 'text-embedding-3-small'
         });
@@ -72,32 +72,66 @@ export class CodeIndexer {
     /**
      * Index entire codebase
      * @param codebasePath Codebase path
+     * @param progressCallback Optional progress callback function
      * @returns Indexing statistics
      */
-    async indexCodebase(codebasePath: string): Promise<{ indexedFiles: number; totalChunks: number }> {
+    async indexCodebase(
+        codebasePath: string,
+        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
+    ): Promise<{ indexedFiles: number; totalChunks: number }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
 
         // 1. Check and prepare vector collection
+        progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
         await this.prepareCollection(codebasePath);
 
         // 2. Recursively traverse codebase to get all supported files
+        progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
         const codeFiles = await this.getCodeFiles(codebasePath);
         console.log(`📁 Found ${codeFiles.length} code files`);
+
+        if (codeFiles.length === 0) {
+            progressCallback?.({ phase: 'No files to index', current: 100, total: 100, percentage: 100 });
+            return { indexedFiles: 0, totalChunks: 0 };
+        }
 
         // 3. Process each file
         const indexedFiles = new Set<string>();
         let totalChunks = 0;
         const batchSize = 10; // Batch processing to avoid excessive memory usage
 
+        // Reserve 10% for preparation, 90% for actual indexing
+        const indexingStartPercentage = 10;
+        const indexingEndPercentage = 100;
+        const indexingRange = indexingEndPercentage - indexingStartPercentage;
+
         for (let i = 0; i < codeFiles.length; i += batchSize) {
             const batch = codeFiles.slice(i, i + batchSize);
             const batchStats = await this.processBatch(batch, codebasePath);
             batchStats.processedFiles.forEach(file => indexedFiles.add(file));
             totalChunks += batchStats.chunksGenerated;
-            console.log(`📊 Processed ${indexedFiles.size}/${codeFiles.length} files`);
+
+            // Calculate progress percentage
+            const filesProcessed = indexedFiles.size;
+            const progressPercentage = indexingStartPercentage + (filesProcessed / codeFiles.length) * indexingRange;
+
+            console.log(`📊 Processed ${filesProcessed}/${codeFiles.length} files`);
+            progressCallback?.({
+                phase: `Processing files (${filesProcessed}/${codeFiles.length})...`,
+                current: filesProcessed,
+                total: codeFiles.length,
+                percentage: Math.round(progressPercentage)
+            });
         }
 
         console.log(`✅ Codebase indexing completed! Processed ${indexedFiles.size} files in total, generated ${totalChunks} code chunks`);
+
+        progressCallback?.({
+            phase: 'Indexing complete!',
+            current: indexedFiles.size,
+            total: codeFiles.length,
+            percentage: 100
+        });
 
         return {
             indexedFiles: indexedFiles.size,
@@ -116,7 +150,7 @@ export class CodeIndexer {
         console.log(`🔍 Executing semantic search: "${query}" in ${codebasePath}`);
 
         // 1. Generate query vector
-        const queryEmbedding: EmbeddingVector = await this.embeddingService.embed(query);
+        const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
 
         // 2. Search in vector database
         const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
@@ -140,18 +174,38 @@ export class CodeIndexer {
     }
 
     /**
+     * Check if index exists for codebase
+     * @param codebasePath Codebase path to check
+     * @returns Whether index exists
+     */
+    async hasIndex(codebasePath: string): Promise<boolean> {
+        const collectionName = this.getCollectionName(codebasePath);
+        return await this.vectorDatabase.hasCollection(collectionName);
+    }
+
+    /**
      * Clear index
      * @param codebasePath Codebase path to clear index for
+     * @param progressCallback Optional progress callback function
      */
-    async clearIndex(codebasePath: string): Promise<void> {
+    async clearIndex(
+        codebasePath: string,
+        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
+    ): Promise<void> {
         console.log(`🧹 Cleaning index data for ${codebasePath}...`);
+
+        progressCallback?.({ phase: 'Checking existing index...', current: 0, total: 100, percentage: 0 });
 
         const collectionName = this.getCollectionName(codebasePath);
         const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
+
+        progressCallback?.({ phase: 'Removing index data...', current: 50, total: 100, percentage: 50 });
+
         if (collectionExists) {
             await this.vectorDatabase.dropCollection(collectionName);
         }
 
+        progressCallback?.({ phase: 'Index cleared', current: 100, total: 100, percentage: 100 });
         console.log('✅ Index data cleaned');
     }
 
@@ -161,8 +215,8 @@ export class CodeIndexer {
     private async prepareCollection(codebasePath: string): Promise<void> {
         // Create new collection
         const collectionName = this.getCollectionName(codebasePath);
-        const dimension = this.embeddingService.getDimension();
-        await this.vectorDatabase.createCollection(collectionName, dimension, 'Code chunk vector storage collection');
+        const dimension = this.embedding.getDimension();
+        await this.vectorDatabase.createCollection(collectionName, dimension, `Code chunk vector storage collection for codebase: ${codebasePath}`);
         console.log(`✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
     }
 
@@ -235,7 +289,7 @@ export class CodeIndexer {
 
         // 2. Generate embedding vectors
         const chunkContents = allChunks.map(chunk => chunk.content);
-        const embeddings: EmbeddingVector[] = await this.embeddingService.embedBatch(chunkContents);
+        const embeddings: EmbeddingVector[] = await this.embedding.embedBatch(chunkContents);
 
         // 3. Prepare vector documents
         const documents: VectorDocument[] = allChunks.map((chunk, index) => ({
@@ -288,7 +342,7 @@ export class CodeIndexer {
      * Generate unique ID
      */
     private generateId(): string {
-        return `chunk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return `chunk_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     }
 }
 
