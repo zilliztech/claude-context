@@ -39,33 +39,6 @@
                 "command": "codeIndexer.clearIndex",
                 "title": "Clear Index",
                 "category": "CodeIndexer"
-            },
-            {
-                "command": "codeIndexer.openSettings",
-                "title": "Open Settings",
-                "category": "CodeIndexer"
-            },
-            {
-                "command": "codeIndexer.refreshConfig",
-                "title": "Refresh Configuration",
-                "category": "CodeIndexer"
-            },
-            {
-                "command": "codeIndexer.focusSemanticSearchView",
-                "title": "Focus Semantic Search View",
-                "category": "CodeIndexer"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "codeIndexer.semanticSearch",
-                "key": "ctrl+shift+f",
-                "mac": "cmd+shift+f"
-            },
-            {
-                "command": "codeIndexer.indexCodebase",
-                "key": "ctrl+shift+i",
-                "mac": "cmd+shift+i"
             }
         ],
         "menus": {

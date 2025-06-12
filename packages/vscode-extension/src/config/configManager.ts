@@ -21,7 +21,14 @@ export interface PluginConfig {
     isFirstLaunch: boolean;
 }
 
-type FieldDefinition = { name: string; type: string; description: string };
+type FieldDefinition = {
+    name: string;
+    type: string;
+    description: string;
+    inputType?: 'text' | 'password' | 'url' | 'select';
+    placeholder?: string;
+    required?: boolean;
+};
 
 // Unified provider configuration
 const PROVIDERS = {
@@ -29,11 +36,11 @@ const PROVIDERS = {
         name: 'OpenAI',
         class: OpenAIEmbedding,
         requiredFields: [
-            { name: 'model', type: 'string', description: 'Model name to use' },
-            { name: 'apiKey', type: 'string', description: 'OpenAI API key' }
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select', required: true },
+            { name: 'apiKey', type: 'string', description: 'OpenAI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [
-            { name: 'baseURL', type: 'string', description: 'Custom API endpoint URL (optional)' }
+            { name: 'baseURL', type: 'string', description: 'Custom API endpoint URL (optional)', inputType: 'url', placeholder: 'https://api.openai.com/v1' }
         ] as FieldDefinition[],
         defaultConfig: {
             model: 'text-embedding-3-small'
@@ -43,8 +50,8 @@ const PROVIDERS = {
         name: 'VoyageAI',
         class: VoyageAIEmbedding,
         requiredFields: [
-            { name: 'model', type: 'string', description: 'Model name to use' },
-            { name: 'apiKey', type: 'string', description: 'VoyageAI API key' }
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select', required: true },
+            { name: 'apiKey', type: 'string', description: 'VoyageAI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [] as FieldDefinition[],
         defaultConfig: {

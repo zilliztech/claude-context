@@ -13,7 +13,7 @@
     <div id="searchView" class="view">
         <div class="search-container">
             <div class="header-section">
-                <h3>Semantic Code Search</h3>
+                <h3>🔍 Semantic Code Search</h3>
                 <button id="settingsButton" class="settings-button" title="Settings">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="1.5">
@@ -43,7 +43,7 @@
         <div class="container">
             <div class="header">
                 <div class="header-section">
-                    <h2>CodeIndexer Settings</h2>
+                    <h2>⚙️ Settings</h2>
                     <button id="backButton" class="settings-button" title="Back to Search">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5">
@@ -51,10 +51,11 @@
                         </svg>
                     </button>
                 </div>
-                <p class="subtitle">Configure your embedding provider to get started</p>
             </div>
 
             <form id="configForm">
+                <h3>Embedding Configuration</h3>
+
                 <div class="form-group">
                     <label for="provider">Embedding Provider</label>
                     <select id="provider" required>
@@ -62,22 +63,8 @@
                     </select>
                 </div>
 
-                <div class="form-group" id="modelGroup" style="display: none;">
-                    <label for="model">Model</label>
-                    <select id="model" required>
-                        <option value="">Please select...</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="apiKeyGroup" style="display: none;">
-                    <label for="apiKey">API Key</label>
-                    <input type="password" id="apiKey" required>
-                </div>
-
-                <div class="form-group" id="baseUrlGroup" style="display: none;">
-                    <label for="baseUrl">Base URL (optional)</label>
-                    <input type="url" id="baseUrl" placeholder="https://api.openai.com/v1">
-                </div>
+                <!-- Dynamic form fields will be inserted here -->
+                <div id="dynamicFields"></div>
 
                 <div class="button-group">
                     <button type="button" id="testBtn" class="secondary-btn" disabled>Test Embedding</button>
@@ -86,7 +73,6 @@
                 <div class="form-separator"></div>
 
                 <h3>Vector Database Configuration</h3>
-                <p class="subtitle">Configure your Milvus vector database connection</p>
 
                 <div class="form-group">
                     <label for="milvusAddress">Milvus Address</label>
