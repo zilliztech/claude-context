@@ -7,7 +7,13 @@ class SemanticSearchController {
         this.vscode = acquireVsCodeApi();
         this.initializeElements();
         this.bindEvents();
+        this.initializeDefaultProviders(); // Ensure providers are available
         this.checkIndexStatus();
+
+        // Request config immediately to get proper provider data
+        setTimeout(() => {
+            this.requestConfig();
+        }, 100);
     }
 
     /**
@@ -30,23 +36,18 @@ class SemanticSearchController {
 
         // Settings elements
         this.providerSelect = document.getElementById('provider');
-        this.modelSelect = document.getElementById('model');
-        this.apiKeyInput = document.getElementById('apiKey');
-        this.baseUrlInput = document.getElementById('baseUrl');
+        this.dynamicFields = document.getElementById('dynamicFields');
         this.milvusAddressInput = document.getElementById('milvusAddress');
         this.milvusTokenInput = document.getElementById('milvusToken');
         this.testBtn = document.getElementById('testBtn');
         this.saveBtn = document.getElementById('saveBtn');
         this.statusDiv = document.getElementById('status');
-        this.modelGroup = document.getElementById('modelGroup');
-        this.apiKeyGroup = document.getElementById('apiKeyGroup');
-        this.baseUrlGroup = document.getElementById('baseUrlGroup');
-        // this.modelDescription = document.getElementById('modelDescription'); // Removed
         this.configForm = document.getElementById('configForm');
 
         // Current config state
         this.currentConfig = null;
         this.supportedProviders = {};
+        this.dynamicFieldElements = new Map(); // Store dynamic field elements
     }
 
     /**
@@ -66,8 +67,6 @@ class SemanticSearchController {
 
         // Settings event listeners
         this.providerSelect.addEventListener('change', () => this.handleProviderChange());
-        this.modelSelect.addEventListener('change', () => this.handleModelChange());
-        this.apiKeyInput.addEventListener('input', () => this.validateForm());
         this.milvusAddressInput.addEventListener('input', () => this.validateForm());
         this.milvusTokenInput.addEventListener('input', () => this.validateForm());
         this.testBtn.addEventListener('click', () => this.handleTestConnection());
@@ -119,6 +118,9 @@ class SemanticSearchController {
     showSettingsView() {
         this.searchView.style.display = 'none';
         this.settingsView.style.display = 'block';
+
+        // Add default providers if not already loaded
+        this.initializeDefaultProviders();
         this.requestConfig();
     }
 
@@ -137,6 +139,30 @@ class SemanticSearchController {
         this.vscode.postMessage({
             command: 'getConfig'
         });
+    }
+
+    /**
+ * Initialize default providers to ensure they show up even if config loading fails
+ */
+    initializeDefaultProviders() {
+        // Only initialize if providers haven't been loaded yet
+        if (this.providerSelect.children.length <= 1) {
+            // Clear existing options and add placeholder
+            this.providerSelect.innerHTML = '<option value="">Please select...</option>';
+
+            // Add basic provider options (models will be loaded from backend)
+            const defaultProviders = [
+                { value: 'OpenAI', text: 'OpenAI' },
+                { value: 'VoyageAI', text: 'VoyageAI' }
+            ];
+
+            defaultProviders.forEach(provider => {
+                const option = document.createElement('option');
+                option.value = provider.value;
+                option.textContent = provider.text;
+                this.providerSelect.appendChild(option);
+            });
+        }
     }
 
     /**
@@ -262,86 +288,200 @@ class SemanticSearchController {
     handleProviderChange() {
         const selectedProvider = this.providerSelect.value;
 
-        if (selectedProvider && this.supportedProviders[selectedProvider]) {
-            this.modelGroup.style.display = 'block';
-            this.populateModels(selectedProvider);
-            this.apiKeyGroup.style.display = 'block';
-            this.baseUrlGroup.style.display = 'block';
+        // Clear existing dynamic fields
+        this.clearDynamicFields();
 
-            if (selectedProvider === 'OpenAI') {
-                this.baseUrlInput.placeholder = 'https://api.openai.com/v1';
-            } else if (selectedProvider === 'VoyageAI') {
-                this.baseUrlInput.placeholder = 'https://api.voyageai.com/v1';
-            }
-        } else {
-            this.modelGroup.style.display = 'none';
-            this.apiKeyGroup.style.display = 'none';
-            this.baseUrlGroup.style.display = 'none';
+        if (selectedProvider && this.supportedProviders[selectedProvider]) {
+            this.generateDynamicFields(selectedProvider);
+        } else if (selectedProvider) {
+            // If we have a selected provider but no supportedProviders data, request config
+            this.requestConfig();
         }
 
         this.validateForm();
     }
 
-    populateModels(provider) {
-        const models = this.supportedProviders[provider]?.models || {};
 
-        this.modelSelect.innerHTML = '<option value="">Please select...</option>';
 
-        Object.entries(models).forEach(([modelId, modelInfo]) => {
-            const option = document.createElement('option');
-            option.value = modelId;
-            option.textContent = modelId;
-            this.modelSelect.appendChild(option);
+    /**
+     * Clear all dynamic form fields
+     */
+    clearDynamicFields() {
+        this.dynamicFields.innerHTML = '';
+        this.dynamicFieldElements.clear();
+    }
+
+    /**
+     * Generate dynamic form fields based on provider configuration
+     */
+    generateDynamicFields(provider) {
+        const providerInfo = this.supportedProviders[provider];
+
+        if (!providerInfo) {
+            return;
+        }
+
+        const requiredFields = providerInfo.requiredFields || [];
+        const optionalFields = providerInfo.optionalFields || [];
+        const allFields = [...requiredFields, ...optionalFields];
+
+        if (allFields.length === 0) {
+            return;
+        }
+
+        allFields.forEach((field) => {
+            try {
+                const fieldElement = this.createFormField(field, providerInfo);
+                this.dynamicFields.appendChild(fieldElement.container);
+                this.dynamicFieldElements.set(field.name, fieldElement);
+
+                // Add event listeners
+                if (fieldElement.input) {
+                    fieldElement.input.addEventListener('input', () => this.validateForm());
+                    fieldElement.input.addEventListener('change', () => this.validateForm());
+                }
+            } catch (error) {
+                console.error(`Failed to create field ${field.name}:`, error);
+            }
         });
 
-        if (this.currentConfig && this.currentConfig.provider === provider && this.currentConfig.config) {
-            this.modelSelect.value = this.currentConfig.config.model;
-            this.handleModelChange();
-        }
+        // Load current values if available
+        this.loadCurrentValues(provider);
     }
 
-    handleModelChange() {
-        this.validateForm();
+    /**
+     * Create a form field element based on field definition
+     */
+    createFormField(field, providerInfo) {
+        const container = document.createElement('div');
+        container.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.textContent = field.description;
+        label.setAttribute('for', field.name);
+        container.appendChild(label);
+
+        let input;
+
+        if (field.name === 'model') {
+            // Special handling for model field - create select
+            input = document.createElement('select');
+            input.id = field.name;
+            input.required = field.required || false;
+
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Please select...';
+            input.appendChild(defaultOption);
+
+            // Populate with models
+            const models = providerInfo.models || {};
+            Object.entries(models).forEach(([modelId, modelInfo]) => {
+                const option = document.createElement('option');
+                option.value = modelId;
+                option.textContent = modelId;
+
+                // Keep description as tooltip if available
+                if (modelInfo && modelInfo.description) {
+                    option.title = modelInfo.description;
+                }
+
+                input.appendChild(option);
+            });
+        } else {
+            // Create input based on inputType
+            input = document.createElement('input');
+            input.id = field.name;
+            input.required = field.required || false;
+
+            switch (field.inputType) {
+                case 'password':
+                    input.type = 'password';
+                    break;
+                case 'url':
+                    input.type = 'url';
+                    break;
+                case 'text':
+                default:
+                    input.type = 'text';
+                    break;
+            }
+
+            if (field.placeholder) {
+                input.placeholder = field.placeholder;
+            }
+        }
+
+        container.appendChild(input);
+
+        return {
+            container,
+            input,
+            field
+        };
+    }
+
+    /**
+     * Load current values into dynamic fields
+     */
+    loadCurrentValues(provider) {
+        if (this.currentConfig && this.currentConfig.provider === provider && this.currentConfig.config) {
+            this.dynamicFieldElements.forEach((fieldElement, fieldName) => {
+                const value = this.currentConfig.config[fieldName];
+                if (value !== undefined && fieldElement.input) {
+                    fieldElement.input.value = value;
+                }
+            });
+        }
     }
 
     validateForm() {
         const hasProvider = !!this.providerSelect.value;
-        const hasModel = !!this.modelSelect.value;
-        const hasApiKey = !!this.apiKeyInput.value.trim();
         const hasMilvusAddress = !!this.milvusAddressInput.value.trim();
 
+        // Check all required dynamic fields
+        let hasAllRequiredFields = true;
+        if (hasProvider && this.supportedProviders[this.providerSelect.value]) {
+            const providerInfo = this.supportedProviders[this.providerSelect.value];
+            for (const field of providerInfo.requiredFields) {
+                const fieldElement = this.dynamicFieldElements.get(field.name);
+                if (!fieldElement || !fieldElement.input.value.trim()) {
+                    hasAllRequiredFields = false;
+                    break;
+                }
+            }
+        } else {
+            hasAllRequiredFields = false;
+        }
+
         // Test button only needs embedding config
-        const canTestEmbedding = hasProvider && hasModel && hasApiKey;
+        const canTestEmbedding = hasProvider && hasAllRequiredFields;
         // Save button needs all config
-        const canSave = hasProvider && hasModel && hasApiKey && hasMilvusAddress;
+        const canSave = hasProvider && hasAllRequiredFields && hasMilvusAddress;
 
         this.testBtn.disabled = !canTestEmbedding;
         this.saveBtn.disabled = !canSave;
     }
 
     handleTestConnection() {
-        const hasProvider = !!this.providerSelect.value;
-        const hasModel = !!this.modelSelect.value;
-        const hasApiKey = !!this.apiKeyInput.value.trim();
+        const provider = this.providerSelect.value;
+        if (!provider) {
+            this.showStatus('Please select a provider first', 'error');
+            return;
+        }
 
-        if (!hasProvider || !hasModel || !hasApiKey) {
-            this.showStatus('Please complete Embedding configuration first', 'error');
+        // Collect config from dynamic fields
+        const config = this.collectDynamicFieldValues();
+        if (!config) {
+            this.showStatus('Please complete all required fields', 'error');
             return;
         }
 
         const embeddingConfig = {
-            provider: this.providerSelect.value,
-            config: {
-                model: this.modelSelect.value,
-                apiKey: this.apiKeyInput.value.trim()
-            }
+            provider: provider,
+            config: config
         };
-
-        // Add baseURL if provided
-        const baseURL = this.baseUrlInput.value.trim();
-        if (baseURL) {
-            embeddingConfig.config.baseURL = baseURL;
-        }
 
         this.showStatus('Testing Embedding connection...', 'info');
         this.testBtn.disabled = true;
@@ -351,6 +491,38 @@ class SemanticSearchController {
             command: 'testEmbedding',
             config: embeddingConfig
         });
+    }
+
+    /**
+     * Collect values from all dynamic fields
+     */
+    collectDynamicFieldValues() {
+        const provider = this.providerSelect.value;
+        if (!provider || !this.supportedProviders[provider]) {
+            return null;
+        }
+
+        const config = {};
+        const providerInfo = this.supportedProviders[provider];
+
+        // Check required fields
+        for (const field of providerInfo.requiredFields) {
+            const fieldElement = this.dynamicFieldElements.get(field.name);
+            if (!fieldElement || !fieldElement.input.value.trim()) {
+                return null; // Missing required field
+            }
+            config[field.name] = fieldElement.input.value.trim();
+        }
+
+        // Add optional fields if they have values
+        for (const field of providerInfo.optionalFields) {
+            const fieldElement = this.dynamicFieldElements.get(field.name);
+            if (fieldElement && fieldElement.input.value.trim()) {
+                config[field.name] = fieldElement.input.value.trim();
+            }
+        }
+
+        return config;
     }
 
     handleFormSubmit(event) {
@@ -371,15 +543,10 @@ class SemanticSearchController {
 
     getCurrentFormConfig() {
         const provider = this.providerSelect.value;
-        const configData = {
-            model: this.modelSelect.value,
-            apiKey: this.apiKeyInput.value.trim()
-        };
+        const configData = this.collectDynamicFieldValues();
 
-        // Only add baseURL if it's provided and not empty
-        const baseURL = this.baseUrlInput.value.trim();
-        if (baseURL) {
-            configData.baseURL = baseURL;
+        if (!configData) {
+            return null;
         }
 
         const milvusConfig = {
@@ -402,18 +569,13 @@ class SemanticSearchController {
     validateCurrentForm() {
         const config = this.getCurrentFormConfig();
 
+        if (!config) {
+            this.showStatus('Please complete all required fields', 'error');
+            return false;
+        }
+
         if (!config.provider) {
             this.showStatus('Please select Embedding Provider', 'error');
-            return false;
-        }
-
-        if (!config.config || !config.config.model) {
-            this.showStatus('Please select a model', 'error');
-            return false;
-        }
-
-        if (!config.config.apiKey) {
-            this.showStatus('Please enter API Key', 'error');
             return false;
         }
 
@@ -439,30 +601,27 @@ class SemanticSearchController {
 
     loadConfig(config, providers, milvusConfig) {
         this.currentConfig = config;
-        this.supportedProviders = providers;
 
-        this.providerSelect.innerHTML = '<option value="">Please select...</option>';
-        Object.entries(providers).forEach(([providerId, providerInfo]) => {
-            const option = document.createElement('option');
-            option.value = providerId;
-            option.textContent = providerInfo.name;
-            this.providerSelect.appendChild(option);
-        });
+        // Only update providers if we actually received them from backend
+        if (providers && Object.keys(providers).length > 0) {
+            this.supportedProviders = providers;
+
+            // Update provider select with backend data
+            this.providerSelect.innerHTML = '<option value="">Please select...</option>';
+            Object.entries(providers).forEach(([providerId, providerInfo]) => {
+                const option = document.createElement('option');
+                option.value = providerId;
+                option.textContent = providerInfo.name;
+                this.providerSelect.appendChild(option);
+            });
+        } else {
+            // Request config again if we don't have provider data
+            setTimeout(() => this.requestConfig(), 100);
+        }
 
         if (config) {
             this.providerSelect.value = config.provider;
             this.handleProviderChange();
-
-            setTimeout(() => {
-                if (config.config) {
-                    this.modelSelect.value = config.config.model;
-                    this.apiKeyInput.value = config.config.apiKey;
-                    if (config.config.baseURL) {
-                        this.baseUrlInput.value = config.config.baseURL;
-                    }
-                }
-                this.handleModelChange();
-            }, 50);
         }
 
         // Load Milvus config

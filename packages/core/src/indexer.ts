@@ -26,15 +26,15 @@ export interface CodeIndexerConfig {
     chunkSize?: number;
     chunkOverlap?: number;
     supportedExtensions?: string[];
+    ignorePatterns?: string[];
 }
-
-
 
 export class CodeIndexer {
     private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: CodeSplitter;
     private supportedExtensions: string[];
+    private ignorePatterns: string[];
 
     constructor(config: CodeIndexerConfig = {}) {
         // Initialize services
@@ -52,12 +52,12 @@ export class CodeIndexer {
             config.chunkOverlap || 200
         );
 
-
-
         this.supportedExtensions = config.supportedExtensions || [
             '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
             '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm'
         ];
+
+        this.ignorePatterns = config.ignorePatterns || [];
     }
 
     /**
@@ -210,6 +210,33 @@ export class CodeIndexer {
     }
 
     /**
+     * Update ignore patterns
+     * @param ignorePatterns Array of ignore patterns
+     */
+    updateIgnorePatterns(ignorePatterns: string[]): void {
+        this.ignorePatterns = [...ignorePatterns];
+        console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} patterns loaded`);
+    }
+
+    /**
+     * Update embedding instance
+     * @param embedding New embedding instance
+     */
+    updateEmbedding(embedding: Embedding): void {
+        this.embedding = embedding;
+        console.log(`🔄 Updated embedding provider: ${embedding.getProvider()}`);
+    }
+
+    /**
+     * Update vector database instance
+     * @param vectorDatabase New vector database instance
+     */
+    updateVectorDatabase(vectorDatabase: VectorDatabase): void {
+        this.vectorDatabase = vectorDatabase;
+        console.log(`🔄 Updated vector database`);
+    }
+
+    /**
      * Prepare vector collection
      */
     private async prepareCollection(codebasePath: string): Promise<void> {
@@ -231,6 +258,11 @@ export class CodeIndexer {
 
             for (const entry of entries) {
                 const fullPath = path.join(currentPath, entry.name);
+
+                // Check if path matches ignore patterns
+                if (this.matchesIgnorePattern(fullPath, codebasePath)) {
+                    continue;
+                }
 
                 if (entry.isDirectory()) {
                     // Skip common ignored directories
@@ -343,6 +375,88 @@ export class CodeIndexer {
      */
     private generateId(): string {
         return `chunk_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    }
+
+    /**
+     * Read ignore patterns from file (e.g., .gitignore)
+     * @param filePath Path to the ignore file
+     * @returns Array of ignore patterns
+     */
+    static async getIgnorePatternsFromFile(filePath: string): Promise<string[]> {
+        try {
+            const content = await fs.promises.readFile(filePath, 'utf-8');
+            return content
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#')); // Filter out empty lines and comments
+        } catch (error) {
+            console.warn(`⚠️  Could not read ignore file ${filePath}: ${error}`);
+            return [];
+        }
+    }
+
+    /**
+     * Check if a path matches any ignore pattern
+     * @param filePath Path to check
+     * @param basePath Base path for relative pattern matching
+     * @returns True if path should be ignored
+     */
+    private matchesIgnorePattern(filePath: string, basePath: string): boolean {
+        if (this.ignorePatterns.length === 0) {
+            return false;
+        }
+
+        const relativePath = path.relative(basePath, filePath);
+        const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
+
+        for (const pattern of this.ignorePatterns) {
+            if (this.isPatternMatch(normalizedPath, pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Simple glob pattern matching
+     * @param filePath File path to test
+     * @param pattern Glob pattern
+     * @returns True if pattern matches
+     */
+    private isPatternMatch(filePath: string, pattern: string): boolean {
+        // Handle directory patterns (ending with /)
+        if (pattern.endsWith('/')) {
+            const dirPattern = pattern.slice(0, -1);
+            const pathParts = filePath.split('/');
+            return pathParts.some(part => this.simpleGlobMatch(part, dirPattern));
+        }
+
+        // Handle file patterns
+        if (pattern.includes('/')) {
+            // Pattern with path separator - match exact path
+            return this.simpleGlobMatch(filePath, pattern);
+        } else {
+            // Pattern without path separator - match filename in any directory
+            const fileName = path.basename(filePath);
+            return this.simpleGlobMatch(fileName, pattern);
+        }
+    }
+
+    /**
+     * Simple glob matching supporting * wildcard
+     * @param text Text to test
+     * @param pattern Pattern with * wildcards
+     * @returns True if pattern matches
+     */
+    private simpleGlobMatch(text: string, pattern: string): boolean {
+        // Convert glob pattern to regex
+        const regexPattern = pattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
+            .replace(/\*/g, '.*'); // Convert * to .*
+
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(text);
     }
 }
 

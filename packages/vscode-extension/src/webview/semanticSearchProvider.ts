@@ -45,6 +45,9 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
         // Check index status on load
         this.checkIndexStatusAndUpdateWebview(webviewView.webview);
 
+        // Send initial configuration data to webview
+        this.sendCurrentConfig(webviewView.webview);
+
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(
             async message => {
@@ -256,7 +259,7 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Notify extension to recreate CodeIndexer with new config
-            vscode.commands.executeCommand('codeIndexer.refreshConfig');
+            vscode.commands.executeCommand('codeIndexer.reloadConfiguration');
 
             webview.postMessage({
                 command: 'saveResult',

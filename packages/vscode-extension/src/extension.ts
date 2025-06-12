@@ -45,24 +45,20 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('codeIndexer.embeddingProvider') ||
                 event.affectsConfiguration('codeIndexer.milvus')) {
-                console.log('CodeIndexer configuration changed, refreshing...');
-                refreshCodeIndexerConfig();
+                console.log('CodeIndexer configuration changed, reloading...');
+                reloadCodeIndexerConfiguration();
             }
         }),
 
         // Register commands
-        vscode.commands.registerCommand('codeIndexer.semanticSearch', () => searchCommand.execute()),
+        vscode.commands.registerCommand('codeIndexer.semanticSearch', () => {
+            // Get selected text from active editor
+            const editor = vscode.window.activeTextEditor;
+            const selectedText = editor?.document.getText(editor.selection);
+            return searchCommand.execute(selectedText);
+        }),
         vscode.commands.registerCommand('codeIndexer.indexCodebase', () => indexCommand.execute()),
-        vscode.commands.registerCommand('codeIndexer.clearIndex', () => indexCommand.clearIndex()),
-        vscode.commands.registerCommand('codeIndexer.openSettings', () => {
-            vscode.commands.executeCommand('codeIndexer.focusSemanticSearchView');
-        }),
-        vscode.commands.registerCommand('codeIndexer.refreshConfig', () => {
-            refreshCodeIndexerConfig();
-        }),
-        vscode.commands.registerCommand('codeIndexer.focusSemanticSearchView', () => {
-            vscode.commands.executeCommand('workbench.view.extension.codeIndexerSidebar');
-        })
+        vscode.commands.registerCommand('codeIndexer.clearIndex', () => indexCommand.clearIndex())
     ];
 
     context.subscriptions.push(...disposables);
@@ -113,21 +109,33 @@ function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer 
     }
 }
 
-function refreshCodeIndexerConfig() {
-    console.log('Refreshing CodeIndexer configuration...');
+function reloadCodeIndexerConfiguration() {
+    console.log('Reloading CodeIndexer configuration...');
 
-    // Recreate CodeIndexer with new config
-    codeIndexer = createCodeIndexerWithConfig(configManager);
+    const embeddingConfig = configManager.getEmbeddingProviderConfig();
+    const milvusConfig = configManager.getMilvusFullConfig();
 
-    // Update commands with new CodeIndexer instance
-    searchCommand.updateCodeIndexer(codeIndexer);
-    indexCommand.updateCodeIndexer(codeIndexer);
+    try {
+        // Update embedding if configuration exists
+        if (embeddingConfig) {
+            const embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
+            codeIndexer.updateEmbedding(embedding);
+            console.log(`Embedding updated with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
+        }
 
-    // Update the semantic search provider with new commands
-    semanticSearchProvider.updateCommands(searchCommand, indexCommand);
+        // Update vector database if configuration exists
+        if (milvusConfig) {
+            const vectorDatabase = new MilvusVectorDatabase(milvusConfig);
+            codeIndexer.updateVectorDatabase(vectorDatabase);
+            console.log(`Vector database updated with Milvus (address: ${milvusConfig.address})`);
+        }
 
-    console.log('CodeIndexer configuration refreshed successfully');
-    vscode.window.showInformationMessage('Embedding configuration updated successfully!');
+        console.log('CodeIndexer configuration reloaded successfully');
+        vscode.window.showInformationMessage('Configuration reloaded successfully!');
+    } catch (error) {
+        console.error('Failed to reload CodeIndexer configuration:', error);
+        vscode.window.showErrorMessage(`Failed to reload configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }
 
 async function showFirstTimeSetup(configManager: ConfigManager) {
@@ -138,7 +146,8 @@ async function showFirstTimeSetup(configManager: ConfigManager) {
     );
 
     if (result === 'Configure Now') {
-        vscode.commands.executeCommand('codeIndexer.openSettings');
+        // Open the CodeIndexer sidebar where users can configure settings
+        vscode.commands.executeCommand('workbench.view.extension.codeIndexerSidebar');
     }
 }
 

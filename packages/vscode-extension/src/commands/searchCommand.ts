@@ -15,11 +15,21 @@ export class SearchCommand {
         this.codeIndexer = codeIndexer;
     }
 
-    async execute(): Promise<void> {
-        const searchTerm = await vscode.window.showInputBox({
-            placeHolder: 'Enter search term...',
-            prompt: 'Search for functions, classes, variables, or any code using semantic search'
-        });
+    async execute(preSelectedText?: string): Promise<void> {
+        let searchTerm: string | undefined;
+
+        // Check if we have meaningful pre-selected text
+        const trimmedPreSelectedText = preSelectedText?.trim();
+        if (trimmedPreSelectedText && trimmedPreSelectedText.length > 0) {
+            // Use the pre-selected text directly
+            searchTerm = trimmedPreSelectedText;
+        } else {
+            // Show input box if no meaningful pre-selected text
+            searchTerm = await vscode.window.showInputBox({
+                placeHolder: 'Enter search term...',
+                prompt: 'Search for functions, classes, variables, or any code using semantic search'
+            });
+        }
 
         if (!searchTerm) {
             return;
