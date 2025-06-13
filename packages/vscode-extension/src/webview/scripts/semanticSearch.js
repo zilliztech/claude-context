@@ -201,7 +201,7 @@ class SemanticSearchController {
      */
     createResultHTML(result) {
         return `
-            <div class="result-item" onclick="searchController.openFile('${result.filePath}', ${result.line}, ${result.startLine}, ${result.endLine})">
+            <div class="result-item" onclick="searchController.openFile('${result.relativePath}', ${result.line}, ${result.startLine}, ${result.endLine})">
                 <div class="result-file">
                     <span class="result-filename">${result.file}</span>
                     <span class="result-line">Lines ${result.startLine || result.line}-${result.endLine || result.line}</span>
@@ -215,15 +215,15 @@ class SemanticSearchController {
 
     /**
      * Open file in VSCode editor
-     * @param {string} filePath - File path
+     * @param {string} relativePath - File relative path
      * @param {number} line - Line number
      * @param {number} startLine - Start line
      * @param {number} endLine - End line
      */
-    openFile(filePath, line, startLine, endLine) {
+    openFile(relativePath, line, startLine, endLine) {
         this.vscode.postMessage({
             command: 'openFile',
-            filePath: filePath,
+            relativePath: relativePath,
             line: line,
             startLine: startLine,
             endLine: endLine

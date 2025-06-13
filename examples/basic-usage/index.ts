@@ -48,7 +48,7 @@ async function main() {
             if (results.length > 0) {
                 results.forEach((result, index) => {
                     console.log(`   ${index + 1}. Similarity: ${(result.score * 100).toFixed(2)}%`);
-                    console.log(`      File: ${result.filePath}`);
+                    console.log(`      File: ${path.join(codebasePath, result.relativePath)}`);
                     console.log(`      Language: ${result.language}`);
                     console.log(`      Lines: ${result.startLine}-${result.endLine}`);
                     console.log(`      Preview: ${result.content.substring(0, 100)}...`);

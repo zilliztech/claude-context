@@ -55,8 +55,30 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 max_length: 65535,
             },
             {
+                name: 'relativePath',
+                description: 'Relative path to the codebase',
+                data_type: DataType.VarChar,
+                max_length: 1024,
+            },
+            {
+                name: 'startLine',
+                description: 'Start line number of the chunk',
+                data_type: DataType.Int64,
+            },
+            {
+                name: 'endLine',
+                description: 'End line number of the chunk',
+                data_type: DataType.Int64,
+            },
+            {
+                name: 'fileExtension',
+                description: 'File extension',
+                data_type: DataType.VarChar,
+                max_length: 32,
+            },
+            {
                 name: 'metadata',
-                description: 'Document metadata as JSON string',
+                description: 'Additional document metadata as JSON string',
                 data_type: DataType.VarChar,
                 max_length: 65535,
             },
@@ -107,11 +129,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
     }
 
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
-
         const data = documents.map(doc => ({
             id: doc.id,
             vector: doc.vector,
             content: doc.content,
+            relativePath: doc.relativePath,
+            startLine: doc.startLine,
+            endLine: doc.endLine,
+            fileExtension: doc.fileExtension,
             metadata: JSON.stringify(doc.metadata),
         }));
 
@@ -125,9 +150,9 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         const searchParams = {
             collection_name: collectionName,
-            data: [queryVector], // Use data instead of vectors
-            limit: options?.topK || 10, // Use limit instead of topk
-            output_fields: ['id', 'content', 'metadata'],
+            data: [queryVector],
+            limit: options?.topK || 10,
+            output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
         };
 
         const searchResult = await this.client.search(searchParams);
@@ -139,8 +164,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
         return searchResult.results.map((result: any) => ({
             document: {
                 id: result.id,
-                vector: queryVector, // Original query vector
+                vector: queryVector,
                 content: result.content,
+                relativePath: result.relativePath,
+                startLine: result.startLine,
+                endLine: result.endLine,
+                fileExtension: result.fileExtension,
                 metadata: JSON.parse(result.metadata || '{}'),
             },
             score: result.score,

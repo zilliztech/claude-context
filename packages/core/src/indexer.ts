@@ -1,5 +1,5 @@
 import {
-    CodeSplitter,
+    Splitter,
     CodeChunk,
     LangChainCodeSplitter
 } from './splitter';
@@ -19,10 +19,70 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
+const DEFAULT_SUPPORTED_EXTENSIONS = [
+    // Programming languages
+    '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
+    '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
+    // Text and markup files
+    '.md', '.markdown',
+    // '.txt',  '.json', '.yaml', '.yml', '.xml', '.html', '.htm',
+    // '.css', '.scss', '.less', '.sql', '.sh', '.bash', '.env'
+];
+
+const DEFAULT_IGNORE_PATTERNS = [
+    // Common build output and dependency directories
+    'node_modules/**',
+    'dist/**',
+    'build/**',
+    'out/**',
+    'target/**',
+    'coverage/**',
+    '.nyc_output/**',
+
+    // IDE and editor files
+    '.vscode/**',
+    '.idea/**',
+    '*.swp',
+    '*.swo',
+
+    // Version control
+    '.git/**',
+    '.svn/**',
+    '.hg/**',
+
+    // Cache directories
+    '.cache/**',
+    '__pycache__/**',
+    '.pytest_cache/**',
+
+    // Logs and temporary files
+    'logs/**',
+    'tmp/**',
+    'temp/**',
+    '*.log',
+
+    // Environment and config files
+    '.env',
+    '.env.*',
+    '*.local',
+
+    // Minified and bundled files
+    '*.min.js',
+    '*.min.css',
+    '*.min.map',
+    '*.bundle.js',
+    '*.bundle.css',
+    '*.chunk.js',
+    '*.vendor.js',
+    '*.polyfills.js',
+    '*.runtime.js',
+    '*.map', // source map files
+];
+
 export interface CodeIndexerConfig {
     embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
-    codeSplitter?: CodeSplitter;
+    codeSplitter?: Splitter;
     chunkSize?: number;
     chunkOverlap?: number;
     supportedExtensions?: string[];
@@ -32,7 +92,7 @@ export interface CodeIndexerConfig {
 export class CodeIndexer {
     private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
-    private codeSplitter: CodeSplitter;
+    private codeSplitter: Splitter;
     private supportedExtensions: string[];
     private ignorePatterns: string[];
 
@@ -44,7 +104,8 @@ export class CodeIndexer {
         });
 
         this.vectorDatabase = config.vectorDatabase || new MilvusVectorDatabase({
-            address: process.env.MILVUS_ADDRESS || 'localhost:19530'
+            address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+            ...(process.env.MILVUS_TOKEN && { token: process.env.MILVUS_TOKEN })
         });
 
         this.codeSplitter = config.codeSplitter || new LangChainCodeSplitter(
@@ -52,12 +113,8 @@ export class CodeIndexer {
             config.chunkOverlap || 200
         );
 
-        this.supportedExtensions = config.supportedExtensions || [
-            '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
-            '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm'
-        ];
-
-        this.ignorePatterns = config.ignorePatterns || [];
+        this.supportedExtensions = config.supportedExtensions || DEFAULT_SUPPORTED_EXTENSIONS;
+        this.ignorePatterns = config.ignorePatterns || DEFAULT_IGNORE_PATTERNS;
     }
 
     /**
@@ -162,9 +219,9 @@ export class CodeIndexer {
         // 3. Convert to semantic search result format
         const results: SemanticSearchResult[] = searchResults.map(result => ({
             content: result.document.content,
-            filePath: result.document.metadata.filePath || 'unknown',
-            startLine: result.document.metadata.startLine || 0,
-            endLine: result.document.metadata.endLine || 0,
+            relativePath: result.document.relativePath,
+            startLine: result.document.startLine,
+            endLine: result.document.endLine,
             language: result.document.metadata.language || 'unknown',
             score: result.score
         }));
@@ -210,12 +267,22 @@ export class CodeIndexer {
     }
 
     /**
-     * Update ignore patterns
-     * @param ignorePatterns Array of ignore patterns
+     * Update ignore patterns (merges with default patterns)
+     * @param ignorePatterns Array of ignore patterns to add to defaults
      */
     updateIgnorePatterns(ignorePatterns: string[]): void {
-        this.ignorePatterns = [...ignorePatterns];
-        console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} patterns loaded`);
+        // Merge with default patterns, avoiding duplicates
+        const mergedPatterns = [...DEFAULT_IGNORE_PATTERNS, ...ignorePatterns];
+        this.ignorePatterns = [...new Set(mergedPatterns)]; // Remove duplicates
+        console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} from .gitignore + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total patterns`);
+    }
+
+    /**
+     * Reset ignore patterns to defaults only
+     */
+    resetIgnorePatternsToDefaults(): void {
+        this.ignorePatterns = [...DEFAULT_IGNORE_PATTERNS];
+        console.log(`🔄 Reset ignore patterns to defaults: ${this.ignorePatterns.length} patterns`);
     }
 
     /**
@@ -308,6 +375,13 @@ export class CodeIndexer {
                 const language = this.getLanguageFromExtension(path.extname(filePath));
                 const chunks = await this.codeSplitter.split(content, language, filePath);
 
+                // Log files with many chunks or large content
+                if (chunks.length > 50) {
+                    console.warn(`⚠️  File ${filePath} generated ${chunks.length} chunks (${Math.round(content.length / 1024)}KB)`);
+                } else if (content.length > 100000) {
+                    console.log(`📄 Large file ${filePath}: ${Math.round(content.length / 1024)}KB -> ${chunks.length} chunks`);
+                }
+
                 allChunks.push(...chunks);
                 processedFiles.push(filePath);
             } catch (error) {
@@ -319,26 +393,121 @@ export class CodeIndexer {
             return { processedFiles, chunksGenerated: 0 };
         }
 
-        // 2. Generate embedding vectors
-        const chunkContents = allChunks.map(chunk => chunk.content);
+        console.log(`📝 Processing ${allChunks.length} chunks from ${processedFiles.length} files`);
+
+        // 2. Process chunks in smaller batches to avoid token limits
+        const MAX_CHUNKS_PER_BATCH = 100; // Limit chunks per embedding batch
+        const MAX_ESTIMATED_TOKENS = 200000; // Conservative token limit
+        let totalProcessedChunks = 0;
+
+        for (let i = 0; i < allChunks.length; i += MAX_CHUNKS_PER_BATCH) {
+            const chunkBatch = allChunks.slice(i, i + MAX_CHUNKS_PER_BATCH);
+
+            // Estimate tokens (rough estimation: 1 token ≈ 4 characters)
+            const estimatedTokens = chunkBatch.reduce((sum, chunk) => sum + Math.ceil(chunk.content.length / 4), 0);
+
+            if (estimatedTokens > MAX_ESTIMATED_TOKENS) {
+                console.warn(`⚠️  Chunk batch has ~${estimatedTokens} tokens, splitting further...`);
+                // Process chunks one by one if batch is still too large
+                for (const chunk of chunkBatch) {
+                    await this.processSingleChunk(chunk, codebasePath);
+                    totalProcessedChunks++;
+                }
+            } else {
+                console.log(`🔄 Processing chunk batch ${Math.floor(i / MAX_CHUNKS_PER_BATCH) + 1} with ${chunkBatch.length} chunks (~${estimatedTokens} tokens)`);
+                await this.processChunkBatch(chunkBatch, codebasePath);
+                totalProcessedChunks += chunkBatch.length;
+            }
+        }
+
+        return { processedFiles, chunksGenerated: totalProcessedChunks };
+    }
+
+    /**
+     * Process a batch of chunks
+     */
+    private async processChunkBatch(chunks: CodeChunk[], codebasePath: string): Promise<void> {
+        // Generate embedding vectors
+        const chunkContents = chunks.map(chunk => chunk.content);
         const embeddings: EmbeddingVector[] = await this.embedding.embedBatch(chunkContents);
 
-        // 3. Prepare vector documents
-        const documents: VectorDocument[] = allChunks.map((chunk, index) => ({
-            id: this.generateId(),
-            vector: embeddings[index].vector,
-            content: chunk.content,
-            metadata: {
-                ...chunk.metadata,
-                chunkIndex: index,
-                language: chunk.metadata.language || 'unknown'
+        // Prepare vector documents
+        const documents: VectorDocument[] = chunks.map((chunk, index) => {
+            if (!chunk.metadata.filePath) {
+                throw new Error(`Missing filePath in chunk metadata at index ${index}`);
             }
-        }));
 
-        // 4. Store to vector database
+            const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
+            const fileExtension = path.extname(chunk.metadata.filePath);
+
+            // Extract metadata that should be stored separately
+            const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
+
+            return {
+                id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
+                vector: embeddings[index].vector,
+                content: chunk.content,
+                relativePath,
+                startLine: chunk.metadata.startLine || 0,
+                endLine: chunk.metadata.endLine || 0,
+                fileExtension,
+                metadata: {
+                    ...restMetadata,
+                    codebasePath,
+                    language: chunk.metadata.language || 'unknown',
+                    chunkIndex: index
+                }
+            };
+        });
+
+        // Store to vector database
         await this.vectorDatabase.insert(this.getCollectionName(codebasePath), documents);
+    }
 
-        return { processedFiles, chunksGenerated: documents.length };
+    /**
+     * Process a single chunk (fallback for very large chunks)
+     */
+    private async processSingleChunk(chunk: CodeChunk, codebasePath: string): Promise<void> {
+        if (!chunk.metadata.filePath) {
+            throw new Error(`Missing filePath in chunk metadata`);
+        }
+
+        // Check if chunk is too large even for single processing
+        const estimatedTokens = Math.ceil(chunk.content.length / 4);
+        if (estimatedTokens > 250000) { // Very conservative limit for single chunk
+            console.warn(`⚠️  Skipping extremely large chunk (~${estimatedTokens} tokens) from ${chunk.metadata.filePath}:${chunk.metadata.startLine}-${chunk.metadata.endLine}`);
+            return;
+        }
+
+        console.log(`🔄 Processing single large chunk (~${estimatedTokens} tokens) from ${chunk.metadata.filePath}`);
+
+        // Generate embedding vector
+        const embedding: EmbeddingVector = await this.embedding.embed(chunk.content);
+
+        const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
+        const fileExtension = path.extname(chunk.metadata.filePath);
+
+        // Extract metadata that should be stored separately
+        const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
+
+        const document: VectorDocument = {
+            id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
+            vector: embedding.vector,
+            content: chunk.content,
+            relativePath,
+            startLine: chunk.metadata.startLine || 0,
+            endLine: chunk.metadata.endLine || 0,
+            fileExtension,
+            metadata: {
+                ...restMetadata,
+                codebasePath,
+                language: chunk.metadata.language || 'unknown',
+                chunkIndex: 0
+            }
+        };
+
+        // Store to vector database
+        await this.vectorDatabase.insert(this.getCollectionName(codebasePath), [document]);
     }
 
     /**
@@ -371,10 +540,17 @@ export class CodeIndexer {
     }
 
     /**
-     * Generate unique ID
+     * Generate unique ID based on chunk content and location
+     * @param relativePath Relative path to the file
+     * @param startLine Start line number
+     * @param endLine End line number
+     * @param content Chunk content
+     * @returns Hash-based unique ID
      */
-    private generateId(): string {
-        return `chunk_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    private generateId(relativePath: string, startLine: number, endLine: number, content: string): string {
+        const combinedString = `${relativePath}:${startLine}:${endLine}:${content}`;
+        const hash = crypto.createHash('sha256').update(combinedString, 'utf-8').digest('hex');
+        return `chunk_${hash.substring(0, 16)}`;
     }
 
     /**

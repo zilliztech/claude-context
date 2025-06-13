@@ -1,10 +1,10 @@
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
-import { CodeSplitter, CodeChunk } from './index';
+import { Splitter, CodeChunk } from './index';
 
 // Define LangChain supported language types
 type SupportedLanguage = "cpp" | "go" | "java" | "js" | "php" | "proto" | "python" | "rst" | "ruby" | "rust" | "scala" | "swift" | "markdown" | "latex" | "html" | "sol";
 
-export class LangChainCodeSplitter implements CodeSplitter {
+export class LangChainCodeSplitter implements Splitter {
     private chunkSize: number = 1000;
     private chunkOverlap: number = 200;
 

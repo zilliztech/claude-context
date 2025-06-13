@@ -5,6 +5,8 @@ import {
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import { CodeIndexer, SemanticSearchResult } from "@code-indexer/core";
+import { OpenAIEmbedding } from "@code-indexer/core";
+import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -13,6 +15,7 @@ interface CodeIndexerMcpConfig {
     version: string;
     openaiApiKey: string;
     milvusAddress: string;
+    milvusToken?: string;
 }
 
 class CodeIndexerMcpServer {
@@ -39,8 +42,21 @@ class CodeIndexerMcpServer {
             }
         );
 
-        // Initialize code indexer
-        this.codeIndexer = new CodeIndexer();
+        // Initialize code indexer with proper configuration
+        const embedding = new OpenAIEmbedding({
+            apiKey: config.openaiApiKey,
+            model: 'text-embedding-3-small'
+        });
+
+        const vectorDatabase = new MilvusVectorDatabase({
+            address: config.milvusAddress,
+            ...(config.milvusToken && { token: config.milvusToken })
+        });
+
+        this.codeIndexer = new CodeIndexer({
+            embedding,
+            vectorDatabase
+        });
 
         this.setupTools();
     }
@@ -218,8 +234,8 @@ class CodeIndexerMcpServer {
                 content: [{
                     type: "text",
                     text: `Successfully indexed codebase at '${absolutePath}'\n` +
-                          `Indexed files: ${stats.indexedFiles}\n` +
-                          `Total chunks: ${stats.totalChunks}`
+                        `Indexed files: ${stats.indexedFiles}\n` +
+                        `Total chunks: ${stats.totalChunks}`
                 }]
             };
         } catch (error) {
@@ -268,22 +284,13 @@ class CodeIndexerMcpServer {
 
             // Format results
             const formattedResults = searchResults.map((result: SemanticSearchResult, index: number) => {
-                // Convert absolute path to relative path (if possible)
-                let relativePath = result.filePath;
-                if (process.cwd) {
-                    const cwd = process.cwd();
-                    if (result.filePath.startsWith(cwd + '/') || result.filePath.startsWith(cwd + '\\')) {
-                        relativePath = result.filePath.substring(cwd.length + 1);
-                    }
-                }
-
-                const location = `${relativePath}:${result.startLine}`;
+                const location = `${result.relativePath}:${result.startLine}`;
                 const context = this.truncateContent(result.content, 150);
 
                 return `${index + 1}. Code snippet (${result.language})\n` +
-                       `   Location: ${location}\n` +
-                       `   Score: ${result.score.toFixed(3)}\n` +
-                       `   Context: ${context}\n`;
+                    `   Location: ${location}\n` +
+                    `   Score: ${result.score.toFixed(3)}\n` +
+                    `   Context: ${context}\n`;
             }).join('\n');
 
             return {
@@ -319,9 +326,9 @@ class CodeIndexerMcpServer {
                 content: [{
                     type: "text",
                     text: `Indexing Statistics:\n` +
-                          `- Current codebase: ${this.currentCodebasePath || 'None'}\n` +
-                          `- Indexed files: ${this.indexingStats.indexedFiles}\n` +
-                          `- Total chunks: ${this.indexingStats.totalChunks}`
+                        `- Current codebase: ${this.currentCodebasePath || 'None'}\n` +
+                        `- Indexed files: ${this.indexingStats.indexedFiles}\n` +
+                        `- Total chunks: ${this.indexingStats.totalChunks}`
                 }]
             };
         } catch (error) {
@@ -427,8 +434,8 @@ class CodeIndexerMcpServer {
                 content: [{
                     type: "text",
                     text: `File: ${filePath}\n` +
-                          `${startLine || endLine ? `Lines ${startLine || 1}-${endLine || lines.length}:\n` : ''}\n` +
-                          displayContent
+                        `${startLine || endLine ? `Lines ${startLine || 1}-${endLine || lines.length}:\n` : ''}\n` +
+                        displayContent
                 }]
             };
         } catch (error) {
@@ -474,7 +481,8 @@ async function main() {
         name: process.env.MCP_SERVER_NAME || "CodeIndexer MCP Server",
         version: process.env.MCP_SERVER_VERSION || "1.0.0",
         openaiApiKey: process.env.OPENAI_API_KEY || "",
-        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530"
+        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
+        milvusToken: process.env.MILVUS_TOKEN
     };
 
     // Show help if requested
