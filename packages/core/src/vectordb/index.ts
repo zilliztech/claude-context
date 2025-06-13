@@ -2,8 +2,12 @@
 export interface VectorDocument {
     id: string;
     vector: number[];
-    metadata: Record<string, any>;
     content: string;
+    relativePath: string;
+    startLine: number;
+    endLine: number;
+    fileExtension: string;
+    metadata: Record<string, any>;
 }
 
 export interface SearchOptions {

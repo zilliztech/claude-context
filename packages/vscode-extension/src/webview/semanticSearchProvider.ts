@@ -3,6 +3,7 @@ import { WebviewHelper } from './webviewHelper';
 import { SearchCommand } from '../commands/searchCommand';
 import { IndexCommand } from '../commands/indexCommand';
 import { ConfigManager, EmbeddingProviderConfig } from '../config/configManager';
+import * as path from 'path';
 
 export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
@@ -69,8 +70,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         await this.testEmbedding(message.config, webviewView.webview);
                         return;
 
-
-
                     case 'search':
                         try {
                             // Use search command
@@ -124,7 +123,10 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                     case 'openFile':
                         // Handle file opening
                         try {
-                            const uri = vscode.Uri.file(message.filePath);
+                            const workspaceFolders = vscode.workspace.workspaceFolders;
+                            const workspaceRoot = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
+                            const absPath = path.join(workspaceRoot, message.relativePath);
+                            const uri = vscode.Uri.file(absPath);
                             const document = await vscode.workspace.openTextDocument(uri);
                             const editor = await vscode.window.showTextDocument(document);
 
@@ -142,7 +144,7 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                                 editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
                             }
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to open file: ${message.filePath}`);
+                            vscode.window.showErrorMessage(`Failed to open file: ${message.relativePath}`);
                         }
                         return;
                 }
@@ -160,32 +162,22 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
         const baseWorkspacePath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '/tmp';
 
         return searchResults.map(result => {
-            // Determine the correct file path
-            let filePath = result.filePath;
-
-            // If result.filePath is not an absolute path, concatenate with workspace path
-            if (!result.filePath.startsWith('/') && !result.filePath.includes(':')) {
-                filePath = `${baseWorkspacePath}/${result.filePath}`;
+            let filePath = result.relativePath;
+            if (result.relativePath && !result.relativePath.startsWith('/') && !result.relativePath.includes(':')) {
+                filePath = `${baseWorkspacePath}/${result.relativePath}`;
             }
 
-            // Calculate relative display path from workspace root
-            let displayPath = result.filePath;
-            if (baseWorkspacePath && result.filePath.startsWith(baseWorkspacePath)) {
-                displayPath = result.filePath.substring(baseWorkspacePath.length);
-                // Remove leading slash if present
-                if (displayPath.startsWith('/') || displayPath.startsWith('\\')) {
-                    displayPath = displayPath.substring(1);
-                }
-            }
+            let displayPath = result.relativePath;
 
             // Truncate content for display
-            const truncatedContent = result.content.length <= 150
+            const truncatedContent = result.content && result.content.length <= 150
                 ? result.content
-                : result.content.substring(0, 150) + '...';
+                : (result.content || '').substring(0, 150) + '...';
 
             return {
                 file: displayPath,
                 filePath: filePath,
+                relativePath: result.relativePath,
                 line: result.startLine,
                 preview: truncatedContent,
                 context: `1 match in ${displayPath}`,
@@ -296,6 +288,4 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             });
         }
     }
-
-
 } 

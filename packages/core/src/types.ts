@@ -6,7 +6,7 @@ export interface SearchQuery {
 
 export interface SemanticSearchResult {
     content: string;
-    filePath: string;
+    relativePath: string;
     startLine: number;
     endLine: number;
     language: string;

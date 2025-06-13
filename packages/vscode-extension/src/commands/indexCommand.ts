@@ -44,9 +44,8 @@ export class IndexCommand {
                     console.log('📄 .gitignore file found but no valid patterns detected');
                 }
             } else {
-                console.log('📄 No .gitignore file found, using default ignore patterns');
-                // Reset to empty ignore patterns if no .gitignore found
-                this.codeIndexer.updateIgnorePatterns([]);
+                console.log('📄 No .gitignore file found, using default ignore patterns only');
+                // No need to update patterns - CodeIndexer will use defaults
             }
         } catch (error) {
             console.warn(`⚠️ Failed to load .gitignore patterns: ${error}`);

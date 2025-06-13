@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { CodeIndexer, SearchQuery, SemanticSearchResult } from '@code-indexer/core';
+import * as path from 'path';
 
 export class SearchCommand {
     private codeIndexer: CodeIndexer;
@@ -100,27 +101,10 @@ export class SearchCommand {
                 return;
             }
 
-            // Determine the correct file path
-            let fullPath = result.filePath;
-
-            // If result.filePath is not an absolute path, try to resolve it
-            if (!result.filePath.startsWith('/') && !result.filePath.includes(':')) {
-                // Try to find the file in workspace folders
-                for (const folder of workspaceFolders) {
-                    const testPath = vscode.Uri.joinPath(folder.uri, result.filePath);
-                    try {
-                        await vscode.workspace.fs.stat(testPath);
-                        fullPath = testPath.fsPath;
-                        break;
-                    } catch {
-                        // File not found in this workspace folder, try next
-                    }
-                }
-            }
-
-            if (!fullPath) {
-                vscode.window.showErrorMessage(`File not found: ${result.filePath}`);
-                return;
+            const workspaceRoot = workspaceFolders[0].uri.fsPath;
+            let fullPath = result.relativePath;
+            if (!result.relativePath.startsWith('/') && !result.relativePath.includes(':')) {
+                fullPath = path.join(workspaceRoot, result.relativePath);
             }
 
             const document = await vscode.workspace.openTextDocument(fullPath);
@@ -172,16 +156,7 @@ export class SearchCommand {
      */
     private generateQuickPickItems(results: SemanticSearchResult[], searchTerm: string, workspaceRoot?: string) {
         return results.slice(0, 20).map(result => {
-            // Calculate relative path from workspace root if provided
-            let displayPath = result.filePath;
-            if (workspaceRoot && result.filePath.startsWith(workspaceRoot)) {
-                displayPath = result.filePath.substring(workspaceRoot.length);
-                // Remove leading slash if present
-                if (displayPath.startsWith('/') || displayPath.startsWith('\\')) {
-                    displayPath = displayPath.substring(1);
-                }
-            }
-
+            let displayPath = result.relativePath;
             // Truncate content for display
             const truncatedContent = result.content.length <= 150
                 ? result.content

@@ -9,7 +9,7 @@ export interface CodeChunk {
     };
 }
 
-export interface CodeSplitter {
+export interface Splitter {
     /**
      * Split code into code chunks
      * @param code Code content
