@@ -1,13 +1,13 @@
 {
     "name": "@code-indexer/mcp",
-    "version": "0.0.1",
+    "version": "0.0.1-rc.1",
     "description": "Model Context Protocol integration for CodeIndexer",
     "type": "module",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "bin": "dist/index.js",
     "scripts": {
-        "build": "tsc --build",
+        "build": "pnpm clean && tsc --build --force",
         "dev": "tsx --watch src/index.ts",
         "clean": "rm -rf dist",
         "lint": "eslint src --ext .ts",
@@ -36,5 +36,8 @@
         "url": "https://github.com/zilliztech/CodeIndexer.git",
         "directory": "packages/mcp"
     },
-    "license": "MIT"
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    }
 }

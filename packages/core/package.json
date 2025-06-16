@@ -1,11 +1,11 @@
 {
     "name": "@code-indexer/core",
-    "version": "0.0.1",
+    "version": "0.0.1-rc.1",
     "description": "Core indexing engine for CodeIndexer",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc --build",
+        "build": "pnpm clean && tsc --build --force",
         "dev": "tsc --watch",
         "clean": "rm -rf dist",
         "lint": "eslint src --ext .ts",
@@ -33,5 +33,8 @@
         "url": "https://github.com/zilliztech/CodeIndexer.git",
         "directory": "packages/core"
     },
-    "license": "MIT"
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    }
 }
