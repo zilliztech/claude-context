@@ -1,8 +1,8 @@
 {
-    "name": "@code-indexer/vscode-extension",
-    "displayName": "CodeIndexer",
+    "name": "semanticcodesearch",
+    "displayName": "Semantic Code Search",
     "publisher": "zilliz",
-    "description": "Intelligent code indexing and search for VSCode",
+    "description": "Code indexing and semantic search (built by CodeIndexer)",
     "version": "0.0.1",
     "private": true,
     "engines": {
@@ -13,7 +13,13 @@
     ],
     "keywords": [
         "code",
-        "indexer",
+        "vibe coding",
+        "AI coding",
+        "agent",
+        "MCP",
+        "code search",
+        "semantic search",
+        "index",
         "search",
         "navigation",
         "symbols"
@@ -103,26 +109,27 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "pnpm run compile",
-        "compile": "tsc --build && node copy-assets.js",
+        "vscode:prepublish": "pnpm run build",
+        "build": "pnpm clean && tsc --build --force && node copy-assets.js",
         "watch": "tsc -watch -p ./",
         "clean": "rm -rf dist",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
         "typecheck": "tsc --noEmit",
-        "package": "vsce package"
+        "package": "vsce package",
+        "release": "vsce publish --no-dependencies"
     },
     "dependencies": {
         "@code-indexer/core": "workspace:*"
     },
     "devDependencies": {
-        "@types/vscode": "^1.100.0",
+        "@types/vscode": "^1.74.0",
         "@types/node": "20.x",
         "@typescript-eslint/eslint-plugin": "^8.31.1",
         "@typescript-eslint/parser": "^8.31.1",
         "eslint": "^9.25.1",
         "typescript": "^5.8.3",
-        "vsce": "^2.15.0"
+        "@vscode/vsce": "^3.4.0"
     },
     "repository": {
         "type": "git",
