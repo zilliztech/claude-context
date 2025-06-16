@@ -120,14 +120,6 @@ class CodeIndexerMcpServer {
                         }
                     },
                     {
-                        name: "get_stats",
-                        description: "Get indexing statistics",
-                        inputSchema: {
-                            type: "object",
-                            properties: {}
-                        }
-                    },
-                    {
                         name: "clear_index",
                         description: "Clear the search index",
                         inputSchema: {
@@ -139,28 +131,6 @@ class CodeIndexerMcpServer {
                                 }
                             },
                             required: ["confirm"]
-                        }
-                    },
-                    {
-                        name: "get_file_content",
-                        description: "Retrieve the content of a specific file",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                path: {
-                                    type: "string",
-                                    description: "Path to the file to read"
-                                },
-                                startLine: {
-                                    type: "number",
-                                    description: "Start line number (1-based)"
-                                },
-                                endLine: {
-                                    type: "number",
-                                    description: "End line number (1-based)"
-                                }
-                            },
-                            required: ["path"]
                         }
                     }
                 ]
@@ -176,12 +146,8 @@ class CodeIndexerMcpServer {
                     return await this.handleIndexCodebase(args);
                 case "search_code":
                     return await this.handleSearchCode(args);
-                case "get_stats":
-                    return await this.handleGetStats();
                 case "clear_index":
                     return await this.handleClearIndex(args);
-                case "get_file_content":
-                    return await this.handleGetFileContent(args);
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
@@ -311,38 +277,6 @@ class CodeIndexerMcpServer {
         }
     }
 
-    private async handleGetStats() {
-        try {
-            if (!this.indexingStats) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: "No indexing statistics available. Please index a codebase first."
-                    }]
-                };
-            }
-
-            return {
-                content: [{
-                    type: "text",
-                    text: `Indexing Statistics:\n` +
-                        `- Current codebase: ${this.currentCodebasePath || 'None'}\n` +
-                        `- Indexed files: ${this.indexingStats.indexedFiles}\n` +
-                        `- Total chunks: ${this.indexingStats.totalChunks}`
-                }]
-            };
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            return {
-                content: [{
-                    type: "text",
-                    text: `Error getting stats: ${errorMessage}`
-                }],
-                isError: true
-            };
-        }
-    }
-
     private async handleClearIndex(args: any) {
         const { confirm } = args;
 
@@ -383,67 +317,6 @@ class CodeIndexerMcpServer {
                 content: [{
                     type: "text",
                     text: `Error clearing index: ${errorMessage}`
-                }],
-                isError: true
-            };
-        }
-    }
-
-    private async handleGetFileContent(args: any) {
-        const { path: filePath, startLine, endLine } = args;
-
-        try {
-            // Validate file exists
-            if (!fs.existsSync(filePath)) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: `Error: File '${filePath}' does not exist`
-                    }],
-                    isError: true
-                };
-            }
-
-            // Read file content
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const lines = content.split('\n');
-
-            // Apply line range if specified
-            let displayContent = content;
-            if (startLine !== undefined || endLine !== undefined) {
-                const start = Math.max(0, (startLine || 1) - 1);
-                const end = endLine ? Math.min(lines.length, endLine) : lines.length;
-
-                if (start >= lines.length) {
-                    return {
-                        content: [{
-                            type: "text",
-                            text: `Error: Start line ${startLine} exceeds file length (${lines.length} lines)`
-                        }],
-                        isError: true
-                    };
-                }
-
-                const selectedLines = lines.slice(start, end);
-                displayContent = selectedLines.map((line, index) =>
-                    `${start + index + 1}: ${line}`
-                ).join('\n');
-            }
-
-            return {
-                content: [{
-                    type: "text",
-                    text: `File: ${filePath}\n` +
-                        `${startLine || endLine ? `Lines ${startLine || 1}-${endLine || lines.length}:\n` : ''}\n` +
-                        displayContent
-                }]
-            };
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            return {
-                content: [{
-                    type: "text",
-                    text: `Error reading file: ${errorMessage}`
                 }],
                 isError: true
             };
