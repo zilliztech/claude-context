@@ -16,8 +16,8 @@
         "lint": "pnpm -r lint",
         "lint:fix": "pnpm -r run lint:fix",
         "typecheck": "pnpm -r run typecheck",
-        "release:core": "pnpm --filter @code-indexer/core... run build && pnpm --filter @code-indexer/core publish --access public",
-        "release:mcp": "pnpm --filter @code-indexer/mcp... run build && pnpm --filter @code-indexer/mcp publish --access public",
+        "release:core": "pnpm --filter @code-indexer/core... run build && pnpm --filter @code-indexer/core publish --access public --no-git-checks",
+        "release:mcp": "pnpm --filter @code-indexer/mcp... run build && pnpm --filter @code-indexer/mcp publish --access public --no-git-checks",
         "release:vscode": "pnpm --filter semanticcodesearch... run build && pnpm --filter semanticcodesearch release",
         "example:basic": "pnpm --filter codeindexer-basic-example start"
     },
