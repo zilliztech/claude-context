@@ -23,23 +23,22 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'pnpm'
-        registry-url: 'https://registry.npmjs.org'
         
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
+      
+    - name: Setup npm auth
+      run: |
+        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
       
     - name: Build packages
       run: pnpm build
       
     - name: Publish core package to npm
-      run: pnpm release:core
-      env:
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: pnpm --filter @code-indexer/core publish --access public --no-git-checks
         
     - name: Publish mcp package to npm
-      run: pnpm release:mcp
-      env:
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: pnpm --filter @code-indexer/mcp publish --access public --no-git-checks
         
     - name: Publish vscode extension
       run: pnpm release:vscode
