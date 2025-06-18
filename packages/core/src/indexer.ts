@@ -635,6 +635,3 @@ export class CodeIndexer {
         return regex.test(text);
     }
 }
-
-// Export a default instance for convenience
-export const codeIndexer = new CodeIndexer();

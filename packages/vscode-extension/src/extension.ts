@@ -18,12 +18,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize config manager
     configManager = new ConfigManager(context);
 
-    // Check if this is the first launch
-    if (configManager.isFirstLaunch()) {
-        // Show setup dialog
-        await showFirstTimeSetup(configManager);
-    }
-
     // Initialize shared codeIndexer instance with embedding configuration
     codeIndexer = createCodeIndexerWithConfig(configManager);
 
@@ -43,22 +37,23 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('codeIndexer.embeddingProvider') ||
-                event.affectsConfiguration('codeIndexer.milvus')) {
+            if (event.affectsConfiguration('semanticCodeSearch.embeddingProvider') ||
+                event.affectsConfiguration('semanticCodeSearch.milvus')) {
                 console.log('CodeIndexer configuration changed, reloading...');
                 reloadCodeIndexerConfiguration();
             }
         }),
 
         // Register commands
-        vscode.commands.registerCommand('codeIndexer.semanticSearch', () => {
+        vscode.commands.registerCommand('semanticCodeSearch.semanticSearch', () => {
             // Get selected text from active editor
             const editor = vscode.window.activeTextEditor;
             const selectedText = editor?.document.getText(editor.selection);
             return searchCommand.execute(selectedText);
         }),
-        vscode.commands.registerCommand('codeIndexer.indexCodebase', () => indexCommand.execute()),
-        vscode.commands.registerCommand('codeIndexer.clearIndex', () => indexCommand.clearIndex())
+        vscode.commands.registerCommand('semanticCodeSearch.indexCodebase', () => indexCommand.execute()),
+        vscode.commands.registerCommand('semanticCodeSearch.clearIndex', () => indexCommand.clearIndex()),
+        vscode.commands.registerCommand('semanticCodeSearch.reloadConfiguration', () => reloadCodeIndexerConfiguration())
     ];
 
     context.subscriptions.push(...disposables);
@@ -67,7 +62,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.text = `$(search) CodeIndexer`;
     statusBarItem.tooltip = 'Click to open semantic search';
-    statusBarItem.command = 'codeIndexer.semanticSearch';
+    statusBarItem.command = 'semanticCodeSearch.semanticSearch';
     statusBarItem.show();
 
     context.subscriptions.push(statusBarItem);
@@ -135,19 +130,6 @@ function reloadCodeIndexerConfiguration() {
     } catch (error) {
         console.error('Failed to reload CodeIndexer configuration:', error);
         vscode.window.showErrorMessage(`Failed to reload configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-}
-
-async function showFirstTimeSetup(configManager: ConfigManager) {
-    const result = await vscode.window.showInformationMessage(
-        'Welcome to CodeIndexer! First-time setup requires configuring an embedding provider.',
-        'Configure Now',
-        'Configure Later'
-    );
-
-    if (result === 'Configure Now') {
-        // Open the CodeIndexer sidebar where users can configure settings
-        vscode.commands.executeCommand('workbench.view.extension.codeIndexerSidebar');
     }
 }
 

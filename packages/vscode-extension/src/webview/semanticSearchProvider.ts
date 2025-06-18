@@ -245,13 +245,11 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                 await this.configManager.saveMilvusConfig(configData.milvusConfig);
             }
 
-            this.configManager.markFirstLaunchComplete();
-
             // Add a small delay to ensure configuration is fully saved
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Notify extension to recreate CodeIndexer with new config
-            vscode.commands.executeCommand('codeIndexer.reloadConfiguration');
+            vscode.commands.executeCommand('semanticCodeSearch.reloadConfiguration');
 
             webview.postMessage({
                 command: 'saveResult',
