@@ -32,25 +32,25 @@
     "contributes": {
         "commands": [
             {
-                "command": "codeIndexer.semanticSearch",
+                "command": "semanticCodeSearch.semanticSearch",
                 "title": "Semantic Search",
-                "category": "CodeIndexer"
+                "category": "Semantic Code Search"
             },
             {
-                "command": "codeIndexer.indexCodebase",
+                "command": "semanticCodeSearch.indexCodebase",
                 "title": "Index Codebase",
-                "category": "CodeIndexer"
+                "category": "Semantic Code Search"
             },
             {
-                "command": "codeIndexer.clearIndex",
+                "command": "semanticCodeSearch.clearIndex",
                 "title": "Clear Index",
-                "category": "CodeIndexer"
+                "category": "Semantic Code Search"
             }
         ],
         "menus": {
             "editor/context": [
                 {
-                    "command": "codeIndexer.semanticSearch",
+                    "command": "semanticCodeSearch.semanticSearch",
                     "when": "editorHasSelection",
                     "group": "navigation@100"
                 }
@@ -59,14 +59,14 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "codeIndexerSidebar",
-                    "title": "CodeIndexer",
+                    "id": "semanticCodeSearchSidebar",
+                    "title": "Semantic Code Search",
                     "icon": "$(search)"
                 }
             ]
         },
         "views": {
-            "codeIndexerSidebar": [
+            "semanticCodeSearchSidebar": [
                 {
                     "id": "semanticSearchView",
                     "name": "Semantic Search",
@@ -75,9 +75,9 @@
             ]
         },
         "configuration": {
-            "title": "CodeIndexer",
+            "title": "Semantic Code Search",
             "properties": {
-                "codeIndexer.embeddingProvider.provider": {
+                "semanticCodeSearch.embeddingProvider.provider": {
                     "type": "string",
                     "enum": [
                         "OpenAI",
@@ -85,23 +85,23 @@
                     ],
                     "description": "Embedding service provider"
                 },
-                "codeIndexer.embeddingProvider.model": {
+                "semanticCodeSearch.embeddingProvider.model": {
                     "type": "string",
                     "description": "Embedding model to use"
                 },
-                "codeIndexer.embeddingProvider.apiKey": {
+                "semanticCodeSearch.embeddingProvider.apiKey": {
                     "type": "string",
                     "description": "API key for the embedding provider"
                 },
-                "codeIndexer.embeddingProvider.baseURL": {
+                "semanticCodeSearch.embeddingProvider.baseURL": {
                     "type": "string",
                     "description": "Custom API endpoint URL (optional)"
                 },
-                "codeIndexer.milvus.address": {
+                "semanticCodeSearch.milvus.address": {
                     "type": "string",
                     "description": "Milvus server address (e.g., http://localhost:19530)"
                 },
-                "codeIndexer.milvus.token": {
+                "semanticCodeSearch.milvus.token": {
                     "type": "string",
                     "description": "Milvus authentication token (optional)"
                 }
@@ -109,27 +109,33 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "pnpm run build",
-        "build": "pnpm clean && tsc --build --force && node copy-assets.js",
+        "vscode:prepublish": "pnpm run webpack",
+        "compile": "pnpm clean && tsc --build --force && node copy-assets.js",
+        "webpack": "pnpm clean && webpack --mode production && node copy-assets.js",
+        "webpack:dev": "webpack --mode development",
         "watch": "tsc -watch -p ./",
         "clean": "rm -rf dist",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
         "typecheck": "tsc --noEmit",
-        "package": "vsce package",
+        "package": "vsce package --no-dependencies",
         "release": "vsce publish --no-dependencies"
     },
     "dependencies": {
         "@code-indexer/core": "workspace:*"
     },
     "devDependencies": {
-        "@types/vscode": "^1.74.0",
         "@types/node": "20.x",
+        "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^8.31.1",
         "@typescript-eslint/parser": "^8.31.1",
+        "@vscode/vsce": "^3.4.0",
         "eslint": "^9.25.1",
+        "source-map-loader": "^5.0.0",
+        "ts-loader": "^9.5.2",
         "typescript": "^5.8.3",
-        "@vscode/vsce": "^3.4.0"
+        "webpack": "^5.99.9",
+        "webpack-cli": "^5.1.4"
     },
     "repository": {
         "type": "git",

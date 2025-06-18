@@ -18,7 +18,6 @@ export type EmbeddingProviderConfig = {
 export interface PluginConfig {
     embeddingProvider?: EmbeddingProviderConfig;
     milvusConfig?: MilvusWebConfig;
-    isFirstLaunch: boolean;
 }
 
 type FieldDefinition = {
@@ -61,26 +60,11 @@ const PROVIDERS = {
 } as const;
 
 export class ConfigManager {
-    private static readonly CONFIG_KEY = 'codeIndexer';
-    private static readonly FIRST_LAUNCH_KEY = 'codeIndexer.firstLaunch';
+    private static readonly CONFIG_KEY = 'semanticCodeSearch';
     private context: vscode.ExtensionContext;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
-    }
-
-    /**
-     * Check if this is the first launch
-     */
-    isFirstLaunch(): boolean {
-        return this.context.globalState.get(ConfigManager.FIRST_LAUNCH_KEY, true);
-    }
-
-    /**
-     * Mark first-time setup as complete
-     */
-    markFirstLaunchComplete(): void {
-        this.context.globalState.update(ConfigManager.FIRST_LAUNCH_KEY, false);
     }
 
     /**

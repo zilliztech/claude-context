@@ -6,11 +6,11 @@
     "scripts": {
         "build": "pnpm -r --filter='!./examples/*' build && pnpm -r --filter='./examples/*' build",
         "build:core": "pnpm --filter @code-indexer/core build",
-        "build:vscode": "pnpm --filter @code-indexer/vscode-extension build",
+        "build:vscode": "pnpm --filter semanticcodesearch compile",
         "build:mcp": "pnpm --filter @code-indexer/mcp build",
         "dev": "pnpm -r dev",
         "dev:core": "pnpm --filter @code-indexer/core dev",
-        "dev:vscode": "pnpm --filter @code-indexer/vscode-extension watch",
+        "dev:vscode": "pnpm --filter semanticcodesearch watch",
         "dev:mcp": "pnpm --filter @code-indexer/mcp dev",
         "clean": "pnpm -r clean",
         "lint": "pnpm -r lint",
@@ -18,7 +18,7 @@
         "typecheck": "pnpm -r run typecheck",
         "release:core": "pnpm --filter @code-indexer/core... run build && pnpm --filter @code-indexer/core publish --access public --no-git-checks",
         "release:mcp": "pnpm --filter @code-indexer/mcp... run build && pnpm --filter @code-indexer/mcp publish --access public --no-git-checks",
-        "release:vscode": "pnpm --filter semanticcodesearch... run build && pnpm --filter semanticcodesearch release",
+        "release:vscode": "pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
         "example:basic": "pnpm --filter codeindexer-basic-example start"
     },
     "devDependencies": {
