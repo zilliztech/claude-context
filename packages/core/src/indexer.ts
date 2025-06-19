@@ -11,8 +11,7 @@ import {
 import {
     VectorDatabase,
     VectorDocument,
-    VectorSearchResult,
-    MilvusVectorDatabase
+    VectorSearchResult
 } from './vectordb';
 import { SemanticSearchResult } from './types';
 import * as fs from 'fs';
@@ -103,10 +102,10 @@ export class CodeIndexer {
             model: 'text-embedding-3-small'
         });
 
-        this.vectorDatabase = config.vectorDatabase || new MilvusVectorDatabase({
-            address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-            ...(process.env.MILVUS_TOKEN && { token: process.env.MILVUS_TOKEN })
-        });
+        if (!config.vectorDatabase) {
+            throw new Error('VectorDatabase is required. Please provide a vectorDatabase instance in the config.');
+        }
+        this.vectorDatabase = config.vectorDatabase;
 
         this.codeSplitter = config.codeSplitter || new LangChainCodeSplitter(
             config.chunkSize || 1000,

@@ -96,9 +96,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
         const indexParams = {
             collection_name: collectionName,
             field_name: 'vector',
-            index_type: 'IVF_FLAT',
+            index_type: 'AUTOINDEX',
             metric_type: MetricType.COSINE,
-            params: { nlist: 1024 },
         };
 
         await this.client.createIndex(indexParams);
