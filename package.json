@@ -18,7 +18,7 @@
         "typecheck": "pnpm -r run typecheck",
         "release:core": "pnpm --filter @code-indexer/core... run build && pnpm --filter @code-indexer/core publish --access public --no-git-checks",
         "release:mcp": "pnpm --filter @code-indexer/mcp... run build && pnpm --filter @code-indexer/mcp publish --access public --no-git-checks",
-        "release:vscode": "pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
+        "release:vscode": "pnpm --filter @code-indexer/core build && pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
         "example:basic": "pnpm --filter codeindexer-basic-example start"
     },
     "devDependencies": {

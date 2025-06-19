@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = {
     target: 'node', // VSCode extensions run in a Node.js-context
@@ -14,6 +15,7 @@ module.exports = {
     devtool: 'nosources-source-map',
     externals: {
         vscode: 'commonjs vscode' // the vscode-module is created on-the-fly and must be excluded
+        // Note: We completely ignore @zilliz/milvus2-sdk-node instead of externalizing it
     },
     resolve: {
         // support reading TypeScript and JavaScript files
@@ -38,5 +40,18 @@ module.exports = {
                 ]
             }
         ]
-    }
+    },
+    plugins: [
+        // Ignore gRPC Milvus SDK completely
+        new webpack.IgnorePlugin({
+            resourceRegExp: /@zilliz\/milvus2-sdk-node/
+        }),
+
+        // Replace MilvusVectorDatabase with a stub to avoid import errors
+        // This handles both .ts and .js versions
+        new webpack.NormalModuleReplacementPlugin(
+            /.*milvus-vectordb(\.js)?$/,
+            path.resolve(__dirname, 'src/stubs/milvus-vectordb-stub.js')
+        )
+    ]
 }; 

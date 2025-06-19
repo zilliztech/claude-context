@@ -66,4 +66,5 @@ export interface VectorDatabase {
 }
 
 // Implementation class exports
+export * from './milvus-restful-vectordb';
 export * from './milvus-vectordb'; 

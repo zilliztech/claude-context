@@ -4,7 +4,7 @@ import { SemanticSearchViewProvider } from './webview/semanticSearchProvider';
 import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
 import { ConfigManager } from './config/configManager';
-import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, MilvusVectorDatabase } from '@code-indexer/core';
+import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, MilvusRestfulVectorDatabase } from '@code-indexer/core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;
@@ -76,31 +76,35 @@ function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer 
         let embedding;
         let vectorDatabase;
 
+        const codeIndexerConfig: any = {};
+
         // Create embedding instance
         if (embeddingConfig) {
             embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
             console.log(`Embedding initialized with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
+            codeIndexerConfig.embedding = embedding;
         } else {
-            console.log('No embedding configuration found, using default OpenAI embedding');
+            console.log('No embedding configuration found');
         }
 
         // Create vector database instance
         if (milvusConfig) {
-            vectorDatabase = new MilvusVectorDatabase(milvusConfig);
-            console.log(`Vector database initialized with Milvus (address: ${milvusConfig.address})`);
+            vectorDatabase = new MilvusRestfulVectorDatabase(milvusConfig);
+            console.log(`Vector database initialized with Milvus REST API (address: ${milvusConfig.address})`);
+            codeIndexerConfig.vectorDatabase = vectorDatabase;
         } else {
-            console.log('No Milvus configuration found, using default configuration');
+            vectorDatabase = new MilvusRestfulVectorDatabase({
+                address: process.env.MILVUS_ADDRESS || 'http://localhost:19530',
+                token: process.env.MILVUS_TOKEN || ''
+            });
+            console.log('No Milvus configuration found, using default REST API configuration');
+            codeIndexerConfig.vectorDatabase = vectorDatabase;
         }
-
-        const codeIndexerConfig: any = {};
-        if (embedding) codeIndexerConfig.embedding = embedding;
-        if (vectorDatabase) codeIndexerConfig.vectorDatabase = vectorDatabase;
-
         return new CodeIndexer(codeIndexerConfig);
     } catch (error) {
         console.error('Failed to create CodeIndexer with user config:', error);
         vscode.window.showErrorMessage(`Failed to initialize CodeIndexer: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        return new CodeIndexer();
+        throw error;
     }
 }
 
@@ -120,9 +124,9 @@ function reloadCodeIndexerConfiguration() {
 
         // Update vector database if configuration exists
         if (milvusConfig) {
-            const vectorDatabase = new MilvusVectorDatabase(milvusConfig);
+            const vectorDatabase = new MilvusRestfulVectorDatabase(milvusConfig);
             codeIndexer.updateVectorDatabase(vectorDatabase);
-            console.log(`Vector database updated with Milvus (address: ${milvusConfig.address})`);
+            console.log(`Vector database updated with Milvus REST API (address: ${milvusConfig.address})`);
         }
 
         console.log('CodeIndexer configuration reloaded successfully');
