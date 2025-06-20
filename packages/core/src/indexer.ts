@@ -17,6 +17,7 @@ import { SemanticSearchResult } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { FileSynchronizer } from './sync/synchronizer';
 
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
@@ -94,6 +95,7 @@ export class CodeIndexer {
     private codeSplitter: Splitter;
     private supportedExtensions: string[];
     private ignorePatterns: string[];
+    private synchronizers = new Map<string, FileSynchronizer>();
 
     constructor(config: CodeIndexerConfig = {}) {
         // Initialize services
@@ -136,6 +138,11 @@ export class CodeIndexer {
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
     ): Promise<{ indexedFiles: number; totalChunks: number }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
+
+        // Initialize file synchronizer
+        const synchronizer = new FileSynchronizer(codebasePath);
+        await synchronizer.initialize();
+        this.synchronizers.set(this.getCollectionName(codebasePath), synchronizer);
 
         // 1. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
@@ -193,6 +200,87 @@ export class CodeIndexer {
             indexedFiles: indexedFiles.size,
             totalChunks: totalChunks
         };
+    }
+
+    async reindexByChange(
+        codebasePath: string,
+        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
+    ): Promise<{ added: number, removed: number, modified: number }> {
+        const collectionName = this.getCollectionName(codebasePath);
+        const synchronizer = this.synchronizers.get(collectionName);
+
+        if (!synchronizer) {
+            // To be safe, let's initialize if it's not there.
+            const newSynchronizer = new FileSynchronizer(codebasePath);
+            await newSynchronizer.initialize();
+            this.synchronizers.set(collectionName, newSynchronizer);
+        }
+        
+        const currentSynchronizer = this.synchronizers.get(collectionName)!;
+
+        progressCallback?.({ phase: 'Checking for file changes...', current: 0, total: 100, percentage: 0 });
+        const { added, removed, modified } = await currentSynchronizer.checkForChanges();
+        const totalChanges = added.length + removed.length + modified.length;
+
+        if (totalChanges === 0) {
+            progressCallback?.({ phase: 'No changes detected', current: 100, total: 100, percentage: 100 });
+            console.log('✅ No file changes detected.');
+            return { added: 0, removed: 0, modified: 0 };
+        }
+
+        console.log(`🔄 Found changes: ${added.length} added, ${removed.length} removed, ${modified.length} modified.`);
+
+        let processedChanges = 0;
+        const updateProgress = (phase: string) => {
+            processedChanges++;
+            const percentage = Math.round((processedChanges / (removed.length + modified.length + added.length)) * 100);
+            progressCallback?.({ phase, current: processedChanges, total: totalChanges, percentage });
+        };
+
+        // Handle removed files
+        for (const file of removed) {
+            await this.deleteFileChunks(collectionName, file);
+            updateProgress(`Removed ${file}`);
+        }
+
+        // Handle modified files
+        for (const file of modified) {
+            await this.deleteFileChunks(collectionName, file);
+            updateProgress(`Deleted old chunks for ${file}`);
+        }
+        
+        // Handle added and modified files
+        const filesToIndex = [...added, ...modified].map(f => path.join(codebasePath, f));
+
+        if (filesToIndex.length > 0) {
+            const batchSize = 10;
+            for (let i = 0; i < filesToIndex.length; i += batchSize) {
+                const batch = filesToIndex.slice(i, i + batchSize);
+                await this.processBatch(batch, codebasePath);
+                updateProgress(`Indexed a batch of ${batch.length} files`);
+            }
+        }
+        
+        console.log(`✅ Re-indexing complete. Added: ${added.length}, Removed: ${removed.length}, Modified: ${modified.length}`);
+        progressCallback?.({ phase: 'Re-indexing complete!', current: totalChanges, total: totalChanges, percentage: 100 });
+
+        return { added: added.length, removed: removed.length, modified: modified.length };
+    }
+
+    private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
+        const results = await this.vectorDatabase.query(
+            collectionName,
+            `relativePath == "${relativePath}"`,
+            ['id']
+        );
+    
+        if (results.length > 0) {
+            const ids = results.map(r => r.id as string).filter(id => id);
+            if (ids.length > 0) {
+                await this.vectorDatabase.delete(collectionName, ids);
+                console.log(`Deleted ${ids.length} chunks for file ${relativePath}`);
+            }
+        }
     }
 
     /**
@@ -260,6 +348,9 @@ export class CodeIndexer {
         if (collectionExists) {
             await this.vectorDatabase.dropCollection(collectionName);
         }
+
+        // Delete snapshot file
+        await FileSynchronizer.deleteSnapshot(codebasePath);
 
         progressCallback?.({ phase: 'Index cleared', current: 100, total: 100, percentage: 100 });
         console.log('✅ Index data cleaned');

@@ -9,6 +9,7 @@ import { OpenAIEmbedding } from "@code-indexer/core";
 import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 
 interface CodeIndexerMcpConfig {
     name: string;
@@ -21,13 +22,20 @@ interface CodeIndexerMcpConfig {
 class CodeIndexerMcpServer {
     private server: Server;
     private codeIndexer: CodeIndexer;
-    private currentCodebasePath: string | null = null;
+    private activeCodebasePath: string | null = null;
+    private indexedCodebases: string[] = [];
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
+    private isSyncing: boolean = false;
+    private stateFilePath: string;
 
     constructor(config: CodeIndexerMcpConfig) {
         // Redirect console.log and console.warn to stderr to avoid JSON parsing issues
         // Only MCP protocol messages should go to stdout
         this.setupConsoleRedirection();
+
+        const stateDir = path.join(os.homedir(), '.codeindexer');
+        fs.mkdirSync(stateDir, { recursive: true });
+        this.stateFilePath = path.join(stateDir, 'mcp_state.json');
 
         // Initialize MCP server
         this.server = new Server(
@@ -59,6 +67,7 @@ class CodeIndexerMcpServer {
         });
 
         this.setupTools();
+        this.loadState();
     }
 
     private setupConsoleRedirection() {
@@ -73,6 +82,41 @@ class CodeIndexerMcpServer {
         };
 
         // Keep console.error unchanged as it already goes to stderr
+    }
+
+    private async saveState(): Promise<void> {
+        const state = {
+            activeCodebasePath: this.activeCodebasePath,
+            indexedCodebases: this.indexedCodebases,
+            indexingStats: this.indexingStats
+        };
+        try {
+            await fs.promises.writeFile(this.stateFilePath, JSON.stringify(state, null, 2));
+            console.log(`Saved MCP state to ${this.stateFilePath}`);
+        } catch (error) {
+            console.error('Failed to save MCP state:', error);
+        }
+    }
+
+    private loadState(): void {
+        try {
+            if (fs.existsSync(this.stateFilePath)) {
+                const stateJson = fs.readFileSync(this.stateFilePath, 'utf-8');
+                const state = JSON.parse(stateJson);
+                this.activeCodebasePath = state.activeCodebasePath || null;
+                this.indexedCodebases = state.indexedCodebases || [];
+                this.indexingStats = state.indexingStats || null;
+                if(this.activeCodebasePath) {
+                    console.log(`Loaded MCP state from ${this.stateFilePath}. Active codebase: ${this.activeCodebasePath}`);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load MCP state:', error);
+            // Reset state if file is corrupt
+            this.activeCodebasePath = null;
+            this.indexedCodebases = [];
+            this.indexingStats = null;
+        }
     }
 
     private setupTools() {
@@ -97,6 +141,29 @@ class CodeIndexerMcpServer {
                                 }
                             },
                             required: ["path"]
+                        }
+                    },
+                    {
+                        name: "switch_codebase",
+                        description: "Switch the active codebase for search and sync",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                path: {
+                                    type: "string",
+                                    description: "Path to the codebase to switch to"
+                                }
+                            },
+                            required: ["path"]
+                        }
+                    },
+                    {
+                        name: "list_indexed_codebases",
+                        description: "List all indexed codebases",
+                        inputSchema: {
+                            type: "object",
+                            properties: {},
+                            required: []
                         }
                     },
                     {
@@ -144,6 +211,10 @@ class CodeIndexerMcpServer {
             switch (name) {
                 case "index_codebase":
                     return await this.handleIndexCodebase(args);
+                case "switch_codebase":
+                    return await this.handleSwitchCodebase(args);
+                case "list_indexed_codebases":
+                    return await this.handleListCodebases();
                 case "search_code":
                     return await this.handleSearchCode(args);
                 case "clear_index":
@@ -185,44 +256,121 @@ class CodeIndexerMcpServer {
             const absolutePath = path.resolve(codebasePath);
 
             // Clear index if force is true
-            if (forceReindex && this.currentCodebasePath) {
-                await this.codeIndexer.clearIndex(this.currentCodebasePath);
+            if (forceReindex && this.activeCodebasePath) {
+                await this.codeIndexer.clearIndex(this.activeCodebasePath);
             }
 
             // Start indexing
             const stats = await this.codeIndexer.indexCodebase(absolutePath);
 
             // Store current codebase path and stats
-            this.currentCodebasePath = absolutePath;
+            this.activeCodebasePath = absolutePath;
+            if (!this.indexedCodebases.includes(absolutePath)) {
+                this.indexedCodebases.push(absolutePath);
+            }
             this.indexingStats = stats;
+            await this.saveState();
 
             return {
                 content: [{
                     type: "text",
-                    text: `Successfully indexed codebase at '${absolutePath}'\n` +
-                        `Indexed files: ${stats.indexedFiles}\n` +
-                        `Total chunks: ${stats.totalChunks}`
+                    text: `Successfully indexed codebase '${absolutePath}'.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.`
                 }]
             };
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+        } catch (error: any) {
+            console.error('Error during indexing:', error);
             return {
                 content: [{
                     type: "text",
-                    text: `Error indexing codebase: ${errorMessage}`
+                    text: `Error indexing codebase: ${error.message}`
                 }],
                 isError: true
             };
         }
     }
 
+    private async handleSwitchCodebase(args: any) {
+        const { path: codebasePath } = args;
+        const absolutePath = path.resolve(codebasePath);
+
+        if (!this.indexedCodebases.includes(absolutePath)) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first.`
+                }],
+                isError: true
+            };
+        }
+
+        this.activeCodebasePath = absolutePath;
+        await this.saveState();
+
+        return {
+            content: [{
+                type: "text",
+                text: `Switched active codebase to '${absolutePath}'`
+            }]
+        };
+    }
+
+    private async handleListCodebases() {
+        if (this.indexedCodebases.length === 0) {
+            return {
+                content: [{
+                    type: "text",
+                    text: "No codebases have been indexed yet."
+                }]
+            };
+        }
+
+        const codebaseList = this.indexedCodebases.map(p => 
+            p === this.activeCodebasePath ? `* ${p} (active)` : `  ${p}`
+        ).join('\n');
+
+        return {
+            content: [{
+                type: "text",
+                text: `Available codebases:\n${codebaseList}`
+            }]
+        };
+    }
+
+    private async handleSyncIndex() {
+        if (!this.activeCodebasePath) {
+            // Silently return if no codebase is indexed
+            return;
+        }
+
+        if (this.isSyncing) {
+            console.log('Index sync already in progress. Skipping.');
+            return;
+        }
+
+        this.isSyncing = true;
+        console.log(`Starting index sync for '${this.activeCodebasePath}'...`);
+
+        try {
+            const stats = await this.codeIndexer.reindexByChange(this.activeCodebasePath);
+            if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
+                console.log(`Index sync complete. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified}`);
+            } else {
+                console.log('No changes detected for index sync.');
+            }
+        } catch (error: any) {
+            console.error('Error during index sync:', error);
+        } finally {
+            this.isSyncing = false;
+        }
+    }
+
     private async handleSearchCode(args: any) {
-        const { query, limit } = args;
+        const { query, limit = 10 } = args;
         const resultLimit = limit || 10;
 
         try {
             // Check if we have a current codebase path
-            if (!this.currentCodebasePath) {
+            if (!this.activeCodebasePath) {
                 return {
                     content: [{
                         type: "text",
@@ -233,7 +381,7 @@ class CodeIndexerMcpServer {
             }
 
             const searchResults = await this.codeIndexer.semanticSearch(
-                this.currentCodebasePath,
+                this.activeCodebasePath,
                 query,
                 Math.min(resultLimit, 50),
                 0.3
@@ -289,7 +437,7 @@ class CodeIndexerMcpServer {
             };
         }
 
-        if (!this.currentCodebasePath) {
+        if (!this.activeCodebasePath) {
             return {
                 content: [{
                     type: "text",
@@ -299,11 +447,14 @@ class CodeIndexerMcpServer {
         }
 
         try {
-            await this.codeIndexer.clearIndex(this.currentCodebasePath);
+            const pathToClear = this.activeCodebasePath;
+            await this.codeIndexer.clearIndex(pathToClear);
 
             // Reset state
-            this.currentCodebasePath = null;
+            this.indexedCodebases = this.indexedCodebases.filter(p => p !== pathToClear);
+            this.activeCodebasePath = null;
             this.indexingStats = null;
+            await this.saveState();
 
             return {
                 content: [{
@@ -333,15 +484,17 @@ class CodeIndexerMcpServer {
         return content.substring(0, maxLength) + '...';
     }
 
+    private startBackgroundSync() {
+        // Periodically check for file changes and update the index
+        setInterval(() => this.handleSyncIndex(), 5 * 1000); // every 5 minutes
+    }
+
     async start() {
-        try {
-            const transport = new StdioServerTransport();
-            await this.server.connect(transport);
-            console.error("CodeIndexer MCP Server started successfully (stdio)");
-        } catch (error) {
-            console.error("Failed to start CodeIndexer MCP Server:", error);
-            process.exit(1);
-        }
+        console.log('Starting CodeIndexer MCP server...');
+        this.startBackgroundSync();
+        const transport = new StdioServerTransport();
+        await this.server.connect(transport);
+        console.log("MCP server started and listening on stdio.");
     }
 }
 
