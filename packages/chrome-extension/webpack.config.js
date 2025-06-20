@@ -62,11 +62,7 @@ module.exports = {
         { from: 'src/manifest.json', to: 'manifest.json' },
         { from: 'src/options.html', to: 'options.html' },
         { from: 'src/styles.css', to: 'styles.css' },
-        { from: 'src/icons', to: 'icons' },
-        { 
-          from: '../../node_modules/.pnpm/onnxruntime-web@*/node_modules/onnxruntime-web/dist/*.wasm',
-          to: '[name][ext]'
-        }
+        { from: 'src/icons', to: 'icons' }
       ]
     }),
     new webpack.ProvidePlugin({

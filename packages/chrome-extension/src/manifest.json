@@ -12,8 +12,7 @@
       "32": "icons/icon32.svg",
       "48": "icons/icon48.svg",
       "128": "icons/icon128.svg"
-    },
-    "default_popup": "options.html"
+    }
   },
   "permissions": [
     "storage",
@@ -21,7 +20,10 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://github.com/*"
+    "https://github.com/*",
+    "https://api.openai.com/*",
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"

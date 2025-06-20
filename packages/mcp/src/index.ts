@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -486,7 +487,7 @@ class CodeIndexerMcpServer {
 
     private startBackgroundSync() {
         // Periodically check for file changes and update the index
-        setInterval(() => this.handleSyncIndex(), 5 * 1000); // every 5 minutes
+        setInterval(() => this.handleSyncIndex(), 300 * 1000); // every 5 minutes
     }
 
     async start() {

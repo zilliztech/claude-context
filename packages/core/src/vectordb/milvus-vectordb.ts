@@ -183,16 +183,21 @@ export class MilvusVectorDatabase implements VectorDatabase {
     }
 
     async query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]> {
-        const result = await this.client.query({
-            collection_name: collectionName,
-            filter: filter,
-            output_fields: outputFields,
-        });
+        try {
+            const result = await this.client.query({
+                collection_name: collectionName,
+                filter: filter,
+                output_fields: outputFields,
+            });
 
-        if (result.status.error_code !== 'Success') {
-            throw new Error(`Failed to query Milvus: ${result.status.reason}`);
+            if (result.status.error_code !== 'Success') {
+                throw new Error(`Failed to query Milvus: ${result.status.reason}`);
+            }
+
+            return result.data || [];
+        } catch (error) {
+            console.error(`❌ Failed to query collection '${collectionName}':`, error);
+            throw error;
         }
-
-        return result.data;
     }
 } 
