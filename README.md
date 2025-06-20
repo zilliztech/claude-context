@@ -49,7 +49,7 @@ CodeIndexer bridges the gap between human understanding and code discovery throu
 - 🎨 **Customizable**: Configurable file extensions, ignore patterns, and chunk sizes
 
 ## 🏗️ Architecture
-![](asserts/Architecture.png)
+![](assets/Architecture.png)
 
 CodeIndexer is a monorepo containing three main packages:
 

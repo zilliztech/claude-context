@@ -15,6 +15,46 @@ The core indexing engine for CodeIndexer - a powerful tool for semantic search a
 - **Smart Chunking**: Intelligent code splitting that preserves context and structure
 - **Batch Processing**: Efficient processing of large codebases with progress tracking
 - **Pattern Matching**: Built-in ignore patterns for common build artifacts and dependencies
+- **Incremental File Synchronization**: Efficient change detection using Merkle trees to only re-index modified files
+
+## File Synchronization Architecture
+
+CodeIndexer implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
+
+![File Synchronization Architecture](../../assets/file_synchronizer.png)
+
+### How It Works
+
+The file synchronization system uses a **Merkle tree-based approach** combined with SHA-256 file hashing to detect changes:
+
+#### 1. File Hashing
+- Each file in the codebase is hashed using SHA-256
+- File hashes are computed based on file content, not metadata
+- Hashes are stored with relative file paths for consistency across different environments
+
+#### 2. Merkle Tree Construction
+- All file hashes are organized into a Merkle tree structure
+- The tree provides a single root hash that represents the entire codebase state
+- Any change to any file will cause the root hash to change
+
+#### 3. Snapshot Management
+- File synchronization state is persisted to `~/.codeindexer/merkle/` directory
+- Each codebase gets a unique snapshot file based on its absolute path hash
+- Snapshots contain both file hashes and serialized Merkle tree data
+
+#### 4. Change Detection Process
+1. **Quick Check**: Compare current Merkle root hash with stored snapshot
+2. **Detailed Analysis**: If root hashes differ, perform file-by-file comparison
+3. **Change Classification**: Categorize changes into three types:
+   - **Added**: New files that didn't exist before
+   - **Modified**: Existing files with changed content
+   - **Removed**: Files that were deleted from the codebase
+
+#### 5. Incremental Updates
+- Only process files that have actually changed
+- Update vector database entries only for modified chunks
+- Remove entries for deleted files
+- Add entries for new files
 
 ## Embedding Providers
 
@@ -191,4 +231,4 @@ This package is part of the CodeIndexer monorepo. Please see:
 
 ## License
 
-MIT - See [LICENSE](../../LICENSE) for details 
+MIT - See [LICENSE](../../LICENSE) for details
