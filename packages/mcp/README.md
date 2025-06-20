@@ -16,6 +16,7 @@ The Model Context Protocol (MCP) is an open protocol that standardizes how AI ap
 - **🔌 MCP Protocol Compliance**: Full compatibility with MCP-enabled AI assistants and agents
 - **🔍 Semantic Code Search**: Natural language queries to find relevant code snippets
 - **📁 Codebase Indexing**: Index entire codebases for fast semantic search
+- **🔄 Auto-Sync**: Automatically detects and synchronizes file changes to keep index up-to-date
 - **🧠 AI-Powered**: Uses OpenAI embeddings and Milvus vector database
 - **⚡ Real-time**: Interactive indexing and searching with progress feedback
 - **🛠️ Tool-based**: Exposes three main tools via MCP protocol
