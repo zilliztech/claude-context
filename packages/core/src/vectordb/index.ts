@@ -63,6 +63,14 @@ export interface VectorDatabase {
      * @param ids Document ID array
      */
     delete(collectionName: string, ids: string[]): Promise<void>;
+
+    /**
+     * Query documents by filter
+     * @param collectionName Collection name
+     * @param filter Filter expression string
+     * @param outputFields Fields to return
+     */
+    query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]>;
 }
 
 // Implementation class exports

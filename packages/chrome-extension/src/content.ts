@@ -1,6 +1,11 @@
 export {};
 
 function isRepoHomePage() {
+    // Don't show on GitHub settings pages
+    if (window.location.pathname.startsWith('/settings/')) {
+        return false;
+    }
+    
     // Matches /user/repo or /user/repo/tree/branch but not /user/repo/issues etc.
     return /^\/[^/]+\/[^/]+(\/tree\/[^/]+)?\/?$/.test(window.location.pathname);
 }
@@ -64,6 +69,22 @@ function injectUI() {
                                 <button id="clear-index-btn" class="btn btn-sm" ${!hasToken ? 'disabled' : ''}>
                                     Clear Index
                                 </button>
+                                <button id="show-recent-btn" class="btn btn-sm Link--muted" ${!hasToken ? 'disabled' : ''}>
+                                    Recent Repos
+                                </button>
+                            </div>
+                        </div>
+                        <div id="recent-repos" class="Box mt-2" style="display:none;">
+                            <div class="Box-header">
+                                <h3 class="Box-title">Recently Indexed Repositories</h3>
+                                <button id="close-recent-btn" class="btn-octicon float-right">
+                                    <svg class="octicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+                                        <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="recent-repos-list" class="Box-body">
+                                Loading...
                             </div>
                         </div>
                         <div id="search-results" class="Box mt-2" style="display:none;"></div>
@@ -82,6 +103,8 @@ function injectUI() {
             document.getElementById('index-repo-btn')?.addEventListener('click', startIndexing);
             document.getElementById('clear-index-btn')?.addEventListener('click', clearIndex);
             document.getElementById('search-btn')?.addEventListener('click', handleSearch);
+            document.getElementById('show-recent-btn')?.addEventListener('click', showRecentRepos);
+            document.getElementById('close-recent-btn')?.addEventListener('click', hideRecentRepos);
             document.getElementById('search-input')?.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     handleSearch();
@@ -101,7 +124,7 @@ function injectUI() {
                 window.open(optionsUrl, '_blank');
             });
 
-            // Check if repository is already indexed
+            // Check if repository is already indexed automatically
             checkIndexStatus();
         });
     }
@@ -111,74 +134,149 @@ function startIndexing() {
     const [owner, repo] = window.location.pathname.slice(1).split('/');
     console.log('Start indexing for:', owner, repo);
     const statusEl = document.getElementById('indexing-status');
-    if(statusEl) statusEl.textContent = 'Starting indexing...';
+    if(statusEl) {
+        statusEl.textContent = '🚀 Starting indexing with Milvus...';
+        statusEl.style.color = '#3b82f6';
+    }
     
     const indexBtn = document.getElementById('index-repo-btn') as HTMLButtonElement;
     const clearBtn = document.getElementById('clear-index-btn') as HTMLButtonElement;
     const searchBtn = document.getElementById('search-btn') as HTMLButtonElement;
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
     
-    if(indexBtn) indexBtn.disabled = true;
+    if(indexBtn) {
+        indexBtn.disabled = true;
+        indexBtn.textContent = '⏳ Indexing...';
+    }
     if(clearBtn) clearBtn.disabled = true;
     if(searchBtn) searchBtn.disabled = true;
     if(searchInput) searchInput.disabled = true;
     
-    chrome.runtime.sendMessage({ type: 'START_INDEXING', owner, repo });
+    chrome.runtime.sendMessage({ action: 'indexRepo', owner, repo });
 }
 
 async function checkIndexStatus() {
     const [owner, repo] = window.location.pathname.slice(1).split('/');
+    if (!owner || !repo) return;
+    
     const repoId = `${owner}/${repo}`;
     
+    // 先显示检测状态
+    const statusEl = document.getElementById('indexing-status');
+    if (statusEl) statusEl.textContent = 'Checking repository index status...';
+    
     try {
-        chrome.runtime.sendMessage({ type: 'CHECK_INDEX_STATUS', repoId }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.error('Error checking index status:', chrome.runtime.lastError);
-                updateUIState(false);
-                return;
+        chrome.runtime.sendMessage(
+            { action: 'checkIndexStatus', owner, repo },
+            (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error('Error checking index status:', chrome.runtime.lastError);
+                    updateUIState(false);
+                    if (statusEl) statusEl.textContent = 'Repository needs to be indexed before searching';
+                    return;
+                }
+                
+                if (response && response.success) {
+                    const isIndexed = response.isIndexed;
+                    updateUIState(isIndexed, response.indexInfo);
+                    
+                    if (isIndexed && response.indexInfo) {
+                        const indexedDate = new Date(response.indexInfo.indexedAt).toLocaleDateString();
+                        const lastSearchText = response.indexInfo.lastSearchAt 
+                            ? ` • Last searched: ${new Date(response.indexInfo.lastSearchAt).toLocaleDateString()}`
+                            : '';
+                        if (statusEl) {
+                            statusEl.textContent = `✅ Repository indexed on ${indexedDate} (${response.indexInfo.totalFiles} files, ${response.indexInfo.totalChunks} chunks)${lastSearchText}`;
+                            statusEl.style.color = '#22c55e';
+                        }
+                    } else {
+                        if (statusEl) {
+                            statusEl.textContent = '❌ Repository needs to be indexed before searching';
+                            statusEl.style.color = '#ef4444';
+                        }
+                    }
+                } else {
+                    console.error('Check index status failed:', response?.error);
+                    updateUIState(false);
+                    if (statusEl) {
+                        statusEl.textContent = '❌ Repository needs to be indexed before searching';
+                        statusEl.style.color = '#ef4444';
+                    }
+                }
             }
-            updateUIState(response);
-        });
+        );
     } catch (error) {
-        console.error('Error sending check index status message:', error);
+        console.error('Error checking index status:', error);
         updateUIState(false);
+        if (statusEl) {
+            statusEl.textContent = '❌ Repository needs to be indexed before searching';
+            statusEl.style.color = '#ef4444';
+        }
     }
 }
 
-function updateUIState(isIndexed: boolean) {
+function updateUIState(isIndexed: boolean, indexInfo?: any) {
     const indexBtn = document.getElementById('index-repo-btn') as HTMLButtonElement;
     const clearBtn = document.getElementById('clear-index-btn') as HTMLButtonElement;
     const searchBtn = document.getElementById('search-btn') as HTMLButtonElement;
     const searchInput = document.getElementById('search-input') as HTMLInputElement;
+    const statusEl = document.getElementById('indexing-status');
     
     if (isIndexed) {
         if (indexBtn) {
-            indexBtn.textContent = 'Re-Index Repository';
+            indexBtn.textContent = '🔄 Re-Index Repository';
             indexBtn.title = 'Re-index the repository to update the search index';
             indexBtn.disabled = false;
+            indexBtn.style.backgroundColor = '#fbbf24';
+            indexBtn.style.color = '#1f2937';
         }
         if (clearBtn) {
             clearBtn.disabled = false;
+            clearBtn.style.backgroundColor = '#ef4444';
+            clearBtn.style.color = 'white';
         }
-        if (searchBtn) searchBtn.disabled = false;
-        if (searchInput) searchInput.disabled = false;
+        if (searchBtn) {
+            searchBtn.disabled = false;
+            searchBtn.style.backgroundColor = '#10b981';
+            searchBtn.style.color = 'white';
+        }
+        if (searchInput) {
+            searchInput.disabled = false;
+            searchInput.style.borderColor = '#10b981';
+        }
         
-        const statusEl = document.getElementById('indexing-status');
-        if (statusEl) statusEl.textContent = 'Repository is indexed and ready for search';
+        if (statusEl && !indexInfo) {
+            statusEl.textContent = '✅ Repository is indexed and ready for search';
+            statusEl.style.color = '#22c55e';
+        }
     } else {
         if (indexBtn) {
-            indexBtn.textContent = 'Index Repository';
+            indexBtn.textContent = '📚 Index Repository';
             indexBtn.title = 'Index the repository to enable code search';
             indexBtn.disabled = false;
+            indexBtn.style.backgroundColor = '#3b82f6';
+            indexBtn.style.color = 'white';
         }
         if (clearBtn) {
             clearBtn.disabled = true;
+            clearBtn.style.backgroundColor = '#9ca3af';
+            clearBtn.style.color = '#6b7280';
         }
-        if (searchBtn) searchBtn.disabled = true;
-        if (searchInput) searchInput.disabled = true;
+        if (searchBtn) {
+            searchBtn.disabled = true;
+            searchBtn.style.backgroundColor = '#9ca3af';
+            searchBtn.style.color = '#6b7280';
+        }
+        if (searchInput) {
+            searchInput.disabled = true;
+            searchInput.style.borderColor = '#d1d5db';
+            searchInput.style.backgroundColor = '#f9fafb';
+        }
         
-        const statusEl = document.getElementById('indexing-status');
-        if (statusEl) statusEl.textContent = 'Repository needs to be indexed before searching';
+        if (statusEl && !indexInfo) {
+            statusEl.textContent = '❌ Repository needs to be indexed before searching';
+            statusEl.style.color = '#ef4444';
+        }
     }
 }
 
@@ -196,24 +294,47 @@ function handleSearch() {
     if(searchButton) searchButton.disabled = true;
     
     const [owner, repo] = window.location.pathname.slice(1).split('/');
+    const statusEl = document.getElementById('indexing-status');
+    if (statusEl) {
+        statusEl.textContent = '🔍 Searching with Milvus...';
+        statusEl.style.color = '#3b82f6';
+    }
+    
     try {
-        chrome.runtime.sendMessage({ type: 'SEARCH', owner, repo, query }, (response) => {
+        chrome.runtime.sendMessage({ action: 'searchCode', owner, repo, query }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error('Search error:', chrome.runtime.lastError);
                 if(searchButton) searchButton.disabled = false;
-                const statusEl = document.getElementById('indexing-status');
-                if (statusEl) statusEl.textContent = 'Search failed: ' + chrome.runtime.lastError.message;
+                if (statusEl) {
+                    statusEl.textContent = '❌ Search failed: ' + chrome.runtime.lastError.message;
+                    statusEl.style.color = '#ef4444';
+                }
                 return;
             }
             
-            displayResults(response || []);
+            if (response && response.success) {
+                displayResults(response.results || []);
+                if (statusEl) {
+                    statusEl.textContent = `✅ Found ${response.results?.length || 0} results`;
+                    statusEl.style.color = '#22c55e';
+                }
+            } else {
+                console.error('Search failed:', response?.error);
+                if (statusEl) {
+                    statusEl.textContent = '❌ Search failed: ' + (response?.error || 'Unknown error');
+                    statusEl.style.color = '#ef4444';
+                }
+            }
+            
             if(searchButton) searchButton.disabled = false;
         });
     } catch (error) {
         console.error('Error sending search message:', error);
         if(searchButton) searchButton.disabled = false;
-        const statusEl = document.getElementById('indexing-status');
-        if (statusEl) statusEl.textContent = 'Search failed: ' + error;
+        if (statusEl) {
+            statusEl.textContent = '❌ Search failed: ' + error;
+            statusEl.style.color = '#ef4444';
+        }
     }
 }
 
@@ -226,40 +347,56 @@ function displayResults(results: any[]) {
         return;
     }
 
+    // Ensure results are sorted by score in descending order (highest similarity first)
+    const sortedResults = [...results].sort((a, b) => {
+        const scoreA = a.score !== undefined && a.score !== null ? a.score : 0;
+        const scoreB = b.score !== undefined && b.score !== null ? b.score : 0;
+        return scoreB - scoreA;
+    });
+
     resultsContainer.innerHTML = '';
     resultsContainer.style.display = 'block';
     
     const list = document.createElement('ul');
     list.className = 'list-style-none';
 
-    results.forEach(result => {
+    sortedResults.forEach(result => {
         const item = document.createElement('li');
         
+        // Extract owner/repo from current URL
+        const [owner, repo] = window.location.pathname.slice(1).split('/');
+        
         // Format the file path to show it nicely
-        const filePath = result.file_path;
+        const filePath = result.relativePath;
         const fileExt = filePath.split('.').pop();
+        
+        // Calculate match percentage and determine CSS class
+        const matchPercentage = result.score !== undefined && result.score !== null ? (result.score * 100) : 0;
+        let matchClass = 'low';
+        if (matchPercentage >= 80) {
+            matchClass = 'high';
+        } else if (matchPercentage >= 60) {
+            matchClass = 'medium';
+        }
         
         item.innerHTML = `
             <div class="d-flex flex-items-center">
                 <svg class="octicon mr-2 color-fg-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
                     <path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v11.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25V6H9.75A1.75 1.75 0 018 4.25V1.5H3.75zm5.75.56v2.19c0 .138.112.25.25.25h2.19L9.5 2.06zM2 1.75C2 .784 2.784 0 3.75 0h5.086c.464 0 .909.184 1.237.513l3.414 3.414c.329.328.513.773.513 1.237v8.086A1.75 1.75 0 0112.25 15h-8.5A1.75 1.75 0 012 13.25V1.75z"></path>
                 </svg>
-                <a href="https://github.com/${result.repoId}/blob/main/${result.file_path}" class="Link--primary flex-auto">
-                    ${result.file_path}
+                <a href="https://github.com/${owner}/${repo}/blob/main/${result.relativePath}#L${result.startLine}" class="Link--primary flex-auto" style="font-weight: 600;">
+                    ${result.relativePath}
                 </a>
                 <span class="Label Label--secondary ml-1">${fileExt}</span>
+                <span class="color-fg-muted text-small ml-2">Lines ${result.startLine}-${result.endLine}</span>
+                <span class="match-score ${matchClass}">${matchPercentage.toFixed(1)}%</span>
             </div>
-            <div class="mt-2 color-bg-subtle rounded-2 position-relative">
-                <div class="position-absolute right-0 top-0 pr-2 pt-1">
-                    <span class="Label" title="Similarity score">
-                        ${(result.similarity * 100).toFixed(1)}%
-                    </span>
-                </div>
-                <div class="p-2">
-                    <code class="f6">${escapeHtml(result.chunk)}</code>
-                </div>
+            <div class="color-fg-muted text-small mt-2">
+                <pre class="text-small p-3" style="background-color: #f6f8fa; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5; border: 1px solid #e1e4e8;">${escapeHtml(result.content.substring(0, 300))}${result.content.length > 300 ? '...' : ''}</pre>
             </div>
         `;
+        
+        item.className = 'border-bottom py-2 search-result-item';
         list.appendChild(item);
     });
 
@@ -282,33 +419,170 @@ function clearIndex() {
     const clearBtn = document.getElementById('clear-index-btn') as HTMLButtonElement;
     if (clearBtn) clearBtn.disabled = true;
     
+    const statusEl = document.getElementById('indexing-status');
+    if (statusEl) {
+        statusEl.textContent = '🗑️ Clearing Milvus index...';
+        statusEl.style.color = '#f59e0b';
+    }
+    
     try {
-        chrome.runtime.sendMessage({ type: 'CLEAR_INDEX', repoId }, (response) => {
+        chrome.runtime.sendMessage({ action: 'clearIndex', owner, repo }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error('Error clearing index:', chrome.runtime.lastError);
                 if (clearBtn) clearBtn.disabled = false;
-                const statusEl = document.getElementById('indexing-status');
-                if (statusEl) statusEl.textContent = 'Failed to clear index: ' + chrome.runtime.lastError.message;
+                if (statusEl) {
+                    statusEl.textContent = '❌ Failed to clear index: ' + chrome.runtime.lastError.message;
+                    statusEl.style.color = '#ef4444';
+                }
                 return;
             }
             
-            if (response) {
+            if (response && response.success) {
                 updateUIState(false);
-                const statusEl = document.getElementById('indexing-status');
-                if (statusEl) statusEl.textContent = 'Index cleared. Repository needs to be indexed before searching';
+                if (statusEl) {
+                    statusEl.textContent = '✅ Index cleared. Repository needs to be indexed before searching';
+                    statusEl.style.color = '#22c55e';
+                }
+                
+                // Hide search results if visible
+                const resultsContainer = document.getElementById('search-results');
+                if (resultsContainer) resultsContainer.style.display = 'none';
+                
+                // Clear search input
+                const searchInput = document.getElementById('search-input') as HTMLInputElement;
+                if (searchInput) searchInput.value = '';
             } else {
                 if (clearBtn) clearBtn.disabled = false;
-                const statusEl = document.getElementById('indexing-status');
-                if (statusEl) statusEl.textContent = 'Failed to clear index';
+                if (statusEl) {
+                    statusEl.textContent = '❌ Failed to clear index: ' + (response?.error || 'Unknown error');
+                    statusEl.style.color = '#ef4444';
+                }
             }
         });
     } catch (error) {
         console.error('Error sending clear index message:', error);
         if (clearBtn) clearBtn.disabled = false;
-        const statusEl = document.getElementById('indexing-status');
-        if (statusEl) statusEl.textContent = 'Failed to clear index: ' + error;
+        if (statusEl) {
+            statusEl.textContent = '❌ Failed to clear index: ' + error;
+            statusEl.style.color = '#ef4444';
+        }
     }
 }
+
+function showRecentRepos() {
+    const recentReposContainer = document.getElementById('recent-repos');
+    const recentReposList = document.getElementById('recent-repos-list');
+    
+    if (!recentReposContainer || !recentReposList) return;
+    
+    recentReposContainer.style.display = 'block';
+    recentReposList.innerHTML = 'Loading...';
+    
+    chrome.runtime.sendMessage({ action: 'getIndexedRepos' }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.error('Error getting indexed repos:', chrome.runtime.lastError);
+            recentReposList.innerHTML = 'Error loading recent repositories';
+            return;
+        }
+        
+        if (response && response.success) {
+            displayRecentRepos(response.repos || []);
+        } else {
+            recentReposList.innerHTML = 'Error loading recent repositories: ' + (response?.error || 'Unknown error');
+        }
+    });
+}
+
+function hideRecentRepos() {
+    const recentReposContainer = document.getElementById('recent-repos');
+    if (recentReposContainer) {
+        recentReposContainer.style.display = 'none';
+    }
+}
+
+function displayRecentRepos(repos: any[]) {
+    const recentReposList = document.getElementById('recent-repos-list');
+    if (!recentReposList) return;
+    
+    if (!repos || repos.length === 0) {
+        recentReposList.innerHTML = '<div class="color-fg-muted text-center py-3">No recently indexed repositories</div>';
+        return;
+    }
+    
+    const list = document.createElement('ul');
+    list.className = 'list-style-none';
+    
+    repos.forEach(repo => {
+        const item = document.createElement('li');
+        item.className = 'border-bottom py-2';
+        
+        const indexedDate = new Date(repo.indexedAt).toLocaleDateString();
+        const lastSearchDate = repo.lastSearchAt ? new Date(repo.lastSearchAt).toLocaleDateString() : 'Never';
+        
+        item.innerHTML = `
+            <div class="d-flex flex-items-center justify-content-between">
+                <div class="flex-auto">
+                    <a href="https://github.com/${repo.id}" class="Link--primary font-weight-bold">
+                        ${repo.id}
+                    </a>
+                    <div class="color-fg-muted text-small">
+                        Indexed: ${indexedDate} • ${repo.totalFiles} files, ${repo.totalChunks} chunks
+                    </div>
+                    <div class="color-fg-muted text-small">
+                        Last search: ${lastSearchDate}
+                    </div>
+                </div>
+                <button class="btn btn-sm go-to-repo-btn" data-repo-url="https://github.com/${repo.id}">
+                    Visit
+                </button>
+            </div>
+        `;
+        
+        list.appendChild(item);
+    });
+    
+    recentReposList.innerHTML = '';
+    recentReposList.appendChild(list);
+    
+    // 添加跳转事件监听器
+    list.querySelectorAll('.go-to-repo-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const url = (e.target as HTMLElement).getAttribute('data-repo-url');
+            if (url) {
+                window.location.href = url;
+            }
+        });
+    });
+}
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const statusEl = document.getElementById('indexing-status');
+    
+    if (message.action === 'indexProgress') {
+        if (statusEl) {
+            statusEl.textContent = `🔄 ${message.progress}`;
+            statusEl.style.color = '#3b82f6';
+        }
+    } else if (message.action === 'indexComplete') {
+        if (statusEl) {
+            statusEl.textContent = `✅ Indexing complete! ${message.stats.indexedFiles} files, ${message.stats.totalChunks} chunks`;
+            statusEl.style.color = '#22c55e';
+        }
+        updateUIState(true);
+        
+        // Auto-refresh index status after a short delay to get updated info
+        setTimeout(() => {
+            checkIndexStatus();
+        }, 1000);
+    } else if (message.action === 'indexError') {
+        if (statusEl) {
+            statusEl.textContent = `❌ Indexing failed: ${message.error}`;
+            statusEl.style.color = '#ef4444';
+        }
+        updateUIState(false);
+    }
+});
 
 // Inject UI when the page is loaded
 if (document.readyState === 'loading') {
@@ -317,7 +591,18 @@ if (document.readyState === 'loading') {
     injectUI();
 }
 
-// Also handle dynamic page loads in GitHub
+// Handle dynamic page loads in GitHub (SPA navigation)
+let lastUrl = window.location.href;
 new MutationObserver((mutations, observer) => {
-    injectUI();
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastUrl) {
+        lastUrl = currentUrl;
+        // URL changed, re-inject UI and check index status
+        setTimeout(() => {
+            injectUI();
+        }, 100); // Small delay to ensure DOM is updated
+    } else {
+        // Just check if UI needs to be injected (for dynamic content)
+        injectUI();
+    }
 }).observe(document.body, { childList: true, subtree: true }); 

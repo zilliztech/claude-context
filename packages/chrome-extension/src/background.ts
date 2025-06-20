@@ -1,12 +1,17 @@
-// OpenAI Embedding utilities
-// The extension now relies on OpenAI's embeddings endpoint instead of a locally hosted model.
+// Chrome Extension Background Script with Milvus Integration
+// This replaces the IndexedDB-based storage with Milvus RESTful API
+
+import { ChromeMilvusAdapter, CodeChunk } from './milvus/chromeMilvusAdapter';
+import { MilvusConfigManager } from './config/milvusConfig';
+import { IndexedRepoManager, IndexedRepository } from './storage/indexedRepoManager';
 
 export {};
 
 const EMBEDDING_DIM = 1536;
-const MAX_TOKENS_PER_BATCH = 250000; // Conservative token limit per API request
-const MAX_CHUNKS_PER_BATCH = 100; // Align with core logic
+const MAX_TOKENS_PER_BATCH = 250000;
+const MAX_CHUNKS_PER_BATCH = 100;
 
+// Cosine similarity function
 function cosSim(a: number[], b: number[]): number {
     let dot = 0;
     let normA = 0;
@@ -30,22 +35,13 @@ class EmbeddingModel {
 
     static async getInstance(_progress_callback: Function | undefined = undefined): Promise<EmbeddingFunction> {
         if (this.instance === null) {
-            // Retrieve the OpenAI API key from extension storage.
-            const apiKey: string | undefined = await new Promise((resolve, reject) => {
-                chrome.storage.sync.get(['openaiToken'], (items) => {
-                    if (chrome.runtime.lastError) {
-                        reject(chrome.runtime.lastError);
-                    } else {
-                        resolve(items.openaiToken as string | undefined);
-                    }
-                });
-            });
-
-            if (!apiKey) {
+            // Get OpenAI API key from storage
+            const config = await MilvusConfigManager.getOpenAIConfig();
+            if (!config) {
                 throw new Error('OpenAI API key is not configured.');
             }
 
-            // Define the embedding function that wraps the OpenAI embeddings endpoint.
+            // Define the embedding function
             const embed: EmbeddingFunction = async (input: string | string[], _opts: any = {}): Promise<{ data: number[] }> => {
                 const inputs = Array.isArray(input) ? input : [input];
 
@@ -53,10 +49,10 @@ class EmbeddingModel {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': `Bearer ${config.apiKey}`,
                     },
                     body: JSON.stringify({
-                        model: 'text-embedding-3-small',
+                        model: config.model,
                         input: inputs,
                     }),
                 });
@@ -79,418 +75,595 @@ class EmbeddingModel {
     }
 }
 
-class VectorDB {
-    private dbName: string;
-    private db: IDBDatabase | null;
+// Milvus-based vector storage
+class MilvusVectorDB {
+    private adapter: ChromeMilvusAdapter;
+    public readonly repoCollectionName: string;
 
-    constructor(dbName = 'CodeVectorDB') {
-        this.dbName = dbName;
-        this.db = null;
+    constructor(repoId: string) {
+        this.repoCollectionName = `chrome_repo_${repoId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        this.adapter = new ChromeMilvusAdapter(this.repoCollectionName);
     }
 
-    async open(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, 1);
-
-            request.onupgradeneeded = (event) => {
-                this.db = (event.target as IDBOpenDBRequest).result;
-                if (!this.db.objectStoreNames.contains('code_chunks')) {
-                    const store = this.db.createObjectStore('code_chunks', { autoIncrement: true });
-                    store.createIndex('repoId', 'repoId', { unique: false });
-                }
-            };
-
-            request.onsuccess = (event) => {
-                this.db = (event.target as IDBOpenDBRequest).result;
-                resolve();
-            };
-
-            request.onerror = (event) => {
-                reject('Error opening IndexedDB: ' + (event.target as IDBOpenDBRequest).error);
-            };
-        });
-    }
-
-    async addChunks(chunks: any[]): Promise<void> {
-        if (!this.db) await this.open();
-        const transaction = this.db!.transaction(['code_chunks'], 'readwrite');
-        const store = transaction.objectStore('code_chunks');
-        for (const chunk of chunks) {
-            store.add(chunk);
-        }
-        return new Promise((resolve, reject) => {
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = (event) => reject('Transaction error: ' + (event.target as IDBOpenDBRequest).error);
-        });
-    }
-
-    async getAllChunks(repoId: string): Promise<any[]> {
-        if (!this.db) await this.open();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(['code_chunks'], 'readonly');
-            const store = transaction.objectStore('code_chunks');
-            const index = store.index('repoId');
-            const request = index.getAll(repoId);
-
-            request.onsuccess = () => {
-                resolve(request.result);
-            };
-            request.onerror = (event) => {
-                reject('Error getting chunks: ' + (event.target as IDBOpenDBRequest).error);
-            };
-        });
-    }
-
-    async clearRepo(repoId: string): Promise<void> {
-        if (!this.db) await this.open();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(['code_chunks'], 'readwrite');
-            const store = transaction.objectStore('code_chunks');
-            const index = store.index('repoId');
-            const request = index.openKeyCursor(IDBKeyRange.only(repoId));
-
-            request.onsuccess = () => {
-                const cursor = request.result;
-                if (cursor) {
-                    store.delete(cursor.primaryKey);
-                    cursor.continue();
-                } else {
-                    resolve();
-                }
-            };
-            request.onerror = (event) => reject('Error clearing repo: ' + (event.target as IDBOpenDBRequest).error);
-        });
-    }
-}
-
-class GitHubAPI {
-    token: string;
-    headers: { [key: string]: string };
-
-    constructor(token: string) {
-        this.token = token;
-        this.headers = {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-        };
-    }
-
-    async getRepoTree(owner: string, repo: string, branch: string = 'main'): Promise<any[]> {
-        const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
-        const response = await fetch(url, { headers: this.headers });
-        if (!response.ok) {
-            // If main branch fails, try master
-            if (branch === 'main') {
-                return this.getRepoTree(owner, repo, 'master');
+    async initialize(): Promise<void> {
+        try {
+            await this.adapter.initialize();
+            
+            // Check if collection exists, create if not
+            const exists = await this.adapter.collectionExists();
+            if (!exists) {
+                await this.adapter.createCollection(EMBEDDING_DIM);
             }
-            throw new Error(`GitHub API error: ${response.status}`);
+        } catch (error) {
+            console.error('Failed to initialize Milvus:', error);
+            throw error;
         }
-        const data = await response.json();
-        return data.tree.filter((file: any) => file.type === 'blob' && !file.path.includes('.git'));
     }
 
-    async getFileContent(owner: string, repo: string, fileSha: string): Promise<string> {
-        const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${fileSha}`;
-        const response = await fetch(url, { headers: this.headers });
-        if (!response.ok) {
-            throw new Error(`GitHub API error: ${response.status}`);
+    async addChunks(chunks: CodeChunk[]): Promise<void> {
+        if (chunks.length === 0) return;
+        
+        try {
+            await this.adapter.insertChunks(chunks);
+        } catch (error) {
+            console.error('Failed to add chunks to Milvus:', error);
+            throw error;
         }
-        const data = await response.json();
-        return atob(data.content);
+    }
+
+    async searchSimilar(queryVector: number[], limit: number = 20): Promise<CodeChunk[]> {
+        try {
+            const results = await this.adapter.searchSimilar(queryVector, limit, 0.3);
+            
+            return results.map(result => ({
+                id: result.id,
+                content: result.content,
+                relativePath: result.relativePath,
+                startLine: result.startLine,
+                endLine: result.endLine,
+                fileExtension: result.fileExtension,
+                metadata: result.metadata,
+                score: result.score, // Include score for frontend display
+                vector: [] // Vector not needed for display
+            }));
+        } catch (error) {
+            console.error('Failed to search in Milvus:', error);
+            throw error;
+        }
+    }
+
+    async clear(): Promise<void> {
+        try {
+            await this.adapter.clearCollection();
+            // Recreate the collection
+            await this.adapter.createCollection(EMBEDDING_DIM);
+        } catch (error) {
+            console.error('Failed to clear Milvus collection:', error);
+            throw error;
+        }
+    }
+
+    async getStats(): Promise<{ totalChunks: number } | null> {
+        try {
+            const stats = await this.adapter.getCollectionStats();
+            return stats ? { totalChunks: stats.totalEntities } : null;
+        } catch (error) {
+            console.error('Failed to get Milvus stats:', error);
+            return null;
+        }
     }
 }
 
-const db = new VectorDB();
-
-// Mapping from tabId to repoId to track which repository was indexed in which tab.
-const tabRepoMap: Record<number, string> = {};
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'START_INDEXING') {
-        if (sender.tab?.id) {
-            const repoId = `${message.owner}/${message.repo}`;
-            // Track the repo associated with this tab for later cleanup.
-            tabRepoMap[sender.tab.id] = repoId;
-            startIndexing(message.owner, message.repo, sender.tab.id);
-        }
-        return true;
-    } else if (message.type === 'SEARCH') {
-        // Wrap in try-catch to ensure we always send a response
-        try {
-            performSearch(message.owner, message.repo, message.query)
-                .then(sendResponse)
-                .catch(error => {
-                    console.error('Search error:', error);
-                    sendResponse([]);
-                });
-            return true; // Will respond asynchronously
-        } catch (error) {
-            console.error('Search error:', error);
-            sendResponse([]);
-            return false; // Responded synchronously
-        }
-    } else if (message.type === 'CHECK_INDEX_STATUS') {
-        try {
-            checkIndexStatus(message.repoId)
-                .then(sendResponse)
-                .catch(error => {
-                    console.error('Check index status error:', error);
-                    sendResponse(false);
-                });
-            return true; // Will respond asynchronously
-        } catch (error) {
-            console.error('Check index status error:', error);
-            sendResponse(false);
-            return false; // Responded synchronously
-        }
-    } else if (message.type === 'CLEAR_INDEX') {
-        try {
-            clearRepoIndex(message.repoId)
-                .then(sendResponse)
-                .catch(error => {
-                    console.error('Clear index error:', error);
-                    sendResponse(false);
-                });
-            return true; // Will respond asynchronously
-        } catch (error) {
-            console.error('Clear index error:', error);
-            sendResponse(false);
-            return false; // Responded synchronously
-        }
-    }
-    return false;
-});
-
-/**
- * Batch chunks so that each batch's estimated token count does not exceed the limit.
- * @param chunks Array of string chunks
- * @param maxTokensPerBatch Maximum tokens per batch
- * @returns Array of chunk batches
- */
-function batchChunksByTokenLimit(
-    chunks: string[],
-    maxTokensPerBatch: number,
-    maxChunksPerBatch: number = MAX_CHUNKS_PER_BATCH
-): string[][] {
-    const batches: string[][] = [];
-    let currentBatch: string[] = [];
-    let currentTokens = 0;
-
-    for (const chunk of chunks) {
-        const estimatedTokens = Math.ceil(chunk.length / 4);
-
-        const exceedsTokenLimit = currentTokens + estimatedTokens > maxTokensPerBatch;
-        const exceedsChunkLimit = currentBatch.length >= maxChunksPerBatch;
-
-        if (exceedsTokenLimit || exceedsChunkLimit) {
-            if (currentBatch.length > 0) {
-                batches.push(currentBatch);
-                currentBatch = [];
-                currentTokens = 0;
-            }
-        }
-
-        currentBatch.push(chunk);
-        currentTokens += estimatedTokens;
-    }
-
-    if (currentBatch.length > 0) {
-        batches.push(currentBatch);
-    }
-
-    return batches;
-}
-
-async function sendTabMessage(tabId: number, message: any): Promise<void> {
-    try {
-        const tab = await chrome.tabs.get(tabId);
-        if (!tab) {
-            console.warn(`Tab ${tabId} does not exist`);
-            return;
+// Code splitting functionality - using same parameters as VSCode extension
+function splitCode(content: string, language: string = '', chunkSize: number = 1000, chunkOverlap: number = 200): { content: string; startLine: number; endLine: number }[] {
+    const lines = content.split('\n');
+    const chunks: { content: string; startLine: number; endLine: number }[] = [];
+    
+    // Simple character-based chunking that approximates LangChain's RecursiveCharacterTextSplitter
+    let currentChunk: string[] = [];
+    let currentSize = 0;
+    let startLine = 1;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const lineSize = line.length + 1; // +1 for newline
+        
+        if (currentSize + lineSize > chunkSize && currentChunk.length > 0) {
+            // Create chunk
+            const chunkContent = currentChunk.join('\n');
+            chunks.push({
+                content: chunkContent,
+                startLine: startLine,
+                endLine: startLine + currentChunk.length - 1
+            });
+            
+            // Create overlap - use line-based overlap instead of character-based
+            const overlapLines = Math.min(
+                Math.floor(chunkOverlap / (chunkContent.length / currentChunk.length)),
+                currentChunk.length
+            );
+            
+            const newStartLine = startLine + currentChunk.length - overlapLines;
+            currentChunk = currentChunk.slice(-overlapLines);
+            currentSize = currentChunk.join('\n').length;
+            startLine = newStartLine;
         }
         
-        await chrome.tabs.sendMessage(tabId, message).catch(error => {
-            console.warn(`Failed to send message to tab ${tabId}:`, error);
+        currentChunk.push(line);
+        currentSize += lineSize;
+    }
+    
+    if (currentChunk.length > 0) {
+        chunks.push({
+            content: currentChunk.join('\n'),
+            startLine: startLine,
+            endLine: startLine + currentChunk.length - 1
         });
+    }
+    
+    return chunks.filter(chunk => chunk.content.trim().length > 0);
+}
+
+// GitHub API helpers (reused from original)
+async function validateGitHubToken(token: string): Promise<boolean> {
+    try {
+        const response = await fetch('https://api.github.com/user', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+            }
+        });
+        
+        if (response.status === 401) {
+            throw new Error('Invalid GitHub token or token has expired');
+        }
+        
+        if (response.status === 403) {
+            const remainingRequests = response.headers.get('X-RateLimit-Remaining');
+            if (remainingRequests === '0') {
+                throw new Error('GitHub API rate limit exceeded. Please try again later.');
+            }
+            throw new Error('GitHub token does not have sufficient permissions');
+        }
+        
+        return response.ok;
     } catch (error) {
-        console.warn(`Error checking tab ${tabId}:`, error);
+        console.error('GitHub token validation failed:', error);
+        throw error;
     }
 }
 
-async function startIndexing(owner: string, repo: string, tabId: number) {
-    const repoId = `${owner}/${repo}`;
-    console.log(`Starting indexing for ${repoId}`);
-
-    try {
-        const { githubToken, chunkSize, chunkOverlap } = await new Promise<{ githubToken?: string; chunkSize?: number; chunkOverlap?: number }>((resolve) => {
-            chrome.storage.sync.get(['githubToken', 'chunkSize', 'chunkOverlap'], (items) => resolve(items));
-        });
-
-        const effectiveChunkSize = typeof chunkSize === 'number' ? chunkSize : 1000;
-        const effectiveChunkOverlap = typeof chunkOverlap === 'number' ? chunkOverlap : 200;
-
-        if (!githubToken) {
-            throw new Error('GitHub token not set.');
-        }
-
-        const github = new GitHubAPI(githubToken);
-        const files = await github.getRepoTree(owner, repo);
-
-        // Exclude non-code files such as documentation, images, audio, and video assets
-        const excludedExtensions = [
-            '.md', '.markdown',
-            // Image formats
-            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.svg',
-            // Audio formats
-            '.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma',
-            // Video formats
-            '.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv', '.wmv', '.mpeg', '.mpg'
-        ];
-
-        const codeFiles = files.filter((file: any) => {
-            const lowerPath = file.path.toLowerCase();
-            return !excludedExtensions.some(ext => lowerPath.endsWith(ext));
-        });
-
-        await db.clearRepo(repoId);
-
-        const model = await EmbeddingModel.getInstance();
-
-        const totalFiles = codeFiles.length;
-        let processedFiles = 0;
-        const startTime = performance.now();
-
-        for (const file of codeFiles) {
-            try {
-                const content = await github.getFileContent(owner, repo, file.sha);
-                // Split file into textual chunks
-                const rawChunks = chunkText(content, effectiveChunkSize, effectiveChunkOverlap);
-
-                // Remove chunks that are empty or contain only whitespace
-                const chunks = rawChunks.filter((c) => c.trim().length > 0);
-
-                if (chunks.length === 0) {
-                    continue; // Skip files that yield no meaningful chunks
+async function getGitHubToken(): Promise<string> {
+    return new Promise((resolve, reject) => {
+        chrome.storage.sync.get(['githubToken'], async (items) => {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+            } else if (!items.githubToken) {
+                reject(new Error('GitHub token not found. Please configure your GitHub token in the extension settings.'));
+            } else {
+                try {
+                    // Validate token before returning
+                    await validateGitHubToken(items.githubToken);
+                    resolve(items.githubToken);
+                } catch (error) {
+                    reject(new Error(`GitHub token validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
                 }
-
-                // Embed in batches that respect both token and chunk count limits
-                const chunkBatches = batchChunksByTokenLimit(chunks, MAX_TOKENS_PER_BATCH);
-                let allEmbeddings: number[] = [];
-                for (const batch of chunkBatches) {
-                    const embeddings = await model(batch);
-                    allEmbeddings = allEmbeddings.concat(embeddings.data);
-                }
-
-                const chunkData = chunks.map((chunk, i) => ({
-                    repoId,
-                    file_path: file.path,
-                    chunk,
-                    embedding: Array.from(allEmbeddings.slice(i * EMBEDDING_DIM, (i + 1) * EMBEDDING_DIM))
-                }));
-
-                await db.addChunks(chunkData);
-
-            } catch (error) {
-                console.error(`Error processing file ${file.path}:`, error);
             }
-            processedFiles++;
-            await sendTabMessage(tabId, { 
-                type: 'INDEXING_PROGRESS', 
-                progress: processedFiles, 
-                total: totalFiles 
+        });
+    });
+}
+
+// Check repository access
+async function checkRepositoryAccess(owner: string, repo: string): Promise<void> {
+    const token = await getGitHubToken();
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}`;
+    
+    const response = await fetch(apiUrl, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    });
+    
+    if (response.status === 404) {
+        throw new Error('Repository not found or you do not have access to it. Please check the repository name and ensure your GitHub token has the necessary permissions.');
+    }
+    
+    if (response.status === 403) {
+        const remainingRequests = response.headers.get('X-RateLimit-Remaining');
+        if (remainingRequests === '0') {
+            throw new Error('GitHub API rate limit exceeded. Please try again later.');
+        }
+        throw new Error('Access forbidden. Your GitHub token may not have sufficient permissions to access this repository.');
+    }
+    
+    if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status} - ${await response.text()}`);
+    }
+}
+
+// Rate limiting helper
+async function handleRateLimit(response: Response): Promise<void> {
+    if (response.status === 403) {
+        const remainingRequests = response.headers.get('X-RateLimit-Remaining');
+        const resetTime = response.headers.get('X-RateLimit-Reset');
+        
+        if (remainingRequests === '0' && resetTime) {
+            const resetDate = new Date(parseInt(resetTime) * 1000);
+            const waitTime = resetDate.getTime() - Date.now();
+            
+            if (waitTime > 0 && waitTime < 3600000) { // Wait up to 1 hour
+                console.log(`Rate limit exceeded. Waiting ${Math.ceil(waitTime / 1000)} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
+            } else {
+                throw new Error('GitHub API rate limit exceeded. Please try again later.');
+            }
+        }
+    }
+}
+
+async function fetchRepoFiles(owner: string, repo: string): Promise<any[]> {
+    const token = await getGitHubToken();
+    
+    // First get the default branch
+    const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
+    const repoResponse = await fetch(repoInfoUrl, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    });
+    
+    if (!repoResponse.ok) {
+        throw new Error(`GitHub API error: ${repoResponse.status} - ${await repoResponse.text()}`);
+    }
+    
+    const repoData = await repoResponse.json();
+    const defaultBranch = repoData.default_branch || 'main';
+    
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`;
+    
+    const response = await fetch(apiUrl, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    });
+
+    if (!response.ok) {
+        await handleRateLimit(response);
+        throw new Error(`GitHub API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    return data.tree.filter((item: any) => 
+        item.type === 'blob' && 
+        item.path.match(/\.(ts|tsx|js|jsx|py|java|cpp|c|h|hpp|cs|go|rs|php|rb|swift|kt|scala|m|mm|md)$/)
+    );
+}
+
+async function fetchFileContent(owner: string, repo: string, path: string): Promise<string> {
+    const token = await getGitHubToken();
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    
+    const response = await fetch(apiUrl, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    });
+
+    if (!response.ok) {
+        await handleRateLimit(response);
+        throw new Error(`Failed to fetch file: ${response.status} - ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    if (data.content) {
+        return atob(data.content.replace(/\n/g, ''));
+    }
+    
+    throw new Error('File content not available');
+}
+
+// Main message handlers
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'indexRepo') {
+        handleIndexRepo(request, sendResponse);
+        return true; // Keep message channel open
+    } else if (request.action === 'searchCode') {
+        handleSearchCode(request, sendResponse);
+        return true;
+    } else if (request.action === 'clearIndex') {
+        handleClearIndex(request, sendResponse);
+        return true;
+    } else if (request.action === 'testMilvusConnection') {
+        handleTestMilvusConnection(sendResponse);
+        return true;
+    } else if (request.action === 'checkIndexStatus') {
+        handleCheckIndexStatus(request, sendResponse);
+        return true;
+    } else if (request.action === 'getIndexedRepos') {
+        handleGetIndexedRepos(sendResponse);
+        return true;
+    }
+});
+
+async function handleTestMilvusConnection(sendResponse: Function) {
+    try {
+        console.log('Testing Milvus connection...');
+        
+        const adapter = new ChromeMilvusAdapter('test_connection');
+        const connected = await adapter.testConnection();
+        
+        console.log('Milvus connection test completed successfully');
+        sendResponse({ success: true, connected: true });
+    } catch (error) {
+        console.error('Milvus connection test failed:', error);
+        
+        let errorMessage = 'Unknown error';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        }
+        
+        // Provide more specific error messages based on common issues
+        if (errorMessage.includes('fetch')) {
+            errorMessage = 'Network error: Unable to connect to Milvus server. Check address and network connectivity.';
+        } else if (errorMessage.includes('CORS')) {
+            errorMessage = 'CORS error: Cross-origin request blocked. Check server CORS configuration.';
+        } else if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+            errorMessage = 'Authentication failed: Check your Milvus token or username/password.';
+        } else if (errorMessage.includes('404')) {
+            errorMessage = 'Server not found: Check your Milvus server address.';
+        }
+        
+        sendResponse({ 
+            success: false, 
+            connected: false,
+            error: errorMessage 
+        });
+    }
+}
+
+async function handleIndexRepo(request: any, sendResponse: Function) {
+    try {
+        const { owner, repo } = request;
+        const repoId = `${owner}/${repo}`;
+        
+        sendResponse({ success: true, message: 'Starting indexing process...' });
+
+        // Check repository access first
+        await checkRepositoryAccess(owner, repo);
+
+        // Initialize Milvus
+        const vectorDB = new MilvusVectorDB(repoId);
+        await vectorDB.initialize();
+
+        // Use fixed chunking configuration (same as VSCode extension)
+        const chunkSize = 1000;  // Same as VSCode extension default
+        const chunkOverlap = 200;  // Same as VSCode extension default
+        
+        // Check repository access
+        await checkRepositoryAccess(owner, repo);
+
+        // Fetch repository files
+        const files = await fetchRepoFiles(owner, repo);
+        console.log(`Found ${files.length} files to index`);
+
+        let indexedFiles = 0;
+        let totalChunks = 0;
+        
+        // Get embedding model
+        const embedModel = await EmbeddingModel.getInstance();
+
+        // Process files in batches
+        for (let i = 0; i < files.length; i += 5) {
+            const batch = files.slice(i, i + 5);
+            const batchPromises = batch.map(async (file) => {
+                try {
+                    const content = await fetchFileContent(owner, repo, file.path);
+                    const fileExtension = file.path.split('.').pop() || '';
+                    const chunks = splitCode(content, fileExtension, chunkSize, chunkOverlap);
+                    
+                    const fileChunks: CodeChunk[] = [];
+                    
+                    for (let j = 0; j < chunks.length; j++) {
+                        const chunk = chunks[j];
+                        if (chunk.content.trim().length > 10) {
+                            const { data: embeddings } = await embedModel(chunk.content);
+                            
+                            const codeChunk: CodeChunk = {
+                                id: `${file.path}_chunk_${j}`,
+                                content: chunk.content,
+                                relativePath: file.path,
+                                startLine: chunk.startLine,
+                                endLine: chunk.endLine,
+                                fileExtension: fileExtension,
+                                metadata: JSON.stringify({
+                                    repoId,
+                                    fileSize: file.size,
+                                    chunkIndex: j
+                                }),
+                                vector: embeddings
+                            };
+                            
+                            fileChunks.push(codeChunk);
+                        }
+                    }
+                    
+                    if (fileChunks.length > 0) {
+                        await vectorDB.addChunks(fileChunks);
+                        indexedFiles++;
+                        totalChunks += fileChunks.length;
+                    }
+                    
+                    console.log(`Indexed ${file.path} (${fileChunks.length} chunks)`);
+                } catch (error) {
+                    console.error(`Failed to index ${file.path}:`, error);
+                }
+            });
+            
+            await Promise.all(batchPromises);
+            
+            // Send progress update
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]?.id) {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                        action: 'indexProgress',
+                        progress: `Indexed ${indexedFiles}/${files.length} files (${totalChunks} chunks)`
+                    });
+                }
             });
         }
-        
-        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-        await sendTabMessage(tabId, { 
-            type: 'INDEXING_COMPLETE', 
-            duration 
+
+        // Send completion message
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]?.id) {
+                chrome.tabs.sendMessage(tabs[0].id, {
+                    action: 'indexComplete',
+                    stats: { indexedFiles, totalChunks }
+                });
+            }
         });
 
-    } catch (error: any) {
+        // 保存索引信息到存储
+        await IndexedRepoManager.addIndexedRepo({
+            id: repoId,
+            owner,
+            repo,
+            totalFiles: indexedFiles,
+            totalChunks,
+            collectionName: vectorDB.repoCollectionName
+        });
+
+    } catch (error) {
         console.error('Indexing failed:', error);
-        await sendTabMessage(tabId, { 
-            type: 'INDEXING_COMPLETE', 
-            error: error.message 
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]?.id) {
+                chrome.tabs.sendMessage(tabs[0].id, {
+                    action: 'indexError',
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+            }
         });
     }
 }
 
-async function performSearch(owner: string, repo: string, query: string): Promise<any[]> {
-    const repoId = `${owner}/${repo}`;
-    console.log(`Searching for "${query}" in ${repoId}`);
-
+async function handleSearchCode(request: any, sendResponse: Function) {
     try {
-        const model = await EmbeddingModel.getInstance();
-        const queryEmbedding = await model(query);
+        const { query, owner, repo } = request;
+        const repoId = `${owner}/${repo}`;
+        
+        // Initialize Milvus
+        const vectorDB = new MilvusVectorDB(repoId);
+        await vectorDB.initialize();
 
-        const allChunks = await db.getAllChunks(repoId);
+        // Get query embedding
+        const embedModel = await EmbeddingModel.getInstance();
+        const { data: queryEmbedding } = await embedModel(query);
 
-        if (allChunks.length === 0) {
-            return [];
-        }
+        // Search similar chunks
+        const results = await vectorDB.searchSimilar(queryEmbedding, 20);
 
-        const results = allChunks.map(chunk => {
-            const similarity = cosSim(Array.from(queryEmbedding.data), chunk.embedding);
-            return { ...chunk, similarity };
-        });
+        // 更新最后搜索时间
+        await IndexedRepoManager.updateLastSearchTime(repoId);
 
-        results.sort((a, b) => b.similarity - a.similarity);
-
-        return results.slice(0, 10);
-
+        sendResponse({ success: true, results });
     } catch (error) {
         console.error('Search failed:', error);
-        return [];
-    }
-}
-
-function chunkText(text: string, chunkSize: number, overlap: number): string[] {
-    // Clamp overlap to be less than chunkSize to avoid infinite loops
-    const safeOverlap = Math.min(overlap, chunkSize - 1);
-
-    const chunks: string[] = [];
-    let start = 0;
-
-    while (start < text.length) {
-        const end = Math.min(start + chunkSize, text.length);
-        const chunk = text.slice(start, end);
-        chunks.push(chunk);
-
-        // Move the window forward while keeping the desired overlap
-        start += chunkSize - safeOverlap;
-    }
-
-    return chunks;
-}
-
-// Clean up stored embeddings when the user closes the tab that initiated indexing.
-chrome.tabs.onRemoved.addListener((tabId) => {
-    const repoId = tabRepoMap[tabId];
-    if (repoId) {
-        db.clearRepo(repoId).catch((err) => {
-            console.error('Error clearing repo on tab close:', err);
+        sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
         });
-        delete tabRepoMap[tabId];
-    }
-});
-
-async function checkIndexStatus(repoId: string): Promise<boolean> {
-    try {
-        const chunks = await db.getAllChunks(repoId);
-        return chunks.length > 0;
-    } catch (error) {
-        console.error('Error checking index status:', error);
-        return false;
     }
 }
 
-async function clearRepoIndex(repoId: string): Promise<boolean> {
+async function handleClearIndex(request: any, sendResponse: Function) {
     try {
-        await db.clearRepo(repoId);
-        return true;
+        const { owner, repo } = request;
+        const repoId = `${owner}/${repo}`;
+        
+        const vectorDB = new MilvusVectorDB(repoId);
+        await vectorDB.initialize();
+        await vectorDB.clear();
+
+        // 从存储中移除索引记录
+        await IndexedRepoManager.removeIndexedRepo(repoId);
+
+        sendResponse({ success: true, message: 'Index cleared successfully' });
     } catch (error) {
-        console.error('Error clearing index:', error);
-        return false;
+        console.error('Clear index failed:', error);
+        sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+        });
     }
-} 
+}
+
+async function handleCheckIndexStatus(request: any, sendResponse: Function) {
+    try {
+        const { owner, repo } = request;
+        const repoId = `${owner}/${repo}`;
+        
+        // 检查存储中是否有该仓库的索引记录
+        const indexedRepo = await IndexedRepoManager.isRepoIndexed(repoId);
+        
+        if (indexedRepo) {
+            // 可选：验证Milvus中的集合是否仍然存在
+            try {
+                const vectorDB = new MilvusVectorDB(repoId);
+                await vectorDB.initialize();
+                const stats = await vectorDB.getStats();
+                
+                sendResponse({ 
+                    success: true, 
+                    isIndexed: true,
+                    indexInfo: indexedRepo,
+                    stats 
+                });
+            } catch (milvusError) {
+                // Milvus集合不存在，但存储中有记录，清理存储记录
+                await IndexedRepoManager.removeIndexedRepo(repoId);
+                sendResponse({ 
+                    success: true, 
+                    isIndexed: false,
+                    message: 'Index record found but collection missing, cleaned up storage' 
+                });
+            }
+        } else {
+            sendResponse({ 
+                success: true, 
+                isIndexed: false 
+            });
+        }
+    } catch (error) {
+        console.error('Check index status failed:', error);
+        sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+    }
+}
+
+async function handleGetIndexedRepos(sendResponse: Function) {
+    try {
+        const repos = await IndexedRepoManager.getRecentlyIndexedRepos(20);
+        sendResponse({ 
+            success: true, 
+            repos 
+        });
+    } catch (error) {
+        console.error('Get indexed repos failed:', error);
+        sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+    }
+}
