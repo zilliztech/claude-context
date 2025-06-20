@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub Code Vector Search",
+  "version": "1.0",
+  "description": "Index GitHub repository code and perform vector search.",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "32": "icons/icon32.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    },
+    "default_popup": "options.html"
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://github.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [ "ort-wasm-simd-threaded.wasm", "options.html", "options.js" ],
+      "matches": [ "<all_urls>" ]
+    }
+  ]
+} 
