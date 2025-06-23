@@ -20,6 +20,11 @@ interface CodeIndexerMcpConfig {
     milvusToken?: string;
 }
 
+interface CodebaseSnapshot {
+    indexedCodebases: string[];
+    lastUpdated: string;
+}
+
 class CodeIndexerMcpServer {
     private server: Server;
     private codeIndexer: CodeIndexer;
@@ -27,16 +32,20 @@ class CodeIndexerMcpServer {
     private indexedCodebases: string[] = [];
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
     private isSyncing: boolean = false;
-    private stateFilePath: string;
+    private snapshotFilePath: string;
+    private currentWorkspace: string;
 
     constructor(config: CodeIndexerMcpConfig) {
+        // Get current workspace
+        this.currentWorkspace = process.cwd();
+        console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
+        
+        // Initialize snapshot file path
+        this.snapshotFilePath = path.join(os.homedir(), '.code-indexer-mcp', 'codebase-snapshot.json');
+        
         // Redirect console.log and console.warn to stderr to avoid JSON parsing issues
         // Only MCP protocol messages should go to stdout
         this.setupConsoleRedirection();
-
-        const stateDir = path.join(os.homedir(), '.codeindexer');
-        fs.mkdirSync(stateDir, { recursive: true });
-        this.stateFilePath = path.join(stateDir, 'mcp_state.json');
 
         // Initialize MCP server
         this.server = new Server(
@@ -67,8 +76,10 @@ class CodeIndexerMcpServer {
             vectorDatabase
         });
 
+        // Load existing codebase snapshot on startup
+        this.loadCodebaseSnapshot();
+
         this.setupTools();
-        this.loadState();
     }
 
     private setupConsoleRedirection() {
@@ -85,38 +96,68 @@ class CodeIndexerMcpServer {
         // Keep console.error unchanged as it already goes to stderr
     }
 
-    private async saveState(): Promise<void> {
-        const state = {
-            activeCodebasePath: this.activeCodebasePath,
-            indexedCodebases: this.indexedCodebases,
-            indexingStats: this.indexingStats
-        };
+    private loadCodebaseSnapshot() {
+        console.log('[SNAPSHOT-DEBUG] Loading codebase snapshot from:', this.snapshotFilePath);
+        
         try {
-            await fs.promises.writeFile(this.stateFilePath, JSON.stringify(state, null, 2));
-            console.log(`Saved MCP state to ${this.stateFilePath}`);
-        } catch (error) {
-            console.error('Failed to save MCP state:', error);
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                console.log('[SNAPSHOT-DEBUG] Snapshot file does not exist. Starting with empty codebase list.');
+                return;
+            }
+
+            const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
+            const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
+
+            console.log('[SNAPSHOT-DEBUG] Loaded snapshot:', snapshot);
+
+            // Validate that the codebases still exist
+            const validCodebases: string[] = [];
+            for (const codebasePath of snapshot.indexedCodebases) {
+                if (fs.existsSync(codebasePath)) {
+                    validCodebases.push(codebasePath);
+                    console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
+                } else {
+                    console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
+                }
+            }
+
+            // Restore state
+            this.indexedCodebases = validCodebases;
+
+            console.log(`[SNAPSHOT-DEBUG] Restored ${validCodebases.length} codebases.`);
+
+            // Save updated snapshot if we removed any invalid paths
+            if (validCodebases.length !== snapshot.indexedCodebases.length) {
+                this.saveCodebaseSnapshot();
+            }
+
+        } catch (error: any) {
+            console.error('[SNAPSHOT-DEBUG] Error loading snapshot:', error);
+            console.log('[SNAPSHOT-DEBUG] Starting with empty codebase list due to snapshot error.');
         }
     }
 
-    private loadState(): void {
+    private saveCodebaseSnapshot() {
+        console.log('[SNAPSHOT-DEBUG] Saving codebase snapshot to:', this.snapshotFilePath);
+        
         try {
-            if (fs.existsSync(this.stateFilePath)) {
-                const stateJson = fs.readFileSync(this.stateFilePath, 'utf-8');
-                const state = JSON.parse(stateJson);
-                this.activeCodebasePath = state.activeCodebasePath || null;
-                this.indexedCodebases = state.indexedCodebases || [];
-                this.indexingStats = state.indexingStats || null;
-                if(this.activeCodebasePath) {
-                    console.log(`Loaded MCP state from ${this.stateFilePath}. Active codebase: ${this.activeCodebasePath}`);
-                }
+            // Ensure directory exists
+            const snapshotDir = path.dirname(this.snapshotFilePath);
+            if (!fs.existsSync(snapshotDir)) {
+                fs.mkdirSync(snapshotDir, { recursive: true });
+                console.log('[SNAPSHOT-DEBUG] Created snapshot directory:', snapshotDir);
             }
-        } catch (error) {
-            console.error('Failed to load MCP state:', error);
-            // Reset state if file is corrupt
-            this.activeCodebasePath = null;
-            this.indexedCodebases = [];
-            this.indexingStats = null;
+
+            const snapshot: CodebaseSnapshot = {
+                indexedCodebases: this.indexedCodebases,
+                lastUpdated: new Date().toISOString()
+            };
+
+            fs.writeFileSync(this.snapshotFilePath, JSON.stringify(snapshot, null, 2));
+            console.log('[SNAPSHOT-DEBUG] Snapshot saved successfully. Codebases:', this.indexedCodebases.length);
+
+        } catch (error: any) {
+            console.error('[SNAPSHOT-DEBUG] Error saving snapshot:', error);
         }
     }
 
@@ -145,34 +186,15 @@ class CodeIndexerMcpServer {
                         }
                     },
                     {
-                        name: "switch_codebase",
-                        description: "Switch the active codebase for search and sync",
+                        name: "search_code",
+                        description: "Search the indexed codebase using natural language queries within specified path",
                         inputSchema: {
                             type: "object",
                             properties: {
                                 path: {
                                     type: "string",
-                                    description: "Path to the codebase to switch to"
-                                }
-                            },
-                            required: ["path"]
-                        }
-                    },
-                    {
-                        name: "list_indexed_codebases",
-                        description: "List all indexed codebases",
-                        inputSchema: {
-                            type: "object",
-                            properties: {},
-                            required: []
-                        }
-                    },
-                    {
-                        name: "search_code",
-                        description: "Search the indexed codebase using natural language queries",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
+                                    description: "Path to the codebase directory to search in"
+                                },
                                 query: {
                                     type: "string",
                                     description: "Natural language query to search for in the codebase"
@@ -184,7 +206,7 @@ class CodeIndexerMcpServer {
                                     maximum: 50
                                 }
                             },
-                            required: ["query"]
+                            required: ["path", "query"]
                         }
                     },
                     {
@@ -193,12 +215,12 @@ class CodeIndexerMcpServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                confirm: {
-                                    type: "boolean",
-                                    description: "Confirmation flag to prevent accidental clearing"
+                                path: {
+                                    type: "string",
+                                    description: "Path to the codebase directory to clear"
                                 }
                             },
-                            required: ["confirm"]
+                            required: ["path"]
                         }
                     }
                 ]
@@ -212,10 +234,6 @@ class CodeIndexerMcpServer {
             switch (name) {
                 case "index_codebase":
                     return await this.handleIndexCodebase(args);
-                case "switch_codebase":
-                    return await this.handleSwitchCodebase(args);
-                case "list_indexed_codebases":
-                    return await this.handleListCodebases();
                 case "search_code":
                     return await this.handleSearchCode(args);
                 case "clear_index":
@@ -258,20 +276,21 @@ class CodeIndexerMcpServer {
             }
 
             // Clear index if force is true
-            if (forceReindex && this.activeCodebasePath) {
-                await this.codeIndexer.clearIndex(this.activeCodebasePath);
+            if (forceReindex) {
+                await this.codeIndexer.clearIndex(absolutePath);
             }
 
             // Start indexing
             const stats = await this.codeIndexer.indexCodebase(absolutePath);
 
             // Store current codebase path and stats
-            this.activeCodebasePath = absolutePath;
             if (!this.indexedCodebases.includes(absolutePath)) {
                 this.indexedCodebases.push(absolutePath);
             }
             this.indexingStats = stats;
-            await this.saveState();
+
+            // Save snapshot after updating codebase list
+            this.saveCodebaseSnapshot();
 
             // Include path information in response to confirm what was actually indexed
             const pathInfo = codebasePath !== absolutePath 
@@ -296,99 +315,146 @@ class CodeIndexerMcpServer {
         }
     }
 
-    private async handleSwitchCodebase(args: any) {
-        const { path: codebasePath } = args;
-        const absolutePath = this.ensureAbsolutePath(codebasePath);
-
-        if (!this.indexedCodebases.includes(absolutePath)) {
-            return {
-                content: [{
-                    type: "text",
-                    text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first.`
-                }],
-                isError: true
-            };
-        }
-
-        this.activeCodebasePath = absolutePath;
-        await this.saveState();
-
-        return {
-            content: [{
-                type: "text",
-                text: `Switched active codebase to '${absolutePath}'`
-            }]
-        };
-    }
-
-    private async handleListCodebases() {
-        if (this.indexedCodebases.length === 0) {
-            return {
-                content: [{
-                    type: "text",
-                    text: "No codebases have been indexed yet."
-                }]
-            };
-        }
-
-        const codebaseList = this.indexedCodebases.map(p => 
-            p === this.activeCodebasePath ? `* ${p} (active)` : `  ${p}`
-        ).join('\n');
-
-        return {
-            content: [{
-                type: "text",
-                text: `Available codebases:\n${codebaseList}`
-            }]
-        };
-    }
-
     private async handleSyncIndex() {
-        if (!this.activeCodebasePath) {
-            // Silently return if no codebase is indexed
+        const syncStartTime = Date.now();
+        console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
+        
+        if (this.indexedCodebases.length === 0) {
+            console.log('[SYNC-DEBUG] No codebases indexed. Skipping sync.');
             return;
         }
 
+        console.log(`[SYNC-DEBUG] Found ${this.indexedCodebases.length} indexed codebases:`, this.indexedCodebases);
+        console.log(`[SYNC-DEBUG] Active codebase: ${this.activeCodebasePath || 'none'}`);
+
         if (this.isSyncing) {
-            console.log('Index sync already in progress. Skipping.');
+            console.log('[SYNC-DEBUG] Index sync already in progress. Skipping.');
             return;
         }
 
         this.isSyncing = true;
-        console.log(`Starting index sync for '${this.activeCodebasePath}'...`);
+        console.log(`[SYNC-DEBUG] Starting index sync for all ${this.indexedCodebases.length} codebases...`);
 
         try {
-            const stats = await this.codeIndexer.reindexByChange(this.activeCodebasePath);
-            if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
-                console.log(`Index sync complete. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified}`);
-            } else {
-                console.log('No changes detected for index sync.');
+            let totalStats = { added: 0, removed: 0, modified: 0 };
+            
+            for (let i = 0; i < this.indexedCodebases.length; i++) {
+                const codebasePath = this.indexedCodebases[i];
+                const codebaseStartTime = Date.now();
+                
+                console.log(`[SYNC-DEBUG] [${i + 1}/${this.indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
+                
+                // Check if codebase path still exists
+                try {
+                    const pathExists = fs.existsSync(codebasePath);
+                    console.log(`[SYNC-DEBUG] Codebase path exists: ${pathExists}`);
+                    
+                    if (!pathExists) {
+                        console.warn(`[SYNC-DEBUG] Codebase path '${codebasePath}' no longer exists. Skipping sync.`);
+                        continue;
+                    }
+                } catch (pathError: any) {
+                    console.error(`[SYNC-DEBUG] Error checking codebase path '${codebasePath}':`, pathError);
+                    continue;
+                }
+                
+                try {
+                    console.log(`[SYNC-DEBUG] Calling codeIndexer.reindexByChange() for '${codebasePath}'`);
+                    const stats = await this.codeIndexer.reindexByChange(codebasePath);
+                    const codebaseElapsed = Date.now() - codebaseStartTime;
+                    
+                    console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
+                    console.log(`[SYNC-DEBUG] Codebase sync completed in ${codebaseElapsed}ms`);
+                    
+                    // Accumulate total stats
+                    totalStats.added += stats.added;
+                    totalStats.removed += stats.removed;
+                    totalStats.modified += stats.modified;
+                    
+                    if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
+                        console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
+                    } else {
+                        console.log(`[SYNC] No changes detected for '${codebasePath}' (${codebaseElapsed}ms)`);
+                    }
+                } catch (error: any) {
+                    const codebaseElapsed = Date.now() - codebaseStartTime;
+                    console.error(`[SYNC-DEBUG] Error syncing codebase '${codebasePath}' after ${codebaseElapsed}ms:`, error);
+                    console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
+                    
+                    // Log additional error details
+                    if (error.code) {
+                        console.error(`[SYNC-DEBUG] Error code: ${error.code}`);
+                    }
+                    if (error.errno) {
+                        console.error(`[SYNC-DEBUG] Error errno: ${error.errno}`);
+                    }
+                    
+                    // Continue with next codebase even if one fails
+                }
             }
+            
+            const totalElapsed = Date.now() - syncStartTime;
+            console.log(`[SYNC-DEBUG] Total sync stats across all codebases: Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
+            console.log(`[SYNC-DEBUG] Index sync completed for all codebases in ${totalElapsed}ms`);
+            console.log(`[SYNC] Index sync completed for all codebases. Total changes - Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
         } catch (error: any) {
-            console.error('Error during index sync:', error);
+            const totalElapsed = Date.now() - syncStartTime;
+            console.error(`[SYNC-DEBUG] Error during index sync after ${totalElapsed}ms:`, error);
+            console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
         } finally {
             this.isSyncing = false;
+            const totalElapsed = Date.now() - syncStartTime;
+            console.log(`[SYNC-DEBUG] handleSyncIndex() finished at ${new Date().toISOString()}, total duration: ${totalElapsed}ms`);
         }
     }
 
     private async handleSearchCode(args: any) {
-        const { query, limit = 10 } = args;
+        const { path: codebasePath, query, limit = 10 } = args;
         const resultLimit = limit || 10;
 
         try {
-            // Check if we have a current codebase path
-            if (!this.activeCodebasePath) {
+            // Force absolute path resolution - warn if relative path provided
+            const absolutePath = this.ensureAbsolutePath(codebasePath);
+            
+            // Validate path exists
+            if (!fs.existsSync(absolutePath)) {
                 return {
                     content: [{
                         type: "text",
-                        text: "Error: No codebase has been indexed yet. Please index a codebase first."
+                        text: `Error: Path '${absolutePath}' does not exist. Original input: '${codebasePath}'`
                     }],
                     isError: true
                 };
             }
 
+            // Check if it's a directory
+            const stat = fs.statSync(absolutePath);
+            if (!stat.isDirectory()) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Path '${absolutePath}' is not a directory`
+                    }],
+                    isError: true
+                };
+            }
+
+            // Check if this codebase is indexed
+            if (!this.indexedCodebases.includes(absolutePath)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first.`
+                    }],
+                    isError: true
+                };
+            }
+
+            console.log(`[SEARCH] Searching in codebase: ${absolutePath}`);
+
+            // Search in the specified codebase
             const searchResults = await this.codeIndexer.semanticSearch(
-                this.activeCodebasePath,
+                absolutePath,
                 query,
                 Math.min(resultLimit, 50),
                 0.3
@@ -398,17 +464,18 @@ class CodeIndexerMcpServer {
                 return {
                     content: [{
                         type: "text",
-                        text: `No results found for query: "${query}"`
+                        text: `No results found for query: "${query}" in codebase '${absolutePath}'`
                     }]
                 };
             }
 
             // Format results
-            const formattedResults = searchResults.map((result: SemanticSearchResult, index: number) => {
+            const formattedResults = searchResults.map((result: any, index: number) => {
                 const location = `${result.relativePath}:${result.startLine}`;
                 const context = this.truncateContent(result.content, 150);
+                const codebaseInfo = path.basename(absolutePath);
 
-                return `${index + 1}. Code snippet (${result.language})\n` +
+                return `${index + 1}. Code snippet (${result.language}) [${codebaseInfo}]\n` +
                     `   Location: ${location}\n` +
                     `   Score: ${result.score.toFixed(3)}\n` +
                     `   Context: ${context}\n`;
@@ -417,7 +484,7 @@ class CodeIndexerMcpServer {
             return {
                 content: [{
                     type: "text",
-                    text: `Found ${searchResults.length} results for query: "${query}"\n\n${formattedResults}`
+                    text: `Found ${searchResults.length} results for query: "${query}" in codebase '${absolutePath}'\n\n${formattedResults}`
                 }]
             };
         } catch (error) {
@@ -433,40 +500,96 @@ class CodeIndexerMcpServer {
     }
 
     private async handleClearIndex(args: any) {
-        const { confirm } = args;
+        const { path: codebasePath } = args;
 
-        if (!confirm) {
+        if (this.indexedCodebases.length === 0) {
             return {
                 content: [{
                     type: "text",
-                    text: "Index clearing cancelled. Set 'confirm' to true to proceed."
-                }]
-            };
-        }
-
-        if (!this.activeCodebasePath) {
-            return {
-                content: [{
-                    type: "text",
-                    text: "No codebase is currently indexed."
+                    text: "No codebases are currently indexed."
                 }]
             };
         }
 
         try {
-            const pathToClear = this.activeCodebasePath;
-            await this.codeIndexer.clearIndex(pathToClear);
+            // Force absolute path resolution - warn if relative path provided
+            const absolutePath = this.ensureAbsolutePath(codebasePath);
+            
+            // Validate path exists
+            if (!fs.existsSync(absolutePath)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Path '${absolutePath}' does not exist. Original input: '${codebasePath}'`
+                    }],
+                    isError: true
+                };
+            }
 
-            // Reset state
-            this.indexedCodebases = this.indexedCodebases.filter(p => p !== pathToClear);
-            this.activeCodebasePath = null;
-            this.indexingStats = null;
-            await this.saveState();
+            // Check if it's a directory
+            const stat = fs.statSync(absolutePath);
+            if (!stat.isDirectory()) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Path '${absolutePath}' is not a directory`
+                    }],
+                    isError: true
+                };
+            }
+
+            // Check if this codebase is indexed
+            if (!this.indexedCodebases.includes(absolutePath)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Codebase '${absolutePath}' is not indexed.`
+                    }],
+                    isError: true
+                };
+            }
+
+            console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
+
+            try {
+                await this.codeIndexer.clearIndex(absolutePath);
+                console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
+            } catch (error: any) {
+                const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;
+                console.error(`[CLEAR] ${errorMsg}`);
+                return {
+                    content: [{
+                        type: "text",
+                        text: errorMsg
+                    }],
+                    isError: true
+                };
+            }
+
+            // Remove the cleared codebase from the list
+            this.indexedCodebases = this.indexedCodebases.filter(codebasePath => 
+                codebasePath !== absolutePath
+            );
+            
+            // Reset active codebase if it was cleared
+            if (this.activeCodebasePath === absolutePath) {
+                this.activeCodebasePath = null;
+                this.indexingStats = null;
+            }
+
+            // Save snapshot after clearing index
+            this.saveCodebaseSnapshot();
+
+            let resultText = `Successfully cleared codebase '${absolutePath}'`;
+            
+            if (this.indexedCodebases.length > 0) {
+                resultText += `\n${this.indexedCodebases.length} other codebase(s) remain indexed`;
+            }
 
             return {
                 content: [{
                     type: "text",
-                    text: "Index cleared successfully"
+                    text: resultText
                 }]
             };
         } catch (error) {
@@ -492,16 +615,40 @@ class CodeIndexerMcpServer {
     }
 
     private startBackgroundSync() {
+        console.log('[SYNC-DEBUG] startBackgroundSync() called');
+        
+        // Execute initial sync immediately after a short delay to let server initialize
+        console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
+        setTimeout(() => {
+            console.log('[SYNC-DEBUG] Executing initial sync after server startup');
+            this.handleSyncIndex();
+        }, 5000); // Initial sync after 5 seconds
+        
         // Periodically check for file changes and update the index
-        setInterval(() => this.handleSyncIndex(), 300 * 1000); // every 5 minutes
+        console.log('[SYNC-DEBUG] Setting up periodic sync every 5 minutes (300000ms)');
+        const syncInterval = setInterval(() => {
+            console.log('[SYNC-DEBUG] Executing scheduled periodic sync');
+            this.handleSyncIndex();
+        }, 5 * 60 * 1000); // every 5 minutes
+        
+        console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
     }
 
     async start() {
+        console.log('[SYNC-DEBUG] MCP server start() method called');
         console.log('Starting CodeIndexer MCP server...');
-        this.startBackgroundSync();
+        
         const transport = new StdioServerTransport();
+        console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
+        
         await this.server.connect(transport);
         console.log("MCP server started and listening on stdio.");
+        console.log('[SYNC-DEBUG] Server connection established successfully');
+        
+        // Start background sync after server is connected
+        console.log('[SYNC-DEBUG] Initializing background sync...');
+        this.startBackgroundSync();
+        console.log('[SYNC-DEBUG] MCP server initialization complete');
     }
 
     /**
