@@ -231,30 +231,31 @@ class CodeIndexerMcpServer {
         const forceReindex = force || false;
 
         try {
+            // Force absolute path resolution - warn if relative path provided
+            const absolutePath = this.ensureAbsolutePath(codebasePath);
+            
             // Validate path exists
-            if (!fs.existsSync(codebasePath)) {
+            if (!fs.existsSync(absolutePath)) {
                 return {
                     content: [{
                         type: "text",
-                        text: `Error: Path '${codebasePath}' does not exist`
+                        text: `Error: Path '${absolutePath}' does not exist. Original input: '${codebasePath}'`
                     }],
                     isError: true
                 };
             }
 
             // Check if it's a directory
-            const stat = fs.statSync(codebasePath);
+            const stat = fs.statSync(absolutePath);
             if (!stat.isDirectory()) {
                 return {
                     content: [{
                         type: "text",
-                        text: `Error: Path '${codebasePath}' is not a directory`
+                        text: `Error: Path '${absolutePath}' is not a directory`
                     }],
                     isError: true
                 };
             }
-
-            const absolutePath = path.resolve(codebasePath);
 
             // Clear index if force is true
             if (forceReindex && this.activeCodebasePath) {
@@ -272,10 +273,15 @@ class CodeIndexerMcpServer {
             this.indexingStats = stats;
             await this.saveState();
 
+            // Include path information in response to confirm what was actually indexed
+            const pathInfo = codebasePath !== absolutePath 
+                ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
+                : '';
+
             return {
                 content: [{
                     type: "text",
-                    text: `Successfully indexed codebase '${absolutePath}'.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.`
+                    text: `Successfully indexed codebase '${absolutePath}'.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
                 }]
             };
         } catch (error: any) {
@@ -292,7 +298,7 @@ class CodeIndexerMcpServer {
 
     private async handleSwitchCodebase(args: any) {
         const { path: codebasePath } = args;
-        const absolutePath = path.resolve(codebasePath);
+        const absolutePath = this.ensureAbsolutePath(codebasePath);
 
         if (!this.indexedCodebases.includes(absolutePath)) {
             return {
@@ -496,6 +502,32 @@ class CodeIndexerMcpServer {
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
         console.log("MCP server started and listening on stdio.");
+    }
+
+    /**
+     * Ensure path is absolute. If relative path is provided, resolve it properly.
+     * This method addresses the issue where relative paths in MCP context may not resolve correctly.
+     */
+    private ensureAbsolutePath(inputPath: string): string {
+        // If already absolute, return as is
+        if (path.isAbsolute(inputPath)) {
+            return inputPath;
+        }
+
+        // For relative paths, we need to be more careful
+        // Log a warning about potential path resolution issues
+        console.warn(`Relative path detected: '${inputPath}'. Converting to absolute path.`);
+        
+        // Common relative path patterns that might indicate user intent
+        if (inputPath === '.' || inputPath === './') {
+            console.warn(`Current directory reference detected. This may not resolve to the directory you expect in MCP context.`);
+        }
+        
+        // Try to resolve relative to current working directory
+        const resolved = path.resolve(inputPath);
+        console.warn(`Resolved relative path '${inputPath}' to '${resolved}'. If this is incorrect, please provide an absolute path.`);
+        
+        return resolved;
     }
 }
 
