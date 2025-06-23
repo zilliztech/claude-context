@@ -112,7 +112,7 @@
         "vscode:prepublish": "pnpm run webpack",
         "compile": "pnpm clean && tsc --build --force && node copy-assets.js",
         "webpack": "pnpm clean && webpack --mode production && node copy-assets.js",
-        "webpack:dev": "webpack --mode development",
+        "webpack:dev": "webpack --mode development && node copy-assets.js",
         "watch": "tsc -watch -p ./",
         "clean": "rm -rf dist",
         "lint": "eslint src",
