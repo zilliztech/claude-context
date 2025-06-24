@@ -210,7 +210,7 @@ export class CodeIndexer {
             await newSynchronizer.initialize();
             this.synchronizers.set(collectionName, newSynchronizer);
         }
-        
+
         const currentSynchronizer = this.synchronizers.get(collectionName)!;
 
         progressCallback?.({ phase: 'Checking for file changes...', current: 0, total: 100, percentage: 0 });
@@ -243,7 +243,7 @@ export class CodeIndexer {
             await this.deleteFileChunks(collectionName, file);
             updateProgress(`Deleted old chunks for ${file}`);
         }
-        
+
         // Handle added and modified files
         const filesToIndex = [...added, ...modified].map(f => path.join(codebasePath, f));
 
@@ -255,7 +255,7 @@ export class CodeIndexer {
                 updateProgress(`Indexed a batch of ${batch.length} files`);
             }
         }
-        
+
         console.log(`✅ Re-indexing complete. Added: ${added.length}, Removed: ${removed.length}, Modified: ${modified.length}`);
         progressCallback?.({ phase: 'Re-indexing complete!', current: totalChanges, total: totalChanges, percentage: 100 });
 
@@ -268,7 +268,7 @@ export class CodeIndexer {
             `relativePath == "${relativePath}"`,
             ['id']
         );
-    
+
         if (results.length > 0) {
             const ids = results.map(r => r.id as string).filter(id => id);
             if (ids.length > 0) {
@@ -394,6 +394,12 @@ export class CodeIndexer {
     private async prepareCollection(codebasePath: string): Promise<void> {
         // Create new collection
         const collectionName = this.getCollectionName(codebasePath);
+
+        // For Ollama embeddings, ensure dimension is detected before creating collection
+        if (this.embedding.getProvider() === 'Ollama' && typeof (this.embedding as any).initializeDimension === 'function') {
+            await (this.embedding as any).initializeDimension();
+        }
+
         const dimension = this.embedding.getDimension();
         await this.vectorDatabase.createCollection(collectionName, dimension, `Code chunk vector storage collection for codebase: ${codebasePath}`);
         console.log(`✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
