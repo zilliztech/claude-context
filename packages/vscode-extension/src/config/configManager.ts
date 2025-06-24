@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, MilvusConfig } from '@code-indexer/core';
+import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, MilvusConfig } from '@code-indexer/core';
 
 // Simplified Milvus configuration interface for frontend
 export interface MilvusWebConfig {
@@ -13,6 +13,9 @@ export type EmbeddingProviderConfig = {
 } | {
     provider: 'VoyageAI';
     config: VoyageAIEmbeddingConfig;
+} | {
+    provider: 'Ollama';
+    config: OllamaEmbeddingConfig;
 };
 
 export interface PluginConfig {
@@ -55,6 +58,21 @@ const PROVIDERS = {
         optionalFields: [] as FieldDefinition[],
         defaultConfig: {
             model: 'voyage-code-3'
+        }
+    },
+    'Ollama': {
+        name: 'Ollama',
+        class: OllamaEmbedding,
+        requiredFields: [
+            { name: 'model', type: 'string', description: 'Model name (e.g., nomic-embed-text, mxbai-embed-large)', inputType: 'text', required: true, placeholder: 'nomic-embed-text' }
+        ] as FieldDefinition[],
+        optionalFields: [
+            { name: 'host', type: 'string', description: 'Ollama server host URL', inputType: 'url', placeholder: 'http://127.0.0.1:11434' },
+            { name: 'keepAlive', type: 'string', description: 'Keep model alive duration', inputType: 'text', placeholder: '5m' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            model: 'nomic-embed-text',
+            host: 'http://127.0.0.1:11434'
         }
     }
 } as const;
@@ -118,7 +136,7 @@ export class ConfigManager {
         if (!configObject) return undefined;
 
         return {
-            provider: provider as 'OpenAI' | 'VoyageAI',
+            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama',
             config: configObject
         };
     }
@@ -185,9 +203,12 @@ export class ConfigManager {
         const result: any = {};
 
         for (const [providerKey, providerInfo] of Object.entries(PROVIDERS)) {
+            // Ollama doesn't have getSupportedModels since users input model names manually
+            const models = providerKey === 'Ollama' ? {} : (providerInfo.class as any).getSupportedModels();
+
             result[providerKey] = {
                 name: providerInfo.name,
-                models: providerInfo.class.getSupportedModels(),
+                models: models,
                 requiredFields: [...providerInfo.requiredFields],
                 optionalFields: [...providerInfo.optionalFields],
                 defaultConfig: providerInfo.defaultConfig

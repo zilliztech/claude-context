@@ -34,4 +34,5 @@ export interface Embedding {
 
 // Implementation class exports
 export * from './openai-embedding';
-export * from './voyageai-embedding'; 
+export * from './voyageai-embedding';
+export * from './ollama-embedding'; 

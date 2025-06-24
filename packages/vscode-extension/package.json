@@ -81,7 +81,8 @@
                     "type": "string",
                     "enum": [
                         "OpenAI",
-                        "VoyageAI"
+                        "VoyageAI",
+                        "Ollama"
                     ],
                     "description": "Embedding service provider"
                 },

@@ -18,6 +18,7 @@
         "fs-extra": "^11.0.0",
         "glob": "^10.0.0",
         "langchain": "^0.3.27",
+        "ollama": "^0.5.16",
         "openai": "^5.1.1",
         "typescript": "^5.0.0",
         "voyageai": "^0.0.4"

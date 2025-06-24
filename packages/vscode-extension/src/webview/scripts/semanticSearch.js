@@ -153,7 +153,8 @@ class SemanticSearchController {
             // Add basic provider options (models will be loaded from backend)
             const defaultProviders = [
                 { value: 'OpenAI', text: 'OpenAI' },
-                { value: 'VoyageAI', text: 'VoyageAI' }
+                { value: 'VoyageAI', text: 'VoyageAI' },
+                { value: 'Ollama', text: 'Ollama' }
             ];
 
             defaultProviders.forEach(provider => {
@@ -363,8 +364,8 @@ class SemanticSearchController {
 
         let input;
 
-        if (field.name === 'model') {
-            // Special handling for model field - create select
+        if (field.name === 'model' && field.inputType === 'select') {
+            // Special handling for model field with select type - create dropdown
             input = document.createElement('select');
             input.id = field.name;
             input.required = field.required || false;
