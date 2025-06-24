@@ -1,7 +1,9 @@
 import {
     Splitter,
     CodeChunk,
-    LangChainCodeSplitter
+    SplitterType,
+    SplitterConfig,
+    createSplitter
 } from './splitter';
 import {
     Embedding,
@@ -83,6 +85,8 @@ export interface CodeIndexerConfig {
     embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
     codeSplitter?: Splitter;
+    splitterConfig?: SplitterConfig; // New: splitter configuration
+    // Deprecated: use splitterConfig instead
     chunkSize?: number;
     chunkOverlap?: number;
     supportedExtensions?: string[];
@@ -109,10 +113,18 @@ export class CodeIndexer {
         }
         this.vectorDatabase = config.vectorDatabase;
 
-        this.codeSplitter = config.codeSplitter || new LangChainCodeSplitter(
-            config.chunkSize || 1000,
-            config.chunkOverlap || 200
-        );
+        // Initialize splitter with intelligent configuration
+        if (config.codeSplitter) {
+            this.codeSplitter = config.codeSplitter;
+        } else {
+            // Create splitter based on configuration
+            const splitterConfig: SplitterConfig = config.splitterConfig || {
+                type: SplitterType.AST, // Default to AST with built-in fallback
+                chunkSize: config.chunkSize || 1000,
+                chunkOverlap: config.chunkOverlap || 200
+            };
+            this.codeSplitter = createSplitter(splitterConfig);
+        }
 
         this.supportedExtensions = config.supportedExtensions || DEFAULT_SUPPORTED_EXTENSIONS;
         this.ignorePatterns = config.ignorePatterns || DEFAULT_IGNORE_PATTERNS;
@@ -386,6 +398,15 @@ export class CodeIndexer {
     updateVectorDatabase(vectorDatabase: VectorDatabase): void {
         this.vectorDatabase = vectorDatabase;
         console.log(`🔄 Updated vector database`);
+    }
+
+    /**
+     * Update splitter configuration
+     * @param splitterConfig New splitter configuration
+     */
+    updateSplitterConfig(splitterConfig: SplitterConfig): void {
+        this.codeSplitter = createSplitter(splitterConfig);
+        console.log(`🔄 Updated splitter configuration: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
     }
 
     /**
@@ -724,5 +745,77 @@ export class CodeIndexer {
 
         const regex = new RegExp(`^${regexPattern}$`);
         return regex.test(text);
+    }
+
+    // ===== Splitter Management Methods =====
+
+    /**
+     * Switch to a different splitter type
+     * @param splitterConfig New splitter configuration
+     */
+    setSplitter(splitterConfig: SplitterConfig): void {
+        this.codeSplitter = createSplitter(splitterConfig);
+    }
+
+    /**
+     * Get current splitter information
+     */
+    getSplitterInfo(): { type: string; hasBuiltinFallback: boolean; supportedLanguages?: string[] } {
+        const splitterName = this.codeSplitter.constructor.name;
+        
+        if (splitterName === 'AstCodeSplitter') {
+            const { AstCodeSplitter } = require('./splitter/ast-splitter');
+            return {
+                type: 'ast',
+                hasBuiltinFallback: true,
+                supportedLanguages: AstCodeSplitter.getSupportedLanguages()
+            };
+        } else {
+            return {
+                type: 'langchain',
+                hasBuiltinFallback: false
+            };
+        }
+    }
+
+    /**
+     * Check if current splitter supports a specific language
+     * @param language Programming language
+     */
+    isLanguageSupported(language: string): boolean {
+        const splitterName = this.codeSplitter.constructor.name;
+        
+        if (splitterName === 'AstCodeSplitter') {
+            const { AstCodeSplitter } = require('./splitter/ast-splitter');
+            return AstCodeSplitter.isLanguageSupported(language);
+        }
+        
+        // LangChain splitter supports most languages
+        return true;
+    }
+
+    /**
+     * Get which strategy would be used for a specific language
+     * @param language Programming language
+     */
+    getSplitterStrategyForLanguage(language: string): { strategy: 'ast' | 'langchain'; reason: string } {
+        const splitterName = this.codeSplitter.constructor.name;
+        
+        if (splitterName === 'AstCodeSplitter') {
+            const { AstCodeSplitter } = require('./splitter/ast-splitter');
+            const isSupported = AstCodeSplitter.isLanguageSupported(language);
+            
+            return {
+                strategy: isSupported ? 'ast' : 'langchain',
+                reason: isSupported 
+                    ? 'Language supported by AST parser'
+                    : 'Language not supported by AST, will fallback to LangChain'
+            };
+        } else {
+            return {
+                strategy: 'langchain',
+                reason: 'Using LangChain splitter directly'
+            };
+        }
     }
 }

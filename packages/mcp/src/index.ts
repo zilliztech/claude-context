@@ -5,7 +5,7 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeIndexer, SemanticSearchResult } from "@code-indexer/core";
+import { CodeIndexer, SemanticSearchResult, SplitterType, SplitterConfig } from "@code-indexer/core";
 import { OpenAIEmbedding } from "@code-indexer/core";
 import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
@@ -169,7 +169,7 @@ class CodeIndexerMcpServer {
                 tools: [
                     {
                         name: "index_codebase",
-                        description: "Index a codebase directory for semantic search",
+                        description: "Index a codebase directory for semantic search with configurable code splitter",
                         inputSchema: {
                             type: "object",
                             properties: {
@@ -181,6 +181,12 @@ class CodeIndexerMcpServer {
                                     type: "boolean",
                                     description: "Force re-indexing even if already indexed",
                                     default: false
+                                },
+                                splitter: {
+                                    type: "string",
+                                    description: "Code splitter to use: 'ast' for syntax-aware splitting with automatic fallback, 'langchain' for character-based splitting",
+                                    enum: ["ast", "langchain"],
+                                    default: "ast"
                                 }
                             },
                             required: ["path"]
@@ -246,10 +252,21 @@ class CodeIndexerMcpServer {
     }
 
     private async handleIndexCodebase(args: any) {
-        const { path: codebasePath, force } = args;
+        const { path: codebasePath, force, splitter } = args;
         const forceReindex = force || false;
+        const splitterType = splitter || 'ast'; // Default to AST
 
         try {
+            // Validate splitter parameter
+            if (splitterType !== 'ast' && splitterType !== 'langchain') {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Invalid splitter type '${splitterType}'. Must be 'ast' or 'langchain'.`
+                    }],
+                    isError: true
+                };
+            }
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = this.ensureAbsolutePath(codebasePath);
             
@@ -281,18 +298,53 @@ class CodeIndexerMcpServer {
                 await this.codeIndexer.clearIndex(absolutePath);
             }
 
-            // Initialize file synchronizer
+            // Create a temporary CodeIndexer with the specified splitter for this indexing operation
+            let indexerForThisTask = this.codeIndexer;
+            
+            if (splitterType !== 'ast') { // Only create new instance if not using default AST
+                console.log(`[INDEX] Creating CodeIndexer with ${splitterType} splitter for this indexing task`);
+                
+                // Get embedding and vector database from existing indexer
+                const embedding = this.codeIndexer['embedding'];
+                const vectorDatabase = this.codeIndexer['vectorDatabase'];
+                
+                // Create splitter configuration
+                const splitterConfig: SplitterConfig = {
+                    type: splitterType === 'ast' ? SplitterType.AST : SplitterType.LANGCHAIN,
+                    chunkSize: 1000,
+                    chunkOverlap: 200
+                };
+                
+                // Create temporary indexer with specified splitter
+                const { createSplitter } = await import("@code-indexer/core");
+                const customSplitter = createSplitter(splitterConfig);
+                
+                indexerForThisTask = new CodeIndexer({
+                    embedding,
+                    vectorDatabase,
+                    codeSplitter: customSplitter
+                });
+            }
+
+            // Initialize file synchronizer  
             const { FileSynchronizer } = await import("@code-indexer/core");
             const synchronizer = new FileSynchronizer(absolutePath);
             await synchronizer.initialize();
             // Store synchronizer in the indexer's internal map using the same collection name generation logic
-            const normalizedPath = require('path').resolve(absolutePath);
-            const hash = require('crypto').createHash('md5').update(normalizedPath).digest('hex');
+            const normalizedPath = path.resolve(absolutePath);
+            const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
             const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+            
+            // Store synchronizer in both indexers if using a custom one
             this.codeIndexer['synchronizers'].set(collectionName, synchronizer);
+            if (indexerForThisTask !== this.codeIndexer) {
+                indexerForThisTask['synchronizers'].set(collectionName, synchronizer);
+            }
 
-            // Start indexing
-            const stats = await this.codeIndexer.indexCodebase(absolutePath);
+            console.log(`[INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
+            
+            // Start indexing with the appropriate indexer
+            const stats = await indexerForThisTask.indexCodebase(absolutePath);
 
             // Store current codebase path and stats
             if (!this.indexedCodebases.includes(absolutePath)) {
@@ -303,7 +355,7 @@ class CodeIndexerMcpServer {
             // Save snapshot after updating codebase list
             this.saveCodebaseSnapshot();
 
-            // Include path information in response to confirm what was actually indexed
+            // Include splitter and path information in response to confirm what was actually indexed
             const pathInfo = codebasePath !== absolutePath 
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
                 : '';
@@ -311,7 +363,7 @@ class CodeIndexerMcpServer {
             return {
                 content: [{
                     type: "text",
-                    text: `Successfully indexed codebase '${absolutePath}'.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
+                    text: `Successfully indexed codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
                 }]
             };
         } catch (error: any) {
