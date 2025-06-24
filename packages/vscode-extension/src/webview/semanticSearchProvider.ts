@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { WebviewHelper } from './webviewHelper';
 import { SearchCommand } from '../commands/searchCommand';
 import { IndexCommand } from '../commands/indexCommand';
+import { SyncCommand } from '../commands/syncCommand';
 import { ConfigManager, EmbeddingProviderConfig } from '../config/configManager';
 import * as path from 'path';
 
@@ -9,20 +10,23 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
     private searchCommand: SearchCommand;
     private indexCommand: IndexCommand;
+    private syncCommand: SyncCommand;
     private configManager: ConfigManager;
 
-    constructor(private readonly _extensionUri: vscode.Uri, searchCommand: SearchCommand, indexCommand: IndexCommand, configManager: ConfigManager) {
+    constructor(private readonly _extensionUri: vscode.Uri, searchCommand: SearchCommand, indexCommand: IndexCommand, syncCommand: SyncCommand, configManager: ConfigManager) {
         this.searchCommand = searchCommand;
         this.indexCommand = indexCommand;
+        this.syncCommand = syncCommand;
         this.configManager = configManager;
     }
 
     /**
      * Update the command instances (used when configuration changes)
      */
-    updateCommands(searchCommand: SearchCommand, indexCommand: IndexCommand): void {
+    updateCommands(searchCommand: SearchCommand, indexCommand: IndexCommand, syncCommand: SyncCommand): void {
         this.searchCommand = searchCommand;
         this.indexCommand = indexCommand;
+        this.syncCommand = syncCommand;
     }
 
     resolveWebviewView(

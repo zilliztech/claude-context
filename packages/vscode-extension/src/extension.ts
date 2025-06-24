@@ -3,14 +3,17 @@ import { SemanticSearchViewProvider } from './webview/semanticSearchProvider';
 
 import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
+import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
 import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, MilvusRestfulVectorDatabase } from '@code-indexer/core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;
 let indexCommand: IndexCommand;
+let syncCommand: SyncCommand;
 let configManager: ConfigManager;
 let codeIndexer: CodeIndexer;
+let autoSyncDisposable: vscode.Disposable | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('CodeIndexer extension is now active!');
@@ -24,7 +27,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize providers and commands
     searchCommand = new SearchCommand(codeIndexer);
     indexCommand = new IndexCommand(codeIndexer);
-    semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri, searchCommand, indexCommand, configManager);
+    syncCommand = new SyncCommand(codeIndexer);
+    semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri, searchCommand, indexCommand, syncCommand, configManager);
 
     // Register command handlers
     const disposables = [
@@ -38,7 +42,8 @@ export async function activate(context: vscode.ExtensionContext) {
         // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('semanticCodeSearch.embeddingProvider') ||
-                event.affectsConfiguration('semanticCodeSearch.milvus')) {
+                event.affectsConfiguration('semanticCodeSearch.milvus') ||
+                event.affectsConfiguration('semanticCodeSearch.autoSync')) {
                 console.log('CodeIndexer configuration changed, reloading...');
                 reloadCodeIndexerConfiguration();
             }
@@ -58,6 +63,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(...disposables);
 
+    // Initialize auto-sync if enabled
+    setupAutoSync();
+    
+    // Run initial sync on startup
+    runInitialSync();
+
     // Show status bar item
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.text = `$(search) CodeIndexer`;
@@ -66,6 +77,43 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBarItem.show();
 
     context.subscriptions.push(statusBarItem);
+}
+
+async function runInitialSync() {
+    try {
+        console.log('[STARTUP] Running initial sync...');
+        await syncCommand.executeSilent();
+        console.log('[STARTUP] Initial sync completed');
+    } catch (error) {
+        console.error('[STARTUP] Initial sync failed:', error);
+        // Don't show error message to user for startup sync failure
+    }
+}
+
+function setupAutoSync() {
+    const config = vscode.workspace.getConfiguration('semanticCodeSearch');
+    const autoSyncEnabled = config.get<boolean>('autoSync.enabled', true); 
+    const autoSyncInterval = config.get<number>('autoSync.intervalMinutes', 5);
+
+    // Stop existing auto-sync if running
+    if (autoSyncDisposable) {
+        autoSyncDisposable.dispose();
+        autoSyncDisposable = null;
+    }
+
+    if (autoSyncEnabled) {
+        console.log(`Setting up auto-sync with ${autoSyncInterval} minute interval`);
+        
+        // Start periodic auto-sync
+        syncCommand.startAutoSync(autoSyncInterval).then(disposable => {
+            autoSyncDisposable = disposable;
+        }).catch(error => {
+            console.error('Failed to start auto-sync:', error);
+            vscode.window.showErrorMessage(`Failed to start auto-sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        });
+    } else {
+        console.log('Auto-sync disabled');
+    }
 }
 
 function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer {
@@ -129,6 +177,14 @@ function reloadCodeIndexerConfiguration() {
             console.log(`Vector database updated with Milvus REST API (address: ${milvusConfig.address})`);
         }
 
+        // Update command instances with new codeIndexer
+        searchCommand.updateCodeIndexer(codeIndexer);
+        indexCommand.updateCodeIndexer(codeIndexer);
+        syncCommand.updateCodeIndexer(codeIndexer);
+
+        // Restart auto-sync if it was enabled
+        setupAutoSync();
+
         console.log('CodeIndexer configuration reloaded successfully');
         vscode.window.showInformationMessage('Configuration reloaded successfully!');
     } catch (error) {
@@ -139,4 +195,10 @@ function reloadCodeIndexerConfiguration() {
 
 export function deactivate() {
     console.log('CodeIndexer extension is now deactivated');
-} 
+    
+    // Stop auto-sync if running
+    if (autoSyncDisposable) {
+        autoSyncDisposable.dispose();
+        autoSyncDisposable = null;
+    }
+}
