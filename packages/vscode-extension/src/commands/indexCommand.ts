@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CodeIndexer } from '@code-indexer/core';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 
 export class IndexCommand {
     private codeIndexer: CodeIndexer;
@@ -114,6 +115,17 @@ export class IndexCommand {
                         progress.report({ increment: 0, message: progressInfo.phase });
                     }
                 );
+
+                // Initialize file synchronizer
+                progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
+                const { FileSynchronizer } = await import("@code-indexer/core");
+                const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath);
+                await synchronizer.initialize();
+                // Store synchronizer in the indexer's internal map using the same collection name generation logic
+                const normalizedPath = path.resolve(selectedFolder.uri.fsPath);
+                const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+                const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+                this.codeIndexer['synchronizers'].set(collectionName, synchronizer);
 
                 // Start indexing with progress callback
                 indexStats = await this.codeIndexer.indexCodebase(

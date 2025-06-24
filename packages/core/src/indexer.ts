@@ -139,11 +139,6 @@ export class CodeIndexer {
     ): Promise<{ indexedFiles: number; totalChunks: number }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
 
-        // Initialize file synchronizer
-        const synchronizer = new FileSynchronizer(codebasePath);
-        await synchronizer.initialize();
-        this.synchronizers.set(this.getCollectionName(codebasePath), synchronizer);
-
         // 1. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
         await this.prepareCollection(codebasePath);

@@ -104,6 +104,18 @@
                 "semanticCodeSearch.milvus.token": {
                     "type": "string",
                     "description": "Milvus authentication token (optional)"
+                },
+                "semanticCodeSearch.autoSync.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable automatic synchronization of workspace index every 5 minutes"
+                },
+                "semanticCodeSearch.autoSync.intervalMinutes": {
+                    "type": "number",
+                    "default": 5,
+                    "minimum": 1,
+                    "maximum": 60,
+                    "description": "Auto-sync interval in minutes (1-60). This runs periodic sync to keep the index updated."
                 }
             }
         }

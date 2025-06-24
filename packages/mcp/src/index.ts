@@ -11,6 +11,7 @@ import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import * as crypto from "crypto";
 
 interface CodeIndexerMcpConfig {
     name: string;
@@ -279,6 +280,16 @@ class CodeIndexerMcpServer {
             if (forceReindex) {
                 await this.codeIndexer.clearIndex(absolutePath);
             }
+
+            // Initialize file synchronizer
+            const { FileSynchronizer } = await import("@code-indexer/core");
+            const synchronizer = new FileSynchronizer(absolutePath);
+            await synchronizer.initialize();
+            // Store synchronizer in the indexer's internal map using the same collection name generation logic
+            const normalizedPath = require('path').resolve(absolutePath);
+            const hash = require('crypto').createHash('md5').update(normalizedPath).digest('hex');
+            const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+            this.codeIndexer['synchronizers'].set(collectionName, synchronizer);
 
             // Start indexing
             const stats = await this.codeIndexer.indexCodebase(absolutePath);
