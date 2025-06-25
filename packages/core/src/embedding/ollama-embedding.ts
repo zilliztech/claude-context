@@ -34,12 +34,18 @@ export class OllamaEmbedding implements Embedding {
     private async updateDimensionForModel(model: string): Promise<void> {
         try {
             // Use a dummy query to detect embedding dimension
-            const response = await this.client.embed({
+            const embedOptions: any = {
                 model: model,
                 input: 'test',
-                keep_alive: this.config.keepAlive,
                 options: this.config.options,
-            });
+            };
+
+            // Only include keep_alive if it has a valid value
+            if (this.config.keepAlive && this.config.keepAlive !== '') {
+                embedOptions.keep_alive = this.config.keepAlive;
+            }
+
+            const response = await this.client.embed(embedOptions);
 
             if (response.embeddings && response.embeddings[0]) {
                 this.dimension = response.embeddings[0].length;
@@ -64,12 +70,18 @@ export class OllamaEmbedding implements Embedding {
             await this.updateDimensionForModel(this.config.model);
         }
 
-        const response = await this.client.embed({
+        const embedOptions: any = {
             model: this.config.model,
             input: text,
-            keep_alive: this.config.keepAlive,
             options: this.config.options,
-        });
+        };
+
+        // Only include keep_alive if it has a valid value
+        if (this.config.keepAlive && this.config.keepAlive !== '') {
+            embedOptions.keep_alive = this.config.keepAlive;
+        }
+
+        const response = await this.client.embed(embedOptions);
 
         if (!response.embeddings || !response.embeddings[0]) {
             throw new Error('Ollama API returned invalid response');

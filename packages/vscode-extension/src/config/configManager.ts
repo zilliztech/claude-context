@@ -72,7 +72,8 @@ const PROVIDERS = {
         ] as FieldDefinition[],
         defaultConfig: {
             model: 'nomic-embed-text',
-            host: 'http://127.0.0.1:11434'
+            host: 'http://127.0.0.1:11434',
+            keepAlive: '5m'
         }
     }
 } as const;
@@ -170,9 +171,12 @@ export class ConfigManager {
         for (const field of allFields) {
             const value = (config as any)[field.name];
 
+            // For empty strings, save undefined to avoid validation errors
+            const saveValue = (value === '' || value === null) ? undefined : value;
+
             await workspaceConfig.update(
                 `embeddingProvider.${field.name}`,
-                value ?? undefined,
+                saveValue,
                 vscode.ConfigurationTarget.Global
             );
         }

@@ -98,6 +98,14 @@
                     "type": "string",
                     "description": "Custom API endpoint URL (optional)"
                 },
+                "semanticCodeSearch.embeddingProvider.host": {
+                    "type": "string",
+                    "description": "Ollama server host URL (optional)"
+                },
+                "semanticCodeSearch.embeddingProvider.keepAlive": {
+                    "type": "string",
+                    "description": "Keep model alive duration for Ollama (optional)"
+                },
                 "semanticCodeSearch.milvus.address": {
                     "type": "string",
                     "description": "Milvus server address (e.g., http://localhost:19530)"
