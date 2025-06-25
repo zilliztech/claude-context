@@ -1,6 +1,4 @@
-# CodeIndexer
-
-
+# 🔍 CodeIndexer
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
@@ -10,7 +8,7 @@
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord"/></a>
 
-A powerful code indexing and semantic search tool with multi-platform support. Index your entire codebase and perform intelligent semantic searches powered by vector databases and AI embeddings.
+An open-source code indexing and semantic search tool implemented by Milvus vector database and popular embedding models. You can build your AI Coding IDE or code search plugin with it.
 
 ## 🌟 Why CodeIndexer?
 

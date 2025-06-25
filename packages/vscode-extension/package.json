@@ -61,7 +61,7 @@
                 {
                     "id": "semanticCodeSearchSidebar",
                     "title": "Semantic Code Search",
-                    "icon": "$(search)"
+                    "icon": "./resources/activity_bar.svg"
                 }
             ]
         },
