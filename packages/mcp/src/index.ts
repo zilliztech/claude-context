@@ -5,7 +5,7 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeIndexer, SemanticSearchResult, SplitterType, SplitterConfig } from "@code-indexer/core";
+import { CodeIndexer, SemanticSearchResult } from "@code-indexer/core";
 import { OpenAIEmbedding } from "@code-indexer/core";
 import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
@@ -40,10 +40,10 @@ class CodeIndexerMcpServer {
         // Get current workspace
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
-        
+
         // Initialize snapshot file path
         this.snapshotFilePath = path.join(os.homedir(), '.code-indexer-mcp', 'codebase-snapshot.json');
-        
+
         // Redirect console.log and console.warn to stderr to avoid JSON parsing issues
         // Only MCP protocol messages should go to stdout
         this.setupConsoleRedirection();
@@ -99,7 +99,7 @@ class CodeIndexerMcpServer {
 
     private loadCodebaseSnapshot() {
         console.log('[SNAPSHOT-DEBUG] Loading codebase snapshot from:', this.snapshotFilePath);
-        
+
         try {
             if (!fs.existsSync(this.snapshotFilePath)) {
                 console.log('[SNAPSHOT-DEBUG] Snapshot file does not exist. Starting with empty codebase list.');
@@ -140,7 +140,7 @@ class CodeIndexerMcpServer {
 
     private saveCodebaseSnapshot() {
         console.log('[SNAPSHOT-DEBUG] Saving codebase snapshot to:', this.snapshotFilePath);
-        
+
         try {
             // Ensure directory exists
             const snapshotDir = path.dirname(this.snapshotFilePath);
@@ -269,7 +269,7 @@ class CodeIndexerMcpServer {
             }
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = this.ensureAbsolutePath(codebasePath);
-            
+
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
                 return {
@@ -298,32 +298,11 @@ class CodeIndexerMcpServer {
                 await this.codeIndexer.clearIndex(absolutePath);
             }
 
-            // Create a temporary CodeIndexer with the specified splitter for this indexing operation
+            // Use the existing CodeIndexer instance for indexing.
             let indexerForThisTask = this.codeIndexer;
-            
-            if (splitterType !== 'ast') { // Only create new instance if not using default AST
-                console.log(`[INDEX] Creating CodeIndexer with ${splitterType} splitter for this indexing task`);
-                
-                // Get embedding and vector database from existing indexer
-                const embedding = this.codeIndexer['embedding'];
-                const vectorDatabase = this.codeIndexer['vectorDatabase'];
-                
-                // Create splitter configuration
-                const splitterConfig: SplitterConfig = {
-                    type: splitterType === 'ast' ? SplitterType.AST : SplitterType.LANGCHAIN,
-                    chunkSize: 1000,
-                    chunkOverlap: 200
-                };
-                
-                // Create temporary indexer with specified splitter
-                const { createSplitter } = await import("@code-indexer/core");
-                const customSplitter = createSplitter(splitterConfig);
-                
-                indexerForThisTask = new CodeIndexer({
-                    embedding,
-                    vectorDatabase,
-                    codeSplitter: customSplitter
-                });
+
+            if (splitterType !== 'ast') {
+                console.warn(`[INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
             // Initialize file synchronizer  
@@ -334,7 +313,7 @@ class CodeIndexerMcpServer {
             const normalizedPath = path.resolve(absolutePath);
             const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
             const collectionName = `code_chunks_${hash.substring(0, 8)}`;
-            
+
             // Store synchronizer in both indexers if using a custom one
             this.codeIndexer['synchronizers'].set(collectionName, synchronizer);
             if (indexerForThisTask !== this.codeIndexer) {
@@ -342,7 +321,7 @@ class CodeIndexerMcpServer {
             }
 
             console.log(`[INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
-            
+
             // Start indexing with the appropriate indexer
             const stats = await indexerForThisTask.indexCodebase(absolutePath);
 
@@ -356,7 +335,7 @@ class CodeIndexerMcpServer {
             this.saveCodebaseSnapshot();
 
             // Include splitter and path information in response to confirm what was actually indexed
-            const pathInfo = codebasePath !== absolutePath 
+            const pathInfo = codebasePath !== absolutePath
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
                 : '';
 
@@ -381,7 +360,7 @@ class CodeIndexerMcpServer {
     private async handleSyncIndex() {
         const syncStartTime = Date.now();
         console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
-        
+
         if (this.indexedCodebases.length === 0) {
             console.log('[SYNC-DEBUG] No codebases indexed. Skipping sync.');
             return;
@@ -400,18 +379,18 @@ class CodeIndexerMcpServer {
 
         try {
             let totalStats = { added: 0, removed: 0, modified: 0 };
-            
+
             for (let i = 0; i < this.indexedCodebases.length; i++) {
                 const codebasePath = this.indexedCodebases[i];
                 const codebaseStartTime = Date.now();
-                
+
                 console.log(`[SYNC-DEBUG] [${i + 1}/${this.indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
-                
+
                 // Check if codebase path still exists
                 try {
                     const pathExists = fs.existsSync(codebasePath);
                     console.log(`[SYNC-DEBUG] Codebase path exists: ${pathExists}`);
-                    
+
                     if (!pathExists) {
                         console.warn(`[SYNC-DEBUG] Codebase path '${codebasePath}' no longer exists. Skipping sync.`);
                         continue;
@@ -420,20 +399,20 @@ class CodeIndexerMcpServer {
                     console.error(`[SYNC-DEBUG] Error checking codebase path '${codebasePath}':`, pathError);
                     continue;
                 }
-                
+
                 try {
                     console.log(`[SYNC-DEBUG] Calling codeIndexer.reindexByChange() for '${codebasePath}'`);
                     const stats = await this.codeIndexer.reindexByChange(codebasePath);
                     const codebaseElapsed = Date.now() - codebaseStartTime;
-                    
+
                     console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
                     console.log(`[SYNC-DEBUG] Codebase sync completed in ${codebaseElapsed}ms`);
-                    
+
                     // Accumulate total stats
                     totalStats.added += stats.added;
                     totalStats.removed += stats.removed;
                     totalStats.modified += stats.modified;
-                    
+
                     if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
                         console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
                     } else {
@@ -443,7 +422,7 @@ class CodeIndexerMcpServer {
                     const codebaseElapsed = Date.now() - codebaseStartTime;
                     console.error(`[SYNC-DEBUG] Error syncing codebase '${codebasePath}' after ${codebaseElapsed}ms:`, error);
                     console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
-                    
+
                     // Log additional error details
                     if (error.code) {
                         console.error(`[SYNC-DEBUG] Error code: ${error.code}`);
@@ -451,11 +430,11 @@ class CodeIndexerMcpServer {
                     if (error.errno) {
                         console.error(`[SYNC-DEBUG] Error errno: ${error.errno}`);
                     }
-                    
+
                     // Continue with next codebase even if one fails
                 }
             }
-            
+
             const totalElapsed = Date.now() - syncStartTime;
             console.log(`[SYNC-DEBUG] Total sync stats across all codebases: Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
             console.log(`[SYNC-DEBUG] Index sync completed for all codebases in ${totalElapsed}ms`);
@@ -478,7 +457,7 @@ class CodeIndexerMcpServer {
         try {
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = this.ensureAbsolutePath(codebasePath);
-            
+
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
                 return {
@@ -577,7 +556,7 @@ class CodeIndexerMcpServer {
         try {
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = this.ensureAbsolutePath(codebasePath);
-            
+
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
                 return {
@@ -630,10 +609,10 @@ class CodeIndexerMcpServer {
             }
 
             // Remove the cleared codebase from the list
-            this.indexedCodebases = this.indexedCodebases.filter(codebasePath => 
+            this.indexedCodebases = this.indexedCodebases.filter(codebasePath =>
                 codebasePath !== absolutePath
             );
-            
+
             // Reset active codebase if it was cleared
             if (this.activeCodebasePath === absolutePath) {
                 this.activeCodebasePath = null;
@@ -644,7 +623,7 @@ class CodeIndexerMcpServer {
             this.saveCodebaseSnapshot();
 
             let resultText = `Successfully cleared codebase '${absolutePath}'`;
-            
+
             if (this.indexedCodebases.length > 0) {
                 resultText += `\n${this.indexedCodebases.length} other codebase(s) remain indexed`;
             }
@@ -679,35 +658,35 @@ class CodeIndexerMcpServer {
 
     private startBackgroundSync() {
         console.log('[SYNC-DEBUG] startBackgroundSync() called');
-        
+
         // Execute initial sync immediately after a short delay to let server initialize
         console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
         setTimeout(() => {
             console.log('[SYNC-DEBUG] Executing initial sync after server startup');
             this.handleSyncIndex();
         }, 5000); // Initial sync after 5 seconds
-        
+
         // Periodically check for file changes and update the index
         console.log('[SYNC-DEBUG] Setting up periodic sync every 5 minutes (300000ms)');
         const syncInterval = setInterval(() => {
             console.log('[SYNC-DEBUG] Executing scheduled periodic sync');
             this.handleSyncIndex();
         }, 5 * 60 * 1000); // every 5 minutes
-        
+
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
     }
 
     async start() {
         console.log('[SYNC-DEBUG] MCP server start() method called');
         console.log('Starting CodeIndexer MCP server...');
-        
+
         const transport = new StdioServerTransport();
         console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
-        
+
         await this.server.connect(transport);
         console.log("MCP server started and listening on stdio.");
         console.log('[SYNC-DEBUG] Server connection established successfully');
-        
+
         // Start background sync after server is connected
         console.log('[SYNC-DEBUG] Initializing background sync...');
         this.startBackgroundSync();
@@ -727,16 +706,16 @@ class CodeIndexerMcpServer {
         // For relative paths, we need to be more careful
         // Log a warning about potential path resolution issues
         console.warn(`Relative path detected: '${inputPath}'. Converting to absolute path.`);
-        
+
         // Common relative path patterns that might indicate user intent
         if (inputPath === '.' || inputPath === './') {
             console.warn(`Current directory reference detected. This may not resolve to the directory you expect in MCP context.`);
         }
-        
+
         // Try to resolve relative to current working directory
         const resolved = path.resolve(inputPath);
         console.warn(`Resolved relative path '${inputPath}' to '${resolved}'. If this is incorrect, please provide an absolute path.`);
-        
+
         return resolved;
     }
 }

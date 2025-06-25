@@ -5,7 +5,7 @@ import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
 import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
-import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, MilvusRestfulVectorDatabase } from '@code-indexer/core';
+import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@code-indexer/core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;
@@ -43,6 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('semanticCodeSearch.embeddingProvider') ||
                 event.affectsConfiguration('semanticCodeSearch.milvus') ||
+                event.affectsConfiguration('semanticCodeSearch.splitter') ||
                 event.affectsConfiguration('semanticCodeSearch.autoSync')) {
                 console.log('CodeIndexer configuration changed, reloading...');
                 reloadCodeIndexerConfiguration();
@@ -65,7 +66,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize auto-sync if enabled
     setupAutoSync();
-    
+
     // Run initial sync on startup
     runInitialSync();
 
@@ -92,7 +93,7 @@ async function runInitialSync() {
 
 function setupAutoSync() {
     const config = vscode.workspace.getConfiguration('semanticCodeSearch');
-    const autoSyncEnabled = config.get<boolean>('autoSync.enabled', true); 
+    const autoSyncEnabled = config.get<boolean>('autoSync.enabled', true);
     const autoSyncInterval = config.get<number>('autoSync.intervalMinutes', 5);
 
     // Stop existing auto-sync if running
@@ -103,7 +104,7 @@ function setupAutoSync() {
 
     if (autoSyncEnabled) {
         console.log(`Setting up auto-sync with ${autoSyncInterval} minute interval`);
-        
+
         // Start periodic auto-sync
         syncCommand.startAutoSync(autoSyncInterval).then(disposable => {
             autoSyncDisposable = disposable;
@@ -119,6 +120,7 @@ function setupAutoSync() {
 function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer {
     const embeddingConfig = configManager.getEmbeddingProviderConfig();
     const milvusConfig = configManager.getMilvusFullConfig();
+    const splitterConfig = configManager.getSplitterConfig();
 
     try {
         let embedding;
@@ -148,6 +150,28 @@ function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer 
             console.log('No Milvus configuration found, using default REST API configuration');
             codeIndexerConfig.vectorDatabase = vectorDatabase;
         }
+
+        // Create splitter instance
+        let codeSplitter;
+        if (splitterConfig) {
+            if (splitterConfig.type === SplitterType.LANGCHAIN) {
+                codeSplitter = new LangChainCodeSplitter(
+                    splitterConfig.chunkSize ?? 1000,
+                    splitterConfig.chunkOverlap ?? 200
+                );
+            } else { // Default to AST splitter
+                codeSplitter = new AstCodeSplitter(
+                    splitterConfig.chunkSize ?? 2500,
+                    splitterConfig.chunkOverlap ?? 300
+                );
+            }
+            codeIndexerConfig.codeSplitter = codeSplitter;
+            console.log(`Splitter configured: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
+        } else {
+            codeSplitter = new AstCodeSplitter(2500, 300);
+            codeIndexerConfig.codeSplitter = codeSplitter;
+            console.log('No splitter configuration found, using default AST splitter (chunkSize: 2500, overlap: 300)');
+        }
         return new CodeIndexer(codeIndexerConfig);
     } catch (error) {
         console.error('Failed to create CodeIndexer with user config:', error);
@@ -161,6 +185,7 @@ function reloadCodeIndexerConfiguration() {
 
     const embeddingConfig = configManager.getEmbeddingProviderConfig();
     const milvusConfig = configManager.getMilvusFullConfig();
+    const splitterConfig = configManager.getSplitterConfig();
 
     try {
         // Update embedding if configuration exists
@@ -175,6 +200,28 @@ function reloadCodeIndexerConfiguration() {
             const vectorDatabase = new MilvusRestfulVectorDatabase(milvusConfig);
             codeIndexer.updateVectorDatabase(vectorDatabase);
             console.log(`Vector database updated with Milvus REST API (address: ${milvusConfig.address})`);
+        }
+
+        // Update splitter if configuration exists
+        if (splitterConfig) {
+            let newSplitter;
+            if (splitterConfig.type === SplitterType.LANGCHAIN) {
+                newSplitter = new LangChainCodeSplitter(
+                    splitterConfig.chunkSize ?? 1000,
+                    splitterConfig.chunkOverlap ?? 200
+                );
+            } else {
+                newSplitter = new AstCodeSplitter(
+                    splitterConfig.chunkSize ?? 2500,
+                    splitterConfig.chunkOverlap ?? 300
+                );
+            }
+            codeIndexer.updateSplitter(newSplitter);
+            console.log(`Splitter updated: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
+        } else {
+            const defaultSplitter = new AstCodeSplitter(2500, 300);
+            codeIndexer.updateSplitter(defaultSplitter);
+            console.log('No splitter configuration found, using default AST splitter (chunkSize: 2500, overlap: 300)');
         }
 
         // Update command instances with new codeIndexer
@@ -195,7 +242,7 @@ function reloadCodeIndexerConfiguration() {
 
 export function deactivate() {
     console.log('CodeIndexer extension is now deactivated');
-    
+
     // Stop auto-sync if running
     if (autoSyncDisposable) {
         autoSyncDisposable.dispose();

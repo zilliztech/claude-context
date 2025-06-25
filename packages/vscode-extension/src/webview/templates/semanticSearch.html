@@ -75,6 +75,31 @@
 
                 <div class="form-separator"></div>
 
+                <h3>Code Splitter Configuration</h3>
+
+                <div class="form-group">
+                    <label for="splitterType">Splitter Type</label>
+                    <select id="splitterType" required>
+                        <option value="langchain">LangChain Splitter</option>
+                        <option value="ast">AST Splitter</option>
+                    </select>
+                    <small class="help-text">Choose how to split code into chunks for indexing</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="chunkSize">Chunk Size</label>
+                    <input type="number" id="chunkSize" min="100" max="5000" value="1000" required>
+                    <small class="help-text">Maximum size of each code chunk in characters (100-5000)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="chunkOverlap">Chunk Overlap</label>
+                    <input type="number" id="chunkOverlap" min="0" max="1000" value="200" required>
+                    <small class="help-text">Number of overlapping characters between consecutive chunks (0-1000)</small>
+                </div>
+
+                <div class="form-separator"></div>
+
                 <h3>Vector Database Configuration</h3>
 
                 <div class="form-group">

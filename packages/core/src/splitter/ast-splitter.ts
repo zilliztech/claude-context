@@ -22,8 +22,8 @@ const SPLITTABLE_NODE_TYPES = {
 };
 
 export class AstCodeSplitter implements Splitter {
-    private chunkSize: number = 1000;
-    private chunkOverlap: number = 200;
+    private chunkSize: number = 2500;
+    private chunkOverlap: number = 300;
     private parser: Parser;
     private langchainFallback: any; // LangChainCodeSplitter for fallback
 

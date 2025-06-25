@@ -1,4 +1,4 @@
-import { CodeIndexer, MilvusVectorDatabase, MilvusRestfulVectorDatabase } from '@code-indexer/core';
+import { CodeIndexer, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@code-indexer/core';
 import * as path from 'path';
 
 // Try to load .env file
@@ -19,6 +19,7 @@ async function main() {
         const useRestfulApi = false;
         const milvusAddress = process.env.MILVUS_ADDRESS || 'localhost:19530';
         const milvusToken = process.env.MILVUS_TOKEN;
+        const splitterType = process.env.SPLITTER_TYPE?.toLowerCase() || 'ast';
 
         console.log(`🔧 Using ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
         console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);
@@ -39,12 +40,16 @@ async function main() {
         }
 
         // 2. Create CodeIndexer instance
+        let codeSplitter;
+        if (splitterType === 'langchain') {
+            codeSplitter = new LangChainCodeSplitter(1000, 200);
+        } else {
+            codeSplitter = new AstCodeSplitter(2500, 300);
+        }
         const indexer = new CodeIndexer({
             vectorDatabase,
-            chunkSize: 1000,
-            chunkOverlap: 200,
-            // Can customize supported file extensions
-            supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp']
+            codeSplitter,
+            supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp', '.go', '.rs']
         });
 
         // 3. Check if index already exists and clear if needed
@@ -120,4 +125,4 @@ if (require.main === module) {
     main().catch(console.error);
 }
 
-export { main }; 
+export { main };
