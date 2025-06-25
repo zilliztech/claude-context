@@ -37,6 +37,9 @@ class SemanticSearchController {
         // Settings elements
         this.providerSelect = document.getElementById('provider');
         this.dynamicFields = document.getElementById('dynamicFields');
+        this.splitterTypeSelect = document.getElementById('splitterType');
+        this.chunkSizeInput = document.getElementById('chunkSize');
+        this.chunkOverlapInput = document.getElementById('chunkOverlap');
         this.milvusAddressInput = document.getElementById('milvusAddress');
         this.milvusTokenInput = document.getElementById('milvusToken');
         this.testBtn = document.getElementById('testBtn');
@@ -67,6 +70,9 @@ class SemanticSearchController {
 
         // Settings event listeners
         this.providerSelect.addEventListener('change', () => this.handleProviderChange());
+        this.splitterTypeSelect.addEventListener('change', () => this.validateForm());
+        this.chunkSizeInput.addEventListener('input', () => this.validateForm());
+        this.chunkOverlapInput.addEventListener('input', () => this.validateForm());
         this.milvusAddressInput.addEventListener('input', () => this.validateForm());
         this.milvusTokenInput.addEventListener('input', () => this.validateForm());
         this.testBtn.addEventListener('click', () => this.handleTestConnection());
@@ -253,7 +259,7 @@ class SemanticSearchController {
                 break;
 
             case 'configData':
-                this.loadConfig(message.config, message.supportedProviders, message.milvusConfig);
+                this.loadConfig(message.config, message.supportedProviders, message.milvusConfig, message.splitterConfig);
                 break;
 
             case 'saveResult':
@@ -560,10 +566,17 @@ class SemanticSearchController {
             milvusConfig.token = milvusToken;
         }
 
+        const splitterConfig = {
+            type: this.splitterTypeSelect.value,
+            chunkSize: parseInt(this.chunkSizeInput.value, 10),
+            chunkOverlap: parseInt(this.chunkOverlapInput.value, 10)
+        };
+
         return {
             provider: provider,
             config: configData,
-            milvusConfig: milvusConfig
+            milvusConfig: milvusConfig,
+            splitterConfig: splitterConfig
         };
     }
 
@@ -585,6 +598,27 @@ class SemanticSearchController {
             return false;
         }
 
+        // Validate splitter configuration
+        if (!config.splitterConfig.type) {
+            this.showStatus('Please select a splitter type', 'error');
+            return false;
+        }
+
+        if (config.splitterConfig.chunkSize < 100 || config.splitterConfig.chunkSize > 5000) {
+            this.showStatus('Chunk size must be between 100 and 5000', 'error');
+            return false;
+        }
+
+        if (config.splitterConfig.chunkOverlap < 0 || config.splitterConfig.chunkOverlap > 1000) {
+            this.showStatus('Chunk overlap must be between 0 and 1000', 'error');
+            return false;
+        }
+
+        if (config.splitterConfig.chunkOverlap >= config.splitterConfig.chunkSize) {
+            this.showStatus('Chunk overlap must be less than chunk size', 'error');
+            return false;
+        }
+
         return true;
     }
 
@@ -600,7 +634,7 @@ class SemanticSearchController {
         }
     }
 
-    loadConfig(config, providers, milvusConfig) {
+    loadConfig(config, providers, milvusConfig, splitterConfig) {
         this.currentConfig = config;
 
         // Only update providers if we actually received them from backend
@@ -629,6 +663,18 @@ class SemanticSearchController {
         if (milvusConfig) {
             this.milvusAddressInput.value = milvusConfig.address || '';
             this.milvusTokenInput.value = milvusConfig.token || '';
+        }
+
+        // Load splitter config
+        if (splitterConfig) {
+            this.splitterTypeSelect.value = splitterConfig.type || 'langchain';
+            this.chunkSizeInput.value = splitterConfig.chunkSize || 1000;
+            this.chunkOverlapInput.value = splitterConfig.chunkOverlap || 200;
+        } else {
+            // Set default values
+            this.splitterTypeSelect.value = 'langchain';
+            this.chunkSizeInput.value = 1000;
+            this.chunkOverlapInput.value = 200;
         }
 
         this.validateForm();

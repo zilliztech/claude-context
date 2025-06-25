@@ -225,12 +225,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     private sendCurrentConfig(webview: vscode.Webview) {
         const config = this.configManager.getEmbeddingProviderConfig();
         const milvusConfig = this.configManager.getMilvusConfig();
+        const splitterConfig = this.configManager.getSplitterConfig();
         const supportedProviders = ConfigManager.getSupportedProviders();
 
         webview.postMessage({
             command: 'configData',
             config: config,
             milvusConfig: milvusConfig,
+            splitterConfig: splitterConfig,
             supportedProviders: supportedProviders
         });
     }
@@ -247,6 +249,11 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             // Save Milvus config
             if (configData.milvusConfig) {
                 await this.configManager.saveMilvusConfig(configData.milvusConfig);
+            }
+
+            // Save splitter config
+            if (configData.splitterConfig) {
+                await this.configManager.saveSplitterConfig(configData.splitterConfig);
             }
 
             // Add a small delay to ensure configuration is fully saved

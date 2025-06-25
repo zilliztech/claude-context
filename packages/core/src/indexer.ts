@@ -1,9 +1,7 @@
 import {
     Splitter,
     CodeChunk,
-    SplitterType,
-    SplitterConfig,
-    createSplitter
+    AstCodeSplitter
 } from './splitter';
 import {
     Embedding,
@@ -85,10 +83,6 @@ export interface CodeIndexerConfig {
     embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
     codeSplitter?: Splitter;
-    splitterConfig?: SplitterConfig; // New: splitter configuration
-    // Deprecated: use splitterConfig instead
-    chunkSize?: number;
-    chunkOverlap?: number;
     supportedExtensions?: string[];
     ignorePatterns?: string[];
 }
@@ -113,18 +107,7 @@ export class CodeIndexer {
         }
         this.vectorDatabase = config.vectorDatabase;
 
-        // Initialize splitter with intelligent configuration
-        if (config.codeSplitter) {
-            this.codeSplitter = config.codeSplitter;
-        } else {
-            // Create splitter based on configuration
-            const splitterConfig: SplitterConfig = config.splitterConfig || {
-                type: SplitterType.AST, // Default to AST with built-in fallback
-                chunkSize: config.chunkSize || 1000,
-                chunkOverlap: config.chunkOverlap || 200
-            };
-            this.codeSplitter = createSplitter(splitterConfig);
-        }
+        this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
 
         this.supportedExtensions = config.supportedExtensions || DEFAULT_SUPPORTED_EXTENSIONS;
         this.ignorePatterns = config.ignorePatterns || DEFAULT_IGNORE_PATTERNS;
@@ -401,12 +384,12 @@ export class CodeIndexer {
     }
 
     /**
-     * Update splitter configuration
-     * @param splitterConfig New splitter configuration
+     * Update splitter instance
+     * @param splitter New splitter instance
      */
-    updateSplitterConfig(splitterConfig: SplitterConfig): void {
-        this.codeSplitter = createSplitter(splitterConfig);
-        console.log(`🔄 Updated splitter configuration: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
+    updateSplitter(splitter: Splitter): void {
+        this.codeSplitter = splitter;
+        console.log(`🔄 Updated splitter instance`);
     }
 
     /**
@@ -747,22 +730,12 @@ export class CodeIndexer {
         return regex.test(text);
     }
 
-    // ===== Splitter Management Methods =====
-
-    /**
-     * Switch to a different splitter type
-     * @param splitterConfig New splitter configuration
-     */
-    setSplitter(splitterConfig: SplitterConfig): void {
-        this.codeSplitter = createSplitter(splitterConfig);
-    }
-
     /**
      * Get current splitter information
      */
     getSplitterInfo(): { type: string; hasBuiltinFallback: boolean; supportedLanguages?: string[] } {
         const splitterName = this.codeSplitter.constructor.name;
-        
+
         if (splitterName === 'AstCodeSplitter') {
             const { AstCodeSplitter } = require('./splitter/ast-splitter');
             return {
@@ -784,12 +757,12 @@ export class CodeIndexer {
      */
     isLanguageSupported(language: string): boolean {
         const splitterName = this.codeSplitter.constructor.name;
-        
+
         if (splitterName === 'AstCodeSplitter') {
             const { AstCodeSplitter } = require('./splitter/ast-splitter');
             return AstCodeSplitter.isLanguageSupported(language);
         }
-        
+
         // LangChain splitter supports most languages
         return true;
     }
@@ -800,14 +773,14 @@ export class CodeIndexer {
      */
     getSplitterStrategyForLanguage(language: string): { strategy: 'ast' | 'langchain'; reason: string } {
         const splitterName = this.codeSplitter.constructor.name;
-        
+
         if (splitterName === 'AstCodeSplitter') {
             const { AstCodeSplitter } = require('./splitter/ast-splitter');
             const isSupported = AstCodeSplitter.isLanguageSupported(language);
-            
+
             return {
                 strategy: isSupported ? 'ast' : 'langchain',
-                reason: isSupported 
+                reason: isSupported
                     ? 'Language supported by AST parser'
                     : 'Language not supported by AST, will fallback to LangChain'
             };

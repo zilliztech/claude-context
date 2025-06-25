@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, MilvusConfig } from '@code-indexer/core';
+import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@code-indexer/core';
 
 // Simplified Milvus configuration interface for frontend
 export interface MilvusWebConfig {
@@ -18,9 +18,19 @@ export type EmbeddingProviderConfig = {
     config: OllamaEmbeddingConfig;
 };
 
+export type SplitterProviderConfig = {
+    provider: 'AST';
+    config: { chunkSize?: number; chunkOverlap?: number };
+} | {
+    provider: 'LangChain';
+    config: { chunkSize?: number; chunkOverlap?: number };
+};
+
 export interface PluginConfig {
     embeddingProvider?: EmbeddingProviderConfig;
+    splitterProvider?: SplitterProviderConfig;
     milvusConfig?: MilvusWebConfig;
+    splitterConfig?: SplitterConfig;
 }
 
 type FieldDefinition = {
@@ -33,7 +43,7 @@ type FieldDefinition = {
 };
 
 // Unified provider configuration
-const PROVIDERS = {
+const EMBEDDING_PROVIDERS = {
     'OpenAI': {
         name: 'OpenAI',
         class: OpenAIEmbedding,
@@ -78,6 +88,36 @@ const PROVIDERS = {
     }
 } as const;
 
+// Unified splitter provider configuration
+const SPLITTER_PROVIDERS = {
+    'AST': {
+        name: 'AST Splitter',
+        class: AstCodeSplitter,
+        requiredFields: [] as FieldDefinition[],
+        optionalFields: [
+            { name: 'chunkSize', type: 'number', description: 'Maximum chunk size in characters', inputType: 'text', placeholder: '1000' },
+            { name: 'chunkOverlap', type: 'number', description: 'Overlap between chunks in characters', inputType: 'text', placeholder: '200' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            chunkSize: 2500,
+            chunkOverlap: 300
+        }
+    },
+    'LangChain': {
+        name: 'LangChain Splitter',
+        class: LangChainCodeSplitter,
+        requiredFields: [] as FieldDefinition[],
+        optionalFields: [
+            { name: 'chunkSize', type: 'number', description: 'Maximum chunk size in characters', inputType: 'text', placeholder: '1000' },
+            { name: 'chunkOverlap', type: 'number', description: 'Overlap between chunks in characters', inputType: 'text', placeholder: '200' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            chunkSize: 1000,
+            chunkOverlap: 200
+        }
+    }
+} as const;
+
 export class ConfigManager {
     private static readonly CONFIG_KEY = 'semanticCodeSearch';
     private context: vscode.ExtensionContext;
@@ -87,13 +127,23 @@ export class ConfigManager {
     }
 
     /**
-     * Get provider configuration information
+     * Get embedding provider configuration information
      */
     private static getProviderInfo(provider: string) {
-        if (!(provider in PROVIDERS)) {
+        if (!(provider in EMBEDDING_PROVIDERS)) {
             return null;
         }
-        return PROVIDERS[provider as keyof typeof PROVIDERS];
+        return EMBEDDING_PROVIDERS[provider as keyof typeof EMBEDDING_PROVIDERS];
+    }
+
+    /**
+     * Get splitter provider configuration information
+     */
+    private static getSplitterProviderInfo(provider: string) {
+        if (!(provider in SPLITTER_PROVIDERS)) {
+            return null;
+        }
+        return SPLITTER_PROVIDERS[provider as keyof typeof SPLITTER_PROVIDERS];
     }
 
     /**
@@ -193,7 +243,6 @@ export class ConfigManager {
         return new providerInfo.class(config);
     }
 
-
     /**
      * Get supported embedding providers
      */
@@ -206,7 +255,7 @@ export class ConfigManager {
     }> {
         const result: any = {};
 
-        for (const [providerKey, providerInfo] of Object.entries(PROVIDERS)) {
+        for (const [providerKey, providerInfo] of Object.entries(EMBEDDING_PROVIDERS)) {
             // Ollama doesn't have getSupportedModels since users input model names manually
             const models = providerKey === 'Ollama' ? {} : (providerInfo.class as any).getSupportedModels();
 
@@ -274,4 +323,43 @@ export class ConfigManager {
         };
     }
 
-} 
+    /**
+     * Get splitter configuration
+     */
+    getSplitterConfig(): SplitterConfig | undefined {
+        const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_KEY);
+        const type = config.get<string>('splitter.type');
+        const chunkSize = config.get<number>('splitter.chunkSize');
+        const chunkOverlap = config.get<number>('splitter.chunkOverlap');
+
+        // Return default config if no type is set
+        if (!type) {
+            return {
+                type: SplitterType.AST,
+                chunkSize: 1000,
+                chunkOverlap: 200
+            };
+        }
+
+        return {
+            type: type as SplitterType,
+            chunkSize: chunkSize || 1000,
+            chunkOverlap: chunkOverlap || 200
+        };
+    }
+
+    /**
+     * Save splitter configuration
+     */
+    async saveSplitterConfig(splitterConfig: SplitterConfig): Promise<void> {
+        if (!splitterConfig) {
+            throw new Error('Splitter config is undefined');
+        }
+
+        const workspaceConfig = vscode.workspace.getConfiguration(ConfigManager.CONFIG_KEY);
+
+        await workspaceConfig.update('splitter.type', splitterConfig.type || SplitterType.AST, vscode.ConfigurationTarget.Global);
+        await workspaceConfig.update('splitter.chunkSize', splitterConfig.chunkSize || 1000, vscode.ConfigurationTarget.Global);
+        await workspaceConfig.update('splitter.chunkOverlap', splitterConfig.chunkOverlap || 200, vscode.ConfigurationTarget.Global);
+    }
+}

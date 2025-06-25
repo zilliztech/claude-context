@@ -125,6 +125,33 @@
                     "minimum": 1,
                     "maximum": 60,
                     "description": "Auto-sync interval in minutes (1-60). This runs periodic sync to keep the index updated."
+                },
+                "semanticCodeSearch.splitter.type": {
+                    "type": "string",
+                    "enum": [
+                        "langchain",
+                        "ast"
+                    ],
+                    "enumDescriptions": [
+                        "Language-aware text splitter with support for multiple programming languages",
+                        "AST-based code splitter that splits code by logical units (functions, classes, etc.)"
+                    ],
+                    "default": "langchain",
+                    "description": "Code splitter type to use for breaking down code into chunks"
+                },
+                "semanticCodeSearch.splitter.chunkSize": {
+                    "type": "number",
+                    "default": 1000,
+                    "minimum": 100,
+                    "maximum": 5000,
+                    "description": "Maximum size of each code chunk in characters"
+                },
+                "semanticCodeSearch.splitter.chunkOverlap": {
+                    "type": "number",
+                    "default": 200,
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Number of overlapping characters between consecutive chunks"
                 }
             }
         }
@@ -143,7 +170,8 @@
         "release": "vsce publish --no-dependencies"
     },
     "dependencies": {
-        "@code-indexer/core": "workspace:*"
+        "@code-indexer/core": "workspace:*",
+        "web-tree-sitter": "^0.25.6"
     },
     "devDependencies": {
         "@types/node": "20.x",
@@ -151,6 +179,7 @@
         "@typescript-eslint/eslint-plugin": "^8.31.1",
         "@typescript-eslint/parser": "^8.31.1",
         "@vscode/vsce": "^3.4.0",
+        "copy-webpack-plugin": "^12.0.2",
         "eslint": "^9.25.1",
         "source-map-loader": "^5.0.0",
         "ts-loader": "^9.5.2",

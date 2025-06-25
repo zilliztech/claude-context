@@ -45,4 +45,24 @@ if (fs.existsSync(scriptsDir)) {
     });
 }
 
-console.log('Webview assets copied successfully!'); 
+// Ensure dist/wasm directory exists and copy WASM files
+const wasmDistDir = path.join(__dirname, 'dist', 'wasm');
+if (!fs.existsSync(wasmDistDir)) {
+    fs.mkdirSync(wasmDistDir, { recursive: true });
+}
+
+// Copy WASM parser files
+const wasmDir = path.join(__dirname, 'wasm');
+if (fs.existsSync(wasmDir)) {
+    const wasmFiles = fs.readdirSync(wasmDir);
+    wasmFiles.forEach(file => {
+        if (file.endsWith('.wasm')) {
+            const srcPath = path.join(wasmDir, file);
+            const destPath = path.join(wasmDistDir, file);
+            fs.copyFileSync(srcPath, destPath);
+            console.log(`Copied ${file} to dist/wasm`);
+        }
+    });
+}
+
+console.log('Webview assets and WASM files copied successfully!');
