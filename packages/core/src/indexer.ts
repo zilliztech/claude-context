@@ -201,7 +201,7 @@ export class CodeIndexer {
 
         if (!synchronizer) {
             // To be safe, let's initialize if it's not there.
-            const newSynchronizer = new FileSynchronizer(codebasePath);
+            const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns);
             await newSynchronizer.initialize();
             this.synchronizers.set(collectionName, newSynchronizer);
         }

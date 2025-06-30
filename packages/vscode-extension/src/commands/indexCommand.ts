@@ -119,7 +119,7 @@ export class IndexCommand {
                 // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
                 const { FileSynchronizer } = await import("@code-indexer/core");
-                const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath);
+                const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.codeIndexer['ignorePatterns'] || []);
                 await synchronizer.initialize();
                 // Store synchronizer in the indexer's internal map using the same collection name generation logic
                 const normalizedPath = path.resolve(selectedFolder.uri.fsPath);

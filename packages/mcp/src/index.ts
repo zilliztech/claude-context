@@ -307,7 +307,7 @@ class CodeIndexerMcpServer {
 
             // Initialize file synchronizer  
             const { FileSynchronizer } = await import("@code-indexer/core");
-            const synchronizer = new FileSynchronizer(absolutePath);
+            const synchronizer = new FileSynchronizer(absolutePath, indexerForThisTask['ignorePatterns'] || []);
             await synchronizer.initialize();
             // Store synchronizer in the indexer's internal map using the same collection name generation logic
             const normalizedPath = path.resolve(absolutePath);
