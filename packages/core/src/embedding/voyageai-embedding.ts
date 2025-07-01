@@ -1,25 +1,47 @@
 import { VoyageAIClient } from 'voyageai';
-import { Embedding, EmbeddingVector } from './index';
+import { Embedding, EmbeddingVector } from './base-embedding';
 
 export interface VoyageAIEmbeddingConfig {
     model: string;
     apiKey: string;
 }
 
-export class VoyageAIEmbedding implements Embedding {
+export class VoyageAIEmbedding extends Embedding {
     private client: VoyageAIClient;
     private config: VoyageAIEmbeddingConfig;
     private dimension: number = 1024; // Default dimension for voyage-code-3
     private inputType: 'document' | 'query' = 'document';
+    protected maxTokens: number = 32000; // Default max tokens
 
     constructor(config: VoyageAIEmbeddingConfig) {
+        super();
         this.config = config;
         this.client = new VoyageAIClient({
             apiKey: config.apiKey,
         });
 
-        // Set dimension based on different models
-        this.updateDimensionForModel(config.model || 'voyage-code-3');
+        // Set dimension and context length based on different models
+        this.updateModelSettings(config.model || 'voyage-code-3');
+    }
+
+    private updateModelSettings(model: string): void {
+        const supportedModels = VoyageAIEmbedding.getSupportedModels();
+        const modelInfo = supportedModels[model];
+
+        if (modelInfo) {
+            // If dimension is a string (indicating variable dimension), use default value 1024
+            if (typeof modelInfo.dimension === 'string') {
+                this.dimension = 1024; // Default dimension
+            } else {
+                this.dimension = modelInfo.dimension;
+            }
+            // Set max tokens based on model's context length
+            this.maxTokens = modelInfo.contextLength;
+        } else {
+            // Use default dimension and context length for unknown models
+            this.dimension = 1024;
+            this.maxTokens = 32000;
+        }
     }
 
     private updateDimensionForModel(model: string): void {
@@ -40,10 +62,11 @@ export class VoyageAIEmbedding implements Embedding {
     }
 
     async embed(text: string): Promise<EmbeddingVector> {
+        const processedText = this.preprocessText(text);
         const model = this.config.model || 'voyage-code-3';
 
         const response = await this.client.embed({
-            input: text,
+            input: processedText,
             model: model,
             inputType: this.inputType,
         });
@@ -59,10 +82,11 @@ export class VoyageAIEmbedding implements Embedding {
     }
 
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+        const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model || 'voyage-code-3';
 
         const response = await this.client.embed({
-            input: texts,
+            input: processedTexts,
             model: model,
             inputType: this.inputType,
         });
@@ -96,7 +120,7 @@ export class VoyageAIEmbedding implements Embedding {
      */
     setModel(model: string): void {
         this.config.model = model;
-        this.updateDimensionForModel(model);
+        this.updateModelSettings(model);
     }
 
     /**

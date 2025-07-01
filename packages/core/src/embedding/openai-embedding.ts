@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { Embedding, EmbeddingVector } from './index';
+import { Embedding, EmbeddingVector } from './base-embedding';
 
 export interface OpenAIEmbeddingConfig {
     model: string;
@@ -7,12 +7,14 @@ export interface OpenAIEmbeddingConfig {
     baseURL?: string; // OpenAI supports custom baseURL
 }
 
-export class OpenAIEmbedding implements Embedding {
+export class OpenAIEmbedding extends Embedding {
     private client: OpenAI;
     private config: OpenAIEmbeddingConfig;
     private dimension: number = 1536; // Default dimension for text-embedding-3-small
+    protected maxTokens: number = 8192; // Maximum tokens for OpenAI embedding models
 
     constructor(config: OpenAIEmbeddingConfig) {
+        super();
         this.config = config;
         this.client = new OpenAI({
             apiKey: config.apiKey,
@@ -36,11 +38,12 @@ export class OpenAIEmbedding implements Embedding {
     }
 
     async embed(text: string): Promise<EmbeddingVector> {
+        const processedText = this.preprocessText(text);
         const model = this.config.model || 'text-embedding-3-small';
 
         const response = await this.client.embeddings.create({
             model: model,
-            input: text,
+            input: processedText,
             encoding_format: 'float',
         });
 
@@ -51,11 +54,12 @@ export class OpenAIEmbedding implements Embedding {
     }
 
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+        const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model || 'text-embedding-3-small';
 
         const response = await this.client.embeddings.create({
             model: model,
-            input: texts,
+            input: processedTexts,
             encoding_format: 'float',
         });
 
