@@ -305,9 +305,11 @@ class CodeIndexerMcpServer {
                 console.warn(`[INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
-            // Initialize file synchronizer  
+            // Initialize file synchronizer with proper ignore patterns
             const { FileSynchronizer } = await import("@code-indexer/core");
-            const synchronizer = new FileSynchronizer(absolutePath, indexerForThisTask['ignorePatterns'] || []);
+            const ignorePatterns = this.codeIndexer['ignorePatterns'] || [];
+            console.log(`[INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
+            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
             // Store synchronizer in the indexer's internal map using the same collection name generation logic
             const normalizedPath = path.resolve(absolutePath);
