@@ -21,11 +21,7 @@ pnpm package
 ```
 
 ### Development Setup
-1. Open the extension in VSCode:
-   ```bash
-   code packages/vscode-extension
-   ```
-2. Press `F5` to launch Extension Development Host
+Press `F5` to launch Extension Development Host
 
 ## Making Changes
 
@@ -77,6 +73,30 @@ pnpm package
 - [ ] UI components display correctly
 - [ ] Configuration settings work properly
 - [ ] Commands execute without errors
+
+## Testing with .vsix Package
+
+For a more robust pre-production test (safer than F5 development mode), you can package and install the extension locally:
+
+```bash
+# Navigate to extension directory
+cd packages/vscode-extension
+
+# Package the extension (remove existing .vsix file if present)
+pnpm run package
+
+# Uninstall any existing version
+code --uninstall-extension semanticcodesearch-xxx.vsix
+
+# Install the packaged extension
+code --install-extension semanticcodesearch-xxx.vsix
+```
+
+After installation, the extension will be available in VSCode just like any marketplace extension. This method:
+- Tests the actual packaged version
+- Simulates real user installation experience
+- Provides better isolation from development environment
+- **Recommended for final testing before production release**
 
 ## Publishing
 

@@ -37,16 +37,16 @@ class CodeIndexerMcpServer {
     private currentWorkspace: string;
 
     constructor(config: CodeIndexerMcpConfig) {
+        // Redirect console.log and console.warn to stderr to avoid JSON parsing issues
+        // Only MCP protocol messages should go to stdout
+        this.setupConsoleRedirection();
+
         // Get current workspace
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
 
         // Initialize snapshot file path
         this.snapshotFilePath = path.join(os.homedir(), '.code-indexer-mcp', 'codebase-snapshot.json');
-
-        // Redirect console.log and console.warn to stderr to avoid JSON parsing issues
-        // Only MCP protocol messages should go to stdout
-        this.setupConsoleRedirection();
 
         // Initialize MCP server
         this.server = new Server(
