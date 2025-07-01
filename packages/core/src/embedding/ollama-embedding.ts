@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama';
-import { Embedding, EmbeddingVector } from './index';
+import { Embedding, EmbeddingVector } from './base-embedding';
 
 export interface OllamaEmbeddingConfig {
     model: string;
@@ -8,15 +8,18 @@ export interface OllamaEmbeddingConfig {
     keepAlive?: string | number;
     options?: Record<string, any>;
     dimension?: number; // Optional dimension parameter
+    maxTokens?: number; // Optional max tokens parameter
 }
 
-export class OllamaEmbedding implements Embedding {
+export class OllamaEmbedding extends Embedding {
     private client: Ollama;
     private config: OllamaEmbeddingConfig;
     private dimension: number = 768; // Default dimension for many embedding models
     private dimensionDetected: boolean = false; // Track if dimension has been detected
+    protected maxTokens: number = 2048; // Default context window for Ollama
 
     constructor(config: OllamaEmbeddingConfig) {
+        super();
         this.config = config;
         this.client = new Ollama({
             host: config.host || 'http://127.0.0.1:11434',
@@ -28,7 +31,27 @@ export class OllamaEmbedding implements Embedding {
             this.dimension = config.dimension;
             this.dimensionDetected = true;
         }
+
+        // Set max tokens based on config or use default
+        if (config.maxTokens) {
+            this.maxTokens = config.maxTokens;
+        } else {
+            // Set default based on known models
+            this.setDefaultMaxTokensForModel(config.model);
+        }
+
         // If no dimension is provided, it will be detected in the first embed call
+    }
+
+    private setDefaultMaxTokensForModel(model: string): void {
+        // Set different max tokens based on known models
+        if (model?.includes('nomic-embed-text')) {
+            this.maxTokens = 8192; // nomic-embed-text supports 8192 tokens
+        } else if (model?.includes('snowflake-arctic-embed')) {
+            this.maxTokens = 8192; // snowflake-arctic-embed supports 8192 tokens
+        } else {
+            this.maxTokens = 2048; // Default for most Ollama models
+        }
     }
 
     private async updateDimensionForModel(model: string): Promise<void> {
@@ -65,6 +88,9 @@ export class OllamaEmbedding implements Embedding {
     }
 
     async embed(text: string): Promise<EmbeddingVector> {
+        // Preprocess the text
+        const processedText = this.preprocessText(text);
+
         // Detect dimension on first use if not configured
         if (!this.dimensionDetected) {
             await this.updateDimensionForModel(this.config.model);
@@ -72,7 +98,7 @@ export class OllamaEmbedding implements Embedding {
 
         const embedOptions: any = {
             model: this.config.model,
-            input: text,
+            input: processedText,
             options: this.config.options,
         };
 
@@ -94,13 +120,15 @@ export class OllamaEmbedding implements Embedding {
     }
 
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+        // Preprocess all texts
+        const processedTexts = this.preprocessTexts(texts);
         const results: EmbeddingVector[] = [];
 
         // Process texts in batches to avoid overwhelming the API
         const batchSize = 10;
-        for (let i = 0; i < texts.length; i += batchSize) {
-            const batch = texts.slice(i, i + batchSize);
-            const batchPromises = batch.map(text => this.embed(text));
+        for (let i = 0; i < processedTexts.length; i += batchSize) {
+            const batch = processedTexts.slice(i, i + batchSize);
+            const batchPromises = batch.map((text: string) => this.embed(text));
             const batchResults = await Promise.all(batchPromises);
             results.push(...batchResults);
         }
@@ -124,6 +152,8 @@ export class OllamaEmbedding implements Embedding {
         this.config.model = model;
         // Reset dimension detection when model changes
         this.dimensionDetected = false;
+        // Update max tokens for new model
+        this.setDefaultMaxTokensForModel(model);
         if (!this.config.dimension) {
             await this.updateDimensionForModel(model);
         }
@@ -165,6 +195,15 @@ export class OllamaEmbedding implements Embedding {
         this.config.dimension = dimension;
         this.dimension = dimension;
         this.dimensionDetected = true;
+    }
+
+    /**
+     * Set max tokens manually
+     * @param maxTokens Maximum number of tokens
+     */
+    setMaxTokens(maxTokens: number): void {
+        this.config.maxTokens = maxTokens;
+        this.maxTokens = maxTokens;
     }
 
     /**
