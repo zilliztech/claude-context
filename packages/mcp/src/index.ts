@@ -771,10 +771,8 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
-// Start the server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-    main().catch((error) => {
-        console.error("Fatal error:", error);
-        process.exit(1);
-    });
-}
+// Always start the server - this is designed to be the main entry point
+main().catch((error) => {
+    console.error("Fatal error:", error);
+    process.exit(1);
+});
