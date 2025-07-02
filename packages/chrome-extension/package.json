@@ -1,6 +1,6 @@
 {
     "name": "@code-indexer/chrome-extension",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "CodeIndexer Chrome extension for web-based code indexing",
     "private": true,
     "scripts": {
