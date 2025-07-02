@@ -1,6 +1,6 @@
 {
     "name": "codeindexer-basic-example",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Basic usage example for CodeIndexer",
     "main": "index.ts",
     "scripts": {

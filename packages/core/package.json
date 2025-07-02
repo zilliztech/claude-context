@@ -1,6 +1,6 @@
 {
     "name": "@code-indexer/core",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Core indexing engine for CodeIndexer",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
