@@ -7,72 +7,36 @@ The core indexing engine for CodeIndexer - a powerful tool for semantic search a
 
 > 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and quick start guide.
 
-## Features
-
-- **Multi-language Support**: Index TypeScript, JavaScript, Python, Java, C++, and many other programming languages
-- **Semantic Search**: Find code using natural language queries powered by AI embeddings
-- **Flexible Architecture**: Pluggable embedding providers and vector databases
-- **Smart Chunking**: Intelligent code splitting that preserves context and structure
-- **Batch Processing**: Efficient processing of large codebases with progress tracking
-- **Pattern Matching**: Built-in ignore patterns for common build artifacts and dependencies
-- **Incremental File Synchronization**: Efficient change detection using Merkle trees to only re-index modified files
-
-## File Synchronization Architecture
-
-CodeIndexer implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
-
-![File Synchronization Architecture](../../assets/file_synchronizer.png)
-
-### How It Works
-
-The file synchronization system uses a **Merkle tree-based approach** combined with SHA-256 file hashing to detect changes:
-
-#### 1. File Hashing
-- Each file in the codebase is hashed using SHA-256
-- File hashes are computed based on file content, not metadata
-- Hashes are stored with relative file paths for consistency across different environments
-
-#### 2. Merkle Tree Construction
-- All file hashes are organized into a Merkle tree structure
-- The tree provides a single root hash that represents the entire codebase state
-- Any change to any file will cause the root hash to change
-
-#### 3. Snapshot Management
-- File synchronization state is persisted to `~/.codeindexer/merkle/` directory
-- Each codebase gets a unique snapshot file based on its absolute path hash
-- Snapshots contain both file hashes and serialized Merkle tree data
-
-#### 4. Change Detection Process
-1. **Quick Check**: Compare current Merkle root hash with stored snapshot
-2. **Detailed Analysis**: If root hashes differ, perform file-by-file comparison
-3. **Change Classification**: Categorize changes into three types:
-   - **Added**: New files that didn't exist before
-   - **Modified**: Existing files with changed content
-   - **Removed**: Files that were deleted from the codebase
-
-#### 5. Incremental Updates
-- Only process files that have actually changed
-- Update vector database entries only for modified chunks
-- Remove entries for deleted files
-- Add entries for new files
-
-## Embedding Providers
-
-- **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`)
-- **VoyageAI Embeddings** - High-quality embeddings optimized for code
-
-## Vector Database Support
-
-- **Milvus/Zilliz Cloud** - High-performance vector database
-
-## Code Splitters
-
-- **LangChain Code Splitter** - Language-aware code chunking
-
 ## Installation
 
 ```bash
 npm install @code-indexer/core
+```
+
+## Environment Variables
+
+#### OpenAI API key
+See [OpenAI Documentation](https://platform.openai.com/docs/api-reference) for more details to get your API key.
+```bash
+OPENAI_API_KEY=your-openai-api-key
+```
+
+#### Milvus configuration
+**Optional 1**: Self-hosted Milvus
+See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
+- `MILVUS_ADDRESS` is the address of your Milvus instance
+- (Optional)`MILVUS_TOKEN` is the token of your Milvus instance, which can be left empty if you don't use token-based authentication.
+```bash
+MILVUS_ADDRESS=localhost:19530
+MILVUS_TOKEN=your-milvus-token
+```
+**Optional 2**: Zilliz Cloud(fully managed vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+
+- `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
+- `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
+```bash
+MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
+MILVUS_TOKEN=xxxxxxx
 ```
 
 ## Quick Start
@@ -81,18 +45,25 @@ npm install @code-indexer/core
 import { 
   CodeIndexer, 
   OpenAIEmbedding, 
-  MilvusVectorDB 
+  MilvusVectorDatabase 
 } from '@code-indexer/core';
 
-// Initialize the indexer
+// Initialize embedding provider
+const embedding = new OpenAIEmbedding({
+  apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
+  model: 'text-embedding-3-small'
+});
+
+// Initialize vector database
+const vectorDatabase = new MilvusVectorDatabase({
+  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+  token: process.env.MILVUS_TOKEN || ''
+});
+
+// Create indexer instance
 const indexer = new CodeIndexer({
-  embedding: new OpenAIEmbedding({
-    apiKey: process.env.OPENAI_API_KEY,
-    model: 'text-embedding-3-small'
-  }),
-  vectorDatabase: new MilvusVectorDB({
-    address: 'localhost:19530'
-  })
+  embedding,
+  vectorDatabase
 });
 
 // Index a codebase
@@ -116,6 +87,30 @@ results.forEach(result => {
 });
 ```
 
+## Features
+
+- **Multi-language Support**: Index TypeScript, JavaScript, Python, Java, C++, and many other programming languages
+- **Semantic Search**: Find code using natural language queries powered by AI embeddings
+- **Flexible Architecture**: Pluggable embedding providers and vector databases
+- **Smart Chunking**: Intelligent code splitting that preserves context and structure
+- **Batch Processing**: Efficient processing of large codebases with progress tracking
+- **Pattern Matching**: Built-in ignore patterns for common build artifacts and dependencies
+- **Incremental File Synchronization**: Efficient change detection using Merkle trees to only re-index modified files
+
+## Embedding Providers
+
+- **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`)
+- **VoyageAI Embeddings** - High-quality embeddings optimized for code
+
+## Vector Database Support
+
+- **Milvus/Zilliz Cloud** - High-performance vector database
+
+## Code Splitters
+
+- **AST Code Splitter** - AST-based code splitting with automatic fallback (default)
+- **LangChain Code Splitter** - Character-based code chunking
+
 ## Configuration
 
 ### CodeIndexerConfig
@@ -125,8 +120,6 @@ interface CodeIndexerConfig {
   embedding?: Embedding;           // Embedding provider
   vectorDatabase?: VectorDatabase; // Vector database instance (required)
   codeSplitter?: Splitter;        // Code splitting strategy
-  chunkSize?: number;             // Default: 1000
-  chunkOverlap?: number;          // Default: 200
   supportedExtensions?: string[]; // File extensions to index
   ignorePatterns?: string[];      // Patterns to ignore
 }
@@ -174,33 +167,33 @@ interface SemanticSearchResult {
   startLine: number;    // Starting line number
   endLine: number;      // Ending line number
   language: string;     // Programming language
-  score: number;        // Similarity score
+  score: number;        // Similarity score (0-1)
+  fileExtension: string; // File extension
 }
 ```
 
-## Environment Variables
-
-```bash
-# OpenAI API Key (required for OpenAI embeddings)
-OPENAI_API_KEY=your_openai_api_key
-
-# VoyageAI API Key (required for VoyageAI embeddings)  
-VOYAGEAI_API_KEY=your_voyageai_api_key
-```
 
 ## Examples
 
 ### Using VoyageAI Embeddings
 
 ```typescript
-import { VoyageAIEmbedding } from '@code-indexer/core';
+import { CodeIndexer, MilvusVectorDatabase, VoyageAIEmbedding } from '@code-indexer/core';
+
+// Initialize with VoyageAI embedding provider
+const embedding = new VoyageAIEmbedding({
+  apiKey: process.env.VOYAGEAI_API_KEY || 'your-voyageai-api-key',
+  model: 'voyage-code-2'  // Optimized for code
+});
+
+const vectorDatabase = new MilvusVectorDatabase({
+  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+  token: process.env.MILVUS_TOKEN || ''
+});
 
 const indexer = new CodeIndexer({
-  embedding: new VoyageAIEmbedding({
-    apiKey: process.env.VOYAGEAI_API_KEY,
-    model: 'voyage-code-2'
-  }),
-  // ... other config
+  embedding,
+  vectorDatabase
 });
 ```
 
@@ -208,15 +201,57 @@ const indexer = new CodeIndexer({
 
 ```typescript
 const indexer = new CodeIndexer({
-  supportedExtensions: ['.ts', '.js', '.py'],
+  embedding,
+  vectorDatabase,
+  supportedExtensions: ['.ts', '.js', '.py', '.java'],
   ignorePatterns: [
     'node_modules/**',
     'dist/**',
-    '*.spec.ts'
-  ],
-  // ... other config
+    '*.spec.ts',
+    '*.test.js'
+  ]
 });
 ```
+
+## File Synchronization Architecture
+
+CodeIndexer implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
+
+![File Synchronization Architecture](../../assets/file_synchronizer.png)
+
+### How It Works
+
+The file synchronization system uses a **Merkle tree-based approach** combined with SHA-256 file hashing to detect changes:
+
+#### 1. File Hashing
+- Each file in the codebase is hashed using SHA-256
+- File hashes are computed based on file content, not metadata
+- Hashes are stored with relative file paths for consistency across different environments
+
+#### 2. Merkle Tree Construction
+- All file hashes are organized into a Merkle tree structure
+- The tree provides a single root hash that represents the entire codebase state
+- Any change to any file will cause the root hash to change
+
+#### 3. Snapshot Management
+- File synchronization state is persisted to `~/.codeindexer/merkle/` directory
+- Each codebase gets a unique snapshot file based on its absolute path hash
+- Snapshots contain both file hashes and serialized Merkle tree data
+
+#### 4. Change Detection Process
+1. **Quick Check**: Compare current Merkle root hash with stored snapshot
+2. **Detailed Analysis**: If root hashes differ, perform file-by-file comparison
+3. **Change Classification**: Categorize changes into three types:
+   - **Added**: New files that didn't exist before
+   - **Modified**: Existing files with changed content
+   - **Removed**: Files that were deleted from the codebase
+
+#### 5. Incremental Updates
+- Only process files that have actually changed
+- Update vector database entries only for modified chunks
+- Remove entries for deleted files
+- Add entries for new files
+
 
 ## Contributing
 
@@ -228,6 +263,7 @@ This package is part of the CodeIndexer monorepo. Please see:
 
 - **[@code-indexer/mcp](../mcp)** - MCP server that uses this core engine
 - **[VSCode Extension](../vscode-extension)** - VSCode extension built on this core
+
 
 ## License
 

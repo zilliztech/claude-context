@@ -42,8 +42,7 @@ CodeIndexer/
 │   ├── vscode-extension/  # VSCode extension
 │   └── mcp/              # Model Context Protocol server
 ├── examples/
-│   └── basic-usage/      # Basic usage example
-└── docs/                 # Documentation
+│   └── basic-usage/      # Basic usage example 
 ```
 
 ### Package-Specific Development

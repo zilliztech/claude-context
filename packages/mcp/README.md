@@ -7,7 +7,6 @@ Model Context Protocol (MCP) integration for CodeIndexer - A powerful MCP server
 
 > 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
-## What is MCP?
 
 The Model Context Protocol (MCP) is an open protocol that standardizes how AI applications can securely connect to and interact with data sources and tools. This package provides an MCP server that exposes CodeIndexer's semantic search capabilities to any MCP-compatible client.
 
@@ -80,7 +79,35 @@ MCP_SERVER_VERSION="1.0.0"
 
 ## Usage with MCP Clients
 
-### Claude Desktop
+![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUfOR-7goqarF653roYT5u_HY_J3VkMMeUPUc2ZVj11ue82_tIzE_lIOuJ27HWcVYjTEQj2S3v9tZtS0-AXpyOP6F9VV_mymssD-57wT_ZVjF2MrS7cm5Ynj0goSEPpy81N4xSqi=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
+
+
+<details>
+<summary><strong>Cursor</strong></summary>
+
+Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`
+
+Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file is the recommended approach. You may also install in a specific project by creating `.cursor/mcp.json` in your project folder. See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more info.
+
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "npx",
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Claude Desktop</strong></summary>
 
 Add to your Claude Desktop configuration:
 
@@ -99,7 +126,69 @@ Add to your Claude Desktop configuration:
 }
 ```
 
-### Cherry Studio
+</details>
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+Use the command line interface to add the CodeIndexer MCP server:
+
+```bash
+# Add the CodeIndexer MCP server
+claude mcp add code-indexer -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @code-indexer/mcp@latest
+
+```
+
+See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
+
+</details>
+
+<details>
+<summary><strong>Windsurf</strong></summary>
+
+Windsurf supports MCP configuration through a JSON file. Add the following configuration to your Windsurf MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "npx",
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>VS Code</strong></summary>
+
+The CodeIndexer MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "npx",
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Cherry Studio</strong></summary>
 
 Cherry Studio allows for visual MCP server configuration through its settings interface. While it doesn't directly support manual JSON configuration, you can add a new server via the GUI:
 
@@ -114,7 +203,10 @@ Cherry Studio allows for visual MCP server configuration through its settings in
      - `MILVUS_ADDRESS`: `localhost:19530`
 3. Save the configuration to activate the server.
 
-### Cline
+</details>
+
+<details>
+<summary><strong>Cline</strong></summary>
 
 Cline uses a JSON configuration file to manage MCP servers. To integrate the provided MCP server configuration:
 
@@ -124,8 +216,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 
 3. In the `cline_mcp_settings.json` file, add the following configuration:
 
-```
-json
+```json
 {
   "mcpServers": {
     "code-indexer": {
@@ -142,7 +233,10 @@ json
 
 4. Save the file.
 
-### Augment
+</details>
+
+<details>
+<summary><strong>Augment</strong></summary>
 
 To configure Code Indexer MCP in Augment Code, you can use either the graphical interface or manual configuration.
 
@@ -175,9 +269,22 @@ To configure Code Indexer MCP in Augment Code, you can use either the graphical 
 3. Under Advanced, click Edit in settings.json
 4. Add the server configuration to the `mcpServers` array in the `augment.advanced` object
 
-"augment.advanced": { "mcpServers": [ { "name": "code-indexer", "command": "npx", "args": ["-y", "@code-indexer/mcp@latest"] } ] }
+```json
+"augment.advanced": { 
+  "mcpServers": [ 
+    { 
+      "name": "code-indexer", 
+      "command": "npx", 
+      "args": ["-y", "@code-indexer/mcp@latest"] 
+    } 
+  ] 
+}
+```
 
-### Gemini CLI
+</details>
+
+<details>
+<summary><strong>Gemini CLI</strong></summary>
 
 Gemini CLI requires manual configuration through a JSON file:
 
@@ -185,8 +292,7 @@ Gemini CLI requires manual configuration through a JSON file:
 
 2. Add the following configuration:
 
-```
-json
+```json
 {
   "mcpServers": {
     "code-indexer": {
@@ -203,7 +309,10 @@ json
 
 3. Save the file and restart Gemini CLI to apply the changes.
 
-### Roo Code
+</details>
+
+<details>
+<summary><strong>Roo Code</strong></summary>
 
 Roo Code utilizes a JSON configuration file for MCP servers:
 
@@ -211,8 +320,7 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 
 2. In the `mcp_settings.json` file, add the following configuration:
 
-```
-json
+```json
 {
   "mcpServers": {
     "code-indexer": {
@@ -229,13 +337,18 @@ json
 
 3. Save the file to activate the server.
 
-### Other MCP Clients
+</details>
+
+<details>
+<summary><strong>Other MCP Clients</strong></summary>
 
 The server uses stdio transport and follows the standard MCP protocol. It can be integrated with any MCP-compatible client by running:
 
 ```bash
 npx @code-indexer/mcp@latest
 ```
+
+</details>
 
 ## Contributing
 

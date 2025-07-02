@@ -17,9 +17,6 @@ pnpm build:core
 
 # Watch mode for development
 pnpm dev:core
-
-# Type checking
-pnpm typecheck
 ```
 
 ### Making Changes
@@ -31,7 +28,7 @@ pnpm typecheck
 ## Project Structure
 
 - `src/indexer.ts` - Main CodeIndexer class
-- `src/embedding/` - Embedding providers (OpenAI, VoyageAI)
+- `src/embedding/` - Embedding providers (OpenAI, VoyageAI, Ollama)
 - `src/vectordb/` - Vector database implementations (Milvus)
 - `src/splitter/` - Code splitting logic
 - `src/types.ts` - TypeScript type definitions
