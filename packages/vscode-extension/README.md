@@ -1,10 +1,11 @@
 # Semantic Code Search VSCode Extension
 
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
+
 A code indexing and semantic search VSCode extension powered by CodeIndexer.
 
 > 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
-[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 
 ## Features
 
@@ -26,6 +27,9 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
    - Click Install
 
 ## Quick Start
+
+
+![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeRa3Luaxqwi1yk3AtAO2IJNQr-nF8ZwRjPz6YSrqw8LgFFMh_ry3IHdTuINOIMMbSAQo-eq3ffgpfS0hFInfa-k9Uwgw1YlRyMqc1ean2KFyyyqCv3lenFZIpCB3dsBuGMp40MUQ=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
 
 1. **Configure Embedding Model**:
    - Open VSCode Settings (Ctrl+, or Cmd+, on Mac)
