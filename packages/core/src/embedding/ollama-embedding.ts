@@ -122,18 +122,35 @@ export class OllamaEmbedding extends Embedding {
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
         // Preprocess all texts
         const processedTexts = this.preprocessTexts(texts);
-        const results: EmbeddingVector[] = [];
 
-        // Process texts in batches to avoid overwhelming the API
-        const batchSize = 10;
-        for (let i = 0; i < processedTexts.length; i += batchSize) {
-            const batch = processedTexts.slice(i, i + batchSize);
-            const batchPromises = batch.map((text: string) => this.embed(text));
-            const batchResults = await Promise.all(batchPromises);
-            results.push(...batchResults);
+        // Detect dimension on first use if not configured
+        if (!this.dimensionDetected) {
+            await this.updateDimensionForModel(this.config.model);
         }
 
-        return results;
+        // Use Ollama's native batch embedding API
+        const embedOptions: any = {
+            model: this.config.model,
+            input: processedTexts, // Pass array directly to Ollama
+            options: this.config.options,
+        };
+
+        // Only include keep_alive if it has a valid value
+        if (this.config.keepAlive && this.config.keepAlive !== '') {
+            embedOptions.keep_alive = this.config.keepAlive;
+        }
+
+        const response = await this.client.embed(embedOptions);
+
+        if (!response.embeddings || !Array.isArray(response.embeddings)) {
+            throw new Error('Ollama API returned invalid batch response');
+        }
+
+        // Convert to EmbeddingVector format
+        return response.embeddings.map((embedding: number[]) => ({
+            vector: embedding,
+            dimension: this.dimension
+        }));
     }
 
     getDimension(): number {
