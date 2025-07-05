@@ -450,7 +450,7 @@ Visual Studio Code extension that integrates CodeIndexer directly into your IDE.
     - Click Install
 
 
-![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeRa3Luaxqwi1yk3AtAO2IJNQr-nF8ZwRjPz6YSrqw8LgFFMh_ry3IHdTuINOIMMbSAQo-eq3ffgpfS0hFInfa-k9Uwgw1YlRyMqc1ean2KFyyyqCv3lenFZIpCB3dsBuGMp40MUQ=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
 
 
 
