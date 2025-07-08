@@ -8,30 +8,32 @@
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord"/></a>
 
-An open-source code indexing and semantic search tool implemented by Milvus vector database and popular embedding models. You can build your AI Coding IDE or code search plugin with it.
+An open-source implementation of the code indexing and context awareness capabilities found in AI-powered IDEs like Cursor and Windsurf, built with Milvus vector database and popular embedding models. You can build your own AI Coding IDE or code search plugin with it, or directly integrate it into your existing IDEs through MCP or VSCode extension.
 
 ## 🌟 Why CodeIndexer?
 
 In the **AI-first development era**, traditional keyword-based search is no longer sufficient for modern software development:
 
 ### 🚀 **The AI Coding Revolution**
-- **AI-Powered IDEs** like Cursor and GitHub Copilot are transforming development workflows
+- **AI-Powered IDEs** like Cursor and Claude Code are transforming development workflows
 - **Growing demand** for intelligent code assistance and semantic understanding
 - **Modern codebases** contain millions of lines across hundreds of files, making manual navigation inefficient
 
 ### ❌ **Current Limitations**
+- LLMs have **limited context windows** and can't process entire large codebases at once
 - Regex and keyword-based search miss **contextual relationships**
+- Some IDEs lack **context awareness** - they can't understand how different parts of your codebase relate to each other
 - Developers waste time navigating large codebases manually  
-- Knowledge transfer between team members is inefficient
 - Traditional search tools can't bridge the gap between **human intent** and **code implementation**
 
 ### ✅ **Our Solution**
 CodeIndexer bridges the gap between human understanding and code discovery through:
+- **Context awareness** - understands relationships between different parts of your codebase
 - **Semantic search** with natural language queries like *"find authentication functions"*
 - **AI-powered understanding** of code meaning and relationships
-- **Universal integration** across multiple platforms and development environments
+- **Universal integration** across multiple platforms and development environments through MCP and VSCode extension
 
-> 💡 **Find code by describing functionality, not just keywords** - Discover existing solutions before writing duplicate code.
+> 💡 **Find code by describing functionality, not just keywords** - Discover existing solutions before writing duplicate code. Give your AI tools the context they need to understand your entire codebase.
 
 ## ✨ Features
 
