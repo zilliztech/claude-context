@@ -6,6 +6,7 @@
 [![npm - core](https://img.shields.io/npm/v/@code-indexer/core?label=%40code-indexer%2Fcore&logo=npm)](https://www.npmjs.com/package/@code-indexer/core)
 [![npm - mcp](https://img.shields.io/npm/v/@code-indexer/mcp?label=%40code-indexer%2Fmcp&logo=npm)](https://www.npmjs.com/package/@code-indexer/mcp)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/CodeIndexer)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord"/></a>
 
 An open-source implementation of the code indexing and context awareness capabilities found in AI-powered IDEs like Cursor and Windsurf, built with Milvus vector database and popular embedding models. You can build your own AI Coding IDE or code search plugin with it, or directly integrate it into your existing IDEs through MCP or VSCode extension.
