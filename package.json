@@ -1,6 +1,6 @@
 {
     "name": "code-indexer",
-    "version": "0.0.1",
+    "version": "0.0.4",
     "description": "A powerful code indexing tool with multi-platform support",
     "private": true,
     "scripts": {
