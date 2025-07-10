@@ -90,6 +90,11 @@ MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
 MILVUS_TOKEN=xxxxxxx
 ```
 
+#### Embedding Batch Size
+You can set the embedding batch size to optimize the performance of the MCP server, depending your embedding model throughput. The default value is 100.
+```bash
+EMBEDDING_BATCH_SIZE=512
+```
 
 ## Usage with MCP Clients
 

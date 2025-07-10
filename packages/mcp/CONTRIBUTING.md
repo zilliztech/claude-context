@@ -67,13 +67,14 @@ export MILVUS_ADDRESS="localhost:19530"
 
 ## Working with MCP Clients
 
-### Claude Desktop Configuration
+### Claude Desktop/Cursor Configuration
+You can use the following configuration to configure the MCP server with a development mode.
 ```json
 {
   "mcpServers": {
     "code-indexer-local": {
       "command": "node",
-      "args": ["./dist/index.js"],
+      "args": ["PATH_TO_CODEINDEXER/packages/mcp/dist/index.js"],
       "env": {
         "OPENAI_API_KEY": "your-key",  
         "MILVUS_ADDRESS": "localhost:19530"
