@@ -24,7 +24,7 @@ const DEFAULT_SUPPORTED_EXTENSIONS = [
     '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
     '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
     // Text and markup files
-    '.md', '.markdown',
+    '.md', '.markdown', '.ipynb',
     // '.txt',  '.json', '.yaml', '.yml', '.xml', '.html', '.htm',
     // '.css', '.scss', '.less', '.sql', '.sh', '.bash', '.env'
 ];
@@ -148,47 +148,41 @@ export class CodeIndexer {
             return { indexedFiles: 0, totalChunks: 0 };
         }
 
-        // 3. Process each file
-        const indexedFiles = new Set<string>();
-        let totalChunks = 0;
-        const batchSize = 10; // Batch processing to avoid excessive memory usage
-
+        // 3. Process each file with streaming chunk processing
         // Reserve 10% for preparation, 90% for actual indexing
         const indexingStartPercentage = 10;
         const indexingEndPercentage = 100;
         const indexingRange = indexingEndPercentage - indexingStartPercentage;
 
-        for (let i = 0; i < codeFiles.length; i += batchSize) {
-            const batch = codeFiles.slice(i, i + batchSize);
-            const batchStats = await this.processBatch(batch, codebasePath);
-            batchStats.processedFiles.forEach(file => indexedFiles.add(file));
-            totalChunks += batchStats.chunksGenerated;
+        const result = await this.processFileList(
+            codeFiles,
+            codebasePath,
+            (filePath, fileIndex, totalFiles) => {
+                // Calculate progress percentage
+                const progressPercentage = indexingStartPercentage + (fileIndex / totalFiles) * indexingRange;
 
-            // Calculate progress percentage
-            const filesProcessed = indexedFiles.size;
-            const progressPercentage = indexingStartPercentage + (filesProcessed / codeFiles.length) * indexingRange;
+                console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
+                progressCallback?.({
+                    phase: `Processing files (${fileIndex}/${totalFiles})...`,
+                    current: fileIndex,
+                    total: totalFiles,
+                    percentage: Math.round(progressPercentage)
+                });
+            }
+        );
 
-            console.log(`📊 Processed ${filesProcessed}/${codeFiles.length} files`);
-            progressCallback?.({
-                phase: `Processing files (${filesProcessed}/${codeFiles.length})...`,
-                current: filesProcessed,
-                total: codeFiles.length,
-                percentage: Math.round(progressPercentage)
-            });
-        }
-
-        console.log(`✅ Codebase indexing completed! Processed ${indexedFiles.size} files in total, generated ${totalChunks} code chunks`);
+        console.log(`✅ Codebase indexing completed! Processed ${result.processedFiles} files in total, generated ${result.totalChunks} code chunks`);
 
         progressCallback?.({
             phase: 'Indexing complete!',
-            current: indexedFiles.size,
+            current: result.processedFiles,
             total: codeFiles.length,
             percentage: 100
         });
 
         return {
-            indexedFiles: indexedFiles.size,
-            totalChunks: totalChunks
+            indexedFiles: result.processedFiles,
+            totalChunks: result.totalChunks
         };
     }
 
@@ -243,12 +237,13 @@ export class CodeIndexer {
         const filesToIndex = [...added, ...modified].map(f => path.join(codebasePath, f));
 
         if (filesToIndex.length > 0) {
-            const batchSize = 10;
-            for (let i = 0; i < filesToIndex.length; i += batchSize) {
-                const batch = filesToIndex.slice(i, i + batchSize);
-                await this.processBatch(batch, codebasePath);
-                updateProgress(`Indexed a batch of ${batch.length} files`);
-            }
+            await this.processFileList(
+                filesToIndex,
+                codebasePath,
+                (filePath, fileIndex, totalFiles) => {
+                    updateProgress(`Indexed ${filePath} (${fileIndex}/${totalFiles})`);
+                }
+            );
         }
 
         console.log(`✅ Re-indexing complete. Added: ${added.length}, Removed: ${removed.length}, Modified: ${modified.length}`);
@@ -457,14 +452,27 @@ export class CodeIndexer {
     }
 
     /**
-     * Process files in batch
-     */
-    private async processBatch(filePaths: string[], codebasePath: string): Promise<{ processedFiles: string[]; chunksGenerated: number }> {
-        const allChunks: CodeChunk[] = [];
-        const processedFiles: string[] = [];
+ * Process a list of files with streaming chunk processing
+ * @param filePaths Array of file paths to process
+ * @param codebasePath Base path for the codebase
+ * @param onFileProcessed Callback called when each file is processed
+ * @returns Object with processed file count and total chunk count
+ */
+    private async processFileList(
+        filePaths: string[],
+        codebasePath: string,
+        onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void
+    ): Promise<{ processedFiles: number; totalChunks: number }> {
+        const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(process.env.EMBEDDING_BATCH_SIZE || '100', 10));
+        console.log(`🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
 
-        // 1. Read and split files in parallel
-        for (const filePath of filePaths) {
+        let chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
+        let processedFiles = 0;
+        let totalChunks = 0;
+
+        for (let i = 0; i < filePaths.length; i++) {
+            const filePath = filePaths[i];
+
             try {
                 const content = await fs.promises.readFile(filePath, 'utf-8');
                 const language = this.getLanguageFromExtension(path.extname(filePath));
@@ -477,45 +485,59 @@ export class CodeIndexer {
                     console.log(`📄 Large file ${filePath}: ${Math.round(content.length / 1024)}KB -> ${chunks.length} chunks`);
                 }
 
-                allChunks.push(...chunks);
-                processedFiles.push(filePath);
+                // Add chunks to buffer
+                for (const chunk of chunks) {
+                    chunkBuffer.push({ chunk, codebasePath });
+                    totalChunks++;
+
+                    // Process batch when buffer reaches EMBEDDING_BATCH_SIZE
+                    if (chunkBuffer.length >= EMBEDDING_BATCH_SIZE) {
+                        try {
+                            await this.processChunkBuffer(chunkBuffer);
+                        } catch (error) {
+                            console.error(`❌ Failed to process chunk batch: ${error}`);
+                        } finally {
+                            chunkBuffer = []; // Always clear buffer, even on failure
+                        }
+                    }
+                }
+
+                processedFiles++;
+                onFileProcessed?.(filePath, i + 1, filePaths.length);
+
             } catch (error) {
                 console.warn(`⚠️  Skipping file ${filePath}: ${error}`);
             }
         }
 
-        if (allChunks.length === 0) {
-            return { processedFiles, chunksGenerated: 0 };
-        }
-
-        console.log(`📝 Processing ${allChunks.length} chunks from ${processedFiles.length} files`);
-
-        // 2. Process chunks in smaller batches to avoid token limits
-        const MAX_CHUNKS_PER_BATCH = 100; // Limit chunks per embedding batch
-        const MAX_ESTIMATED_TOKENS = 200000; // Conservative token limit
-        let totalProcessedChunks = 0;
-
-        for (let i = 0; i < allChunks.length; i += MAX_CHUNKS_PER_BATCH) {
-            const chunkBatch = allChunks.slice(i, i + MAX_CHUNKS_PER_BATCH);
-
-            // Estimate tokens (rough estimation: 1 token ≈ 4 characters)
-            const estimatedTokens = chunkBatch.reduce((sum, chunk) => sum + Math.ceil(chunk.content.length / 4), 0);
-
-            if (estimatedTokens > MAX_ESTIMATED_TOKENS) {
-                console.warn(`⚠️  Chunk batch has ~${estimatedTokens} tokens, splitting further...`);
-                // Process chunks one by one if batch is still too large
-                for (const chunk of chunkBatch) {
-                    await this.processSingleChunk(chunk, codebasePath);
-                    totalProcessedChunks++;
-                }
-            } else {
-                console.log(`🔄 Processing chunk batch ${Math.floor(i / MAX_CHUNKS_PER_BATCH) + 1} with ${chunkBatch.length} chunks (~${estimatedTokens} tokens)`);
-                await this.processChunkBatch(chunkBatch, codebasePath);
-                totalProcessedChunks += chunkBatch.length;
+        // Process any remaining chunks in the buffer
+        if (chunkBuffer.length > 0) {
+            console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks`);
+            try {
+                await this.processChunkBuffer(chunkBuffer);
+            } catch (error) {
+                console.error(`❌ Failed to process final chunk batch: ${error}`);
             }
         }
 
-        return { processedFiles, chunksGenerated: totalProcessedChunks };
+        return { processedFiles, totalChunks };
+    }
+
+    /**
+ * Process accumulated chunk buffer
+ */
+    private async processChunkBuffer(chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }>): Promise<void> {
+        if (chunkBuffer.length === 0) return;
+
+        // Extract chunks and ensure they all have the same codebasePath
+        const chunks = chunkBuffer.map(item => item.chunk);
+        const codebasePath = chunkBuffer[0].codebasePath;
+
+        // Estimate tokens (rough estimation: 1 token ≈ 4 characters)
+        const estimatedTokens = chunks.reduce((sum, chunk) => sum + Math.ceil(chunk.content.length / 4), 0);
+
+        console.log(`🔄 Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens)`);
+        await this.processChunkBatch(chunks, codebasePath);
     }
 
     /**
@@ -559,51 +581,7 @@ export class CodeIndexer {
         await this.vectorDatabase.insert(this.getCollectionName(codebasePath), documents);
     }
 
-    /**
-     * Process a single chunk (fallback for very large chunks)
-     */
-    private async processSingleChunk(chunk: CodeChunk, codebasePath: string): Promise<void> {
-        if (!chunk.metadata.filePath) {
-            throw new Error(`Missing filePath in chunk metadata`);
-        }
 
-        // Check if chunk is too large even for single processing
-        const estimatedTokens = Math.ceil(chunk.content.length / 4);
-        if (estimatedTokens > 250000) { // Very conservative limit for single chunk
-            console.warn(`⚠️  Skipping extremely large chunk (~${estimatedTokens} tokens) from ${chunk.metadata.filePath}:${chunk.metadata.startLine}-${chunk.metadata.endLine}`);
-            return;
-        }
-
-        console.log(`🔄 Processing single large chunk (~${estimatedTokens} tokens) from ${chunk.metadata.filePath}`);
-
-        // Generate embedding vector
-        const embedding: EmbeddingVector = await this.embedding.embed(chunk.content);
-
-        const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
-        const fileExtension = path.extname(chunk.metadata.filePath);
-
-        // Extract metadata that should be stored separately
-        const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
-
-        const document: VectorDocument = {
-            id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
-            vector: embedding.vector,
-            content: chunk.content,
-            relativePath,
-            startLine: chunk.metadata.startLine || 0,
-            endLine: chunk.metadata.endLine || 0,
-            fileExtension,
-            metadata: {
-                ...restMetadata,
-                codebasePath,
-                language: chunk.metadata.language || 'unknown',
-                chunkIndex: 0
-            }
-        };
-
-        // Store to vector database
-        await this.vectorDatabase.insert(this.getCollectionName(codebasePath), [document]);
-    }
 
     /**
      * Get programming language based on file extension
@@ -629,7 +607,8 @@ export class CodeIndexer {
             '.kt': 'kotlin',
             '.scala': 'scala',
             '.m': 'objective-c',
-            '.mm': 'objective-c'
+            '.mm': 'objective-c',
+            '.ipynb': 'jupyter'
         };
         return languageMap[ext] || 'text';
     }
