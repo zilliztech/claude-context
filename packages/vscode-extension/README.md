@@ -15,6 +15,10 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
 - 🔧 **Multi-platform Support**: Support for OpenAI and VoyageAI as embedding providers
 - 💾 **Vector Storage**: Integrated with Milvus vector database for efficient storage and retrieval
 
+## Requirements
+
+- **VSCode Version**: 1.74.0 or higher
+
 ## Installation
 
 ### From VS Code Marketplace
@@ -29,7 +33,7 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
 ## Quick Start
 
 
-![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUeRa3Luaxqwi1yk3AtAO2IJNQr-nF8ZwRjPz6YSrqw8LgFFMh_ry3IHdTuINOIMMbSAQo-eq3ffgpfS0hFInfa-k9Uwgw1YlRyMqc1ean2KFyyyqCv3lenFZIpCB3dsBuGMp40MUQ=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
 
 1. **Configure Embedding Model**:
    - Open VSCode Settings (Ctrl+, or Cmd+, on Mac)

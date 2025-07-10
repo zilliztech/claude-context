@@ -8,6 +8,10 @@ Thanks for your interest in contributing to the CodeIndexer VSCode extension!
 
 This guide covers development specific to the VSCode extension.
 
+### Requirements
+
+- **VSCode Version**: 1.74.0 or higher
+
 ### Quick Commands
 ```bash
 # Build VSCode extension
