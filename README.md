@@ -100,15 +100,7 @@ OPENAI_API_KEY=your-openai-api-key
 ```
 
 #### Milvus configuration
-**Optional 1**: Self-hosted Milvus
-See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
-- `MILVUS_ADDRESS` is the address of your Milvus instance
-- (Optional)`MILVUS_TOKEN` is the token of your Milvus instance, which can be left empty if you don't use token-based authentication.
-```bash
-MILVUS_ADDRESS=localhost:19530
-MILVUS_TOKEN=your-milvus-token
-```
-**Optional 2**: Zilliz Cloud(fully managed vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+Zilliz Cloud(fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
 
 - `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
 - `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
@@ -116,6 +108,7 @@ MILVUS_TOKEN=your-milvus-token
 MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
 MILVUS_TOKEN=xxxxxxx
 ```
+> Optional: Self-hosted Milvus. See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
 
 
 

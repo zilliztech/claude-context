@@ -7,6 +7,8 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
 > 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
+
 ## Features
 
 - 🔍 **Semantic Search**: Intelligent code search based on semantic understanding, not just keyword matching
@@ -32,13 +34,49 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
 
 ## Quick Start
 
+### Configuration
+The first time you open CodeIndexer, you need to click on Settings icon to configure the relevant options.
 
-![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
+#### Embedding Configuration
+Configure your embedding provider to convert code into semantic vectors.
 
-1. **Configure Embedding Model**:
+**OpenAI Configuration:**
+- `Embedding Provider`: Select "OpenAI" from the dropdown
+- `Model name`: Choose the embedding model (e.g., `text-embedding-3-small`, `text-embedding-3-large`)
+- `OpenAI API key`: Your OpenAI API key for authentication
+- `Custom API endpoint URL`: Optional custom endpoint (defaults to `https://api.openai.com/v1`)
+
+**Other Supported Providers:**
+- VoyageAI: Alternative embedding provider with competitive performance
+- Ollama: For local embedding models
+
+#### Code Splitter Configuration
+Configure how your code is split into chunks for indexing.
+
+**Splitter Settings:**
+- `Splitter Type`: Choose between "AST Splitter" (syntax-aware) or "LangChain Splitter" (character-based)
+- `Chunk Size`: Maximum size of each code chunk (default: 1000 characters)
+- `Chunk Overlap`: Number of overlapping characters between chunks (default: 200 characters)
+
+> **Recommendation**: Use AST Splitter for better semantic understanding of code structure.
+
+#### Milvus configuration
+Zilliz Cloud(fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+
+- `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
+- `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
+```bash
+MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
+MILVUS_TOKEN=xxxxxxx
+```
+> Optional: Self-hosted Milvus. See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
+
+### Usage
+
+1. **Set the Configuration**:
    - Open VSCode Settings (Ctrl+, or Cmd+, on Mac)
    - Search for "Semantic Code Search"
-   - Configure embedding provider and API Key
+   - Set the configuration
 
 2. **Index Codebase**:
    - Open Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac)
