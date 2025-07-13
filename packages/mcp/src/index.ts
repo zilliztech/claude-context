@@ -5,8 +5,8 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeIndexer, SemanticSearchResult } from "@code-indexer/core";
-import { OpenAIEmbedding } from "@code-indexer/core";
+import { CodeIndexer, SemanticSearchResult, Embedding } from "@code-indexer/core";
+import { OpenAIEmbedding, OllamaEmbedding } from "@code-indexer/core";
 import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
 import * as fs from "fs";
@@ -16,10 +16,14 @@ import * as crypto from "crypto";
 interface CodeIndexerMcpConfig {
     name: string;
     version: string;
-    openaiApiKey: string;
-    openaiBaseUrl?: string;
     milvusAddress: string;
     milvusToken?: string;
+    embeddingProvider: 'openai' | 'ollama';
+    openaiApiKey?: string;
+    openaiBaseUrl?: string;
+    openaiModel?: string;
+    ollamaModel?: string;
+    ollamaHost?: string;
 }
 
 interface CodebaseSnapshot {
@@ -63,11 +67,31 @@ class CodeIndexerMcpServer {
         );
 
         // Initialize code indexer with proper configuration
-        const embedding = new OpenAIEmbedding({
-            apiKey: config.openaiApiKey,
-            model: 'text-embedding-3-small',
-            ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl })
-        });
+        let embedding: Embedding;
+
+        console.log(`[CONFIG] Using embedding provider: ${config.embeddingProvider}`);
+
+        if (config.embeddingProvider === 'ollama') {
+            if (!config.ollamaModel) {
+                throw new Error('OLLAMA_MODEL environment variable must be set for Ollama provider');
+            }
+            console.log(`[CONFIG] Using Ollama model: ${config.ollamaModel}, host: ${config.ollamaHost || 'default'}`);
+            embedding = new OllamaEmbedding({
+                model: config.ollamaModel,
+                host: config.ollamaHost,
+            });
+        } else {
+            if (!config.openaiApiKey) {
+                throw new Error('OPENAI_API_KEY environment variable must be set for OpenAI provider');
+            }
+            const model = config.openaiModel || 'text-embedding-3-small';
+            console.log(`[CONFIG] Using OpenAI model: ${model}`);
+            embedding = new OpenAIEmbedding({
+                apiKey: config.openaiApiKey,
+                model: model,
+                ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl })
+            });
+        }
 
         const vectorDatabase = new MilvusVectorDatabase({
             address: config.milvusAddress,
@@ -340,13 +364,15 @@ class CodeIndexerMcpServer {
 
             // Include splitter and path information in response to confirm what was actually indexed
             const pathInfo = codebasePath !== absolutePath
-                ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
+                ? `
+Note: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
                 : '';
 
             return {
                 content: [{
                     type: "text",
-                    text: `Successfully indexed codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
+                    text: `Successfully indexed codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.
+Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
                 }]
             };
         } catch (error: any) {
@@ -629,7 +655,8 @@ class CodeIndexerMcpServer {
             let resultText = `Successfully cleared codebase '${absolutePath}'`;
 
             if (this.indexedCodebases.length > 0) {
-                resultText += `\n${this.indexedCodebases.length} other codebase(s) remain indexed`;
+                resultText += `
+${this.indexedCodebases.length} other codebase(s) remain indexed`;
             }
 
             return {
@@ -728,14 +755,21 @@ class CodeIndexerMcpServer {
 async function main() {
     // Parse command line arguments
     const args = process.argv.slice(2);
+    console.log(`[DEBUG] environment variables:`, process.env);
+
+    const embeddingProvider = (process.env.EMBEDDING_PROVIDER?.toLowerCase() === 'ollama' ? 'ollama' : 'openai') as 'openai' | 'ollama';
 
     const config: CodeIndexerMcpConfig = {
         name: process.env.MCP_SERVER_NAME || "CodeIndexer MCP Server",
         version: process.env.MCP_SERVER_VERSION || "1.0.0",
+        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
+        milvusToken: process.env.MILVUS_TOKEN,
+        embeddingProvider,
         openaiApiKey: process.env.OPENAI_API_KEY || "",
         openaiBaseUrl: process.env.OPENAI_BASE_URL,
-        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
-        milvusToken: process.env.MILVUS_TOKEN
+        openaiModel: process.env.OPENAI_MODEL,
+        ollamaModel: process.env.OLLAMA_MODEL,
+        ollamaHost: process.env.OLLAMA_HOST,
     };
 
     // Show help if requested

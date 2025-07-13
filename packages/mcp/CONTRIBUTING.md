@@ -24,9 +24,28 @@ pnpm start:with-env
 ```
 
 ### Required Environment Variables
+Set the following environment variables based on your chosen embedding provider.
+
+#### OpenAI (Default)
 ```bash
+# Required
 export OPENAI_API_KEY="your-api-key"
 export MILVUS_ADDRESS="localhost:19530"
+
+# Optional
+export EMBEDDING_PROVIDER="openai"
+export OPENAI_MODEL="text-embedding-3-small"
+```
+
+#### Ollama
+```bash
+# Required
+export EMBEDDING_PROVIDER="ollama"
+export OLLAMA_MODEL="nomic-embed-text"
+export MILVUS_ADDRESS="localhost:19530"
+
+# Optional
+export OLLAMA_HOST="http://127.0.0.1:11434"
 ```
 
 ## Running the MCP Server
