@@ -65,26 +65,49 @@ Before using the MCP server, make sure you have:
 > 💡 **Setup Help:** See the [main project setup guide](../../README.md#-quick-start) for detailed installation instructions.
 
 ### Prepare Environment Variables
-#### OpenAI API key
-See [OpenAI Documentation](https://platform.openai.com/docs/api-reference) for more details to get your API key.
+
+#### Embedding Provider
+You can choose between `openai` and `ollama` as the embedding provider.
+
 ```bash
-OPENAI_API_KEY=your-openai-api-key
+# Use 'openai' or 'ollama'
+EMBEDDING_PROVIDER=openai
 ```
 
-#### Milvus configuration
-Zilliz Cloud(fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+#### OpenAI Configuration (if `EMBEDDING_PROVIDER=openai`)
+```bash
+# Required: Your OpenAI API key
+OPENAI_API_KEY=your-openai-api-key
+
+# Optional: Specify OpenAI model (default: text-embedding-3-small)
+OPENAI_MODEL=text-embedding-3-large
+```
+
+#### Ollama Configuration (if `EMBEDDING_PROVIDER=ollama`)
+```bash
+# Required: Specify which Ollama model to use
+OLLAMA_MODEL=nomic-embed-text
+
+# Optional: Specify Ollama host (default: http://127.0.0.1:11434)
+OLLAMA_HOST=http://localhost:11434
+```
+
+#### Milvus Configuration
+Zilliz Cloud (fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
 
 - `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
 - `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
 ```bash
+# Required: Milvus address
 MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
+
+# Required for Zilliz Cloud: Milvus token
 MILVUS_TOKEN=xxxxxxx
 ```
 > Optional: Self-hosted Milvus. See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
 
-
 #### Embedding Batch Size
-You can set the embedding batch size to optimize the performance of the MCP server, depending your embedding model throughput. The default value is 100.
+You can set the embedding batch size to optimize the performance of the MCP server, depending on your embedding model throughput. The default value is 100.
 ```bash
 EMBEDDING_BATCH_SIZE=512
 ```
