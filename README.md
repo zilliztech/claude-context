@@ -97,6 +97,8 @@ yarn add @code-indexer/core
 See [OpenAI Documentation](https://platform.openai.com/docs/api-reference) for more details to get your API key.
 ```bash
 OPENAI_API_KEY=your-openai-api-key
+# Optional: Custom OpenAI API endpoint (for OpenAI-compatible services)
+OPENAI_BASE_URL=https://your-custom-endpoint.com/v1
 ```
 
 #### Milvus configuration
@@ -181,6 +183,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
       "args": ["-y", "@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }
@@ -203,6 +206,7 @@ Add to your Claude Desktop configuration:
       "args": ["@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }
@@ -219,7 +223,7 @@ Use the command line interface to add the CodeIndexer MCP server:
 
 ```bash
 # Add the CodeIndexer MCP server
-claude mcp add code-indexer -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @code-indexer/mcp@latest
+claude mcp add code-indexer -e OPENAI_API_KEY=your-openai-api-key -e OPENAI_BASE_URL=https://your-custom-endpoint.com/v1 -e MILVUS_ADDRESS=localhost:19530 -- npx @code-indexer/mcp@latest
 
 ```
 
@@ -240,6 +244,7 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
       "args": ["-y", "@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }
@@ -262,6 +267,7 @@ The CodeIndexer MCP server can be used with VS Code through MCP-compatible exten
       "args": ["-y", "@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }
@@ -284,6 +290,7 @@ Cherry Studio allows for visual MCP server configuration through its settings in
    - **Arguments**: `["@code-indexer/mcp@latest"]`
    - **Environment Variables**:
      - `OPENAI_API_KEY`: `your-openai-api-key`
+     - `OPENAI_BASE_URL`: `https://your-custom-endpoint.com/v1` (optional)
      - `MILVUS_ADDRESS`: `localhost:19530`
 3. Save the configuration to activate the server.
 
@@ -308,6 +315,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
       "args": ["@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }
@@ -359,9 +367,14 @@ To configure Code Indexer MCP in Augment Code, you can use either the graphical 
     { 
       "name": "code-indexer", 
       "command": "npx", 
-      "args": ["-y", "@code-indexer/mcp@latest"] 
-    } 
-  ] 
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  ]
 }
 ```
 
@@ -384,6 +397,7 @@ Gemini CLI requires manual configuration through a JSON file:
       "args": ["@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }
@@ -412,6 +426,7 @@ Roo Code utilizes a JSON configuration file for MCP servers:
       "args": ["@code-indexer/mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }

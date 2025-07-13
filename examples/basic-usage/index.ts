@@ -114,6 +114,13 @@ async function main() {
                 console.log('   - For gRPC (default): set MILVUS_USE_RESTFUL=false or leave unset');
                 console.log('   - Start Milvus: docker run -p 19530:19530 milvusdb/milvus:latest');
             }
+
+            console.log('\n💡 Environment Variables:');
+            console.log('   - OPENAI_API_KEY: Your OpenAI API key (required)');
+            console.log('   - OPENAI_BASE_URL: Custom OpenAI API endpoint (optional)');
+            console.log('   - MILVUS_ADDRESS: Milvus server address (default: localhost:19530)');
+            console.log('   - MILVUS_TOKEN: Milvus authentication token (optional)');
+            console.log('   - SPLITTER_TYPE: Code splitter type - "ast" or "langchain" (default: ast)');
         }
 
         process.exit(1);

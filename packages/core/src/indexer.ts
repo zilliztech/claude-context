@@ -99,7 +99,8 @@ export class CodeIndexer {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
-            model: 'text-embedding-3-small'
+            model: 'text-embedding-3-small',
+            ...(process.env.OPENAI_BASE_URL && { baseURL: process.env.OPENAI_BASE_URL })
         });
 
         if (!config.vectorDatabase) {

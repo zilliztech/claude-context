@@ -17,6 +17,7 @@ interface CodeIndexerMcpConfig {
     name: string;
     version: string;
     openaiApiKey: string;
+    openaiBaseUrl?: string;
     milvusAddress: string;
     milvusToken?: string;
 }
@@ -64,7 +65,8 @@ class CodeIndexerMcpServer {
         // Initialize code indexer with proper configuration
         const embedding = new OpenAIEmbedding({
             apiKey: config.openaiApiKey,
-            model: 'text-embedding-3-small'
+            model: 'text-embedding-3-small',
+            ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl })
         });
 
         const vectorDatabase = new MilvusVectorDatabase({
@@ -731,6 +733,7 @@ async function main() {
         name: process.env.MCP_SERVER_NAME || "CodeIndexer MCP Server",
         version: process.env.MCP_SERVER_VERSION || "1.0.0",
         openaiApiKey: process.env.OPENAI_API_KEY || "",
+        openaiBaseUrl: process.env.OPENAI_BASE_URL,
         milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
         milvusToken: process.env.MILVUS_TOKEN
     };
@@ -749,7 +752,9 @@ Environment Variables:
   MCP_SERVER_NAME         Server name
   MCP_SERVER_VERSION      Server version
   OPENAI_API_KEY          OpenAI API key (required)
+  OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
   MILVUS_ADDRESS          Milvus address (default: localhost:19530)
+  MILVUS_TOKEN            Milvus token (optional)
 
 Examples:
   # Start MCP server
