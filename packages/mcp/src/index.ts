@@ -364,15 +364,13 @@ class CodeIndexerMcpServer {
 
             // Include splitter and path information in response to confirm what was actually indexed
             const pathInfo = codebasePath !== absolutePath
-                ? `
-Note: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
+                ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
                 : '';
 
             return {
                 content: [{
                     type: "text",
-                    text: `Successfully indexed codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.
-Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
+                    text: `Successfully indexed codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
                 }]
             };
         } catch (error: any) {
@@ -655,8 +653,7 @@ Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`
             let resultText = `Successfully cleared codebase '${absolutePath}'`;
 
             if (this.indexedCodebases.length > 0) {
-                resultText += `
-${this.indexedCodebases.length} other codebase(s) remain indexed`;
+                resultText += `\n${this.indexedCodebases.length} other codebase(s) remain indexed`;
             }
 
             return {
