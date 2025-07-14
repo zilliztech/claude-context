@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,43 +18,51 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
+
         .settings-container {
             background-color: #ffffff;
             border-radius: 6px;
             border: 1px solid #d0d7de;
             padding: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
         }
+
         .header {
             margin-bottom: 16px;
             padding-bottom: 16px;
             border-bottom: 1px solid #d0d7de;
         }
+
         .form-group {
             margin-bottom: 16px;
         }
+
         .note {
             font-size: 12px;
             color: #57606a;
             margin-top: 4px;
         }
+
         .flash {
             padding: 16px;
             border-radius: 6px;
             margin-bottom: 16px;
             display: none;
         }
+
         .flash-success {
             background-color: #dafbe1;
             color: #116329;
             border: 1px solid #2da44e;
         }
+
         .flash-error {
             background-color: #ffebe9;
             color: #cf222e;
             border: 1px solid #cf222e;
             display: none;
         }
+
         #debug-area {
             margin-top: 20px;
             padding: 10px;
@@ -62,50 +71,59 @@
             background-color: #f6f8fa;
             display: none;
         }
+
         #milvus-test-result {
             font-weight: 500;
             display: inline-block;
             min-height: 1.2em;
         }
+
         .connection-status {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-weight: 500;
         }
+
         /* Ensure consistent text rendering */
         * {
             box-sizing: border-box;
             text-rendering: optimizeLegibility;
         }
+
         @media (max-width: 500px) {
             body {
                 padding: 1rem;
                 min-width: 350px;
                 max-width: 400px;
             }
+
             .settings-container {
                 padding: 16px;
             }
+
             .header {
                 margin-bottom: 12px;
                 padding-bottom: 12px;
             }
+
             .form-group {
                 margin-bottom: 12px;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="settings-container">
         <div class="header">
             <h2>GitHub Code Vector Search Settings</h2>
-            <p class="color-fg-muted">Configure your GitHub API token, OpenAI API key, and Milvus connection to enable repository indexing and vector search.</p>
+            <p class="color-fg-muted">Configure your GitHub API token, OpenAI API key, and Milvus connection to enable
+                repository indexing and vector search.</p>
         </div>
 
         <div id="save-success" class="flash flash-success">
             Settings saved successfully!
         </div>
-        
+
         <div id="save-error" class="flash flash-error">
             Error saving settings. Check console for details.
         </div>
@@ -113,14 +131,12 @@
         <form id="settings-form">
             <div class="form-group">
                 <label for="github-token" class="d-block mb-1">GitHub Personal Access Token</label>
-                <input type="password" id="github-token" class="form-control width-full" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-                <div class="d-flex flex-items-center mt-2">
-                    <button id="test-github" class="btn btn-sm btn-outline" type="button">Test GitHub Token</button>
-                    <span id="github-test-result" class="ml-2 text-small connection-status"></span>
-                </div>
+                <input type="password" id="github-token" class="form-control width-full"
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+
                 <p class="note">
-                    This token is used to access GitHub API for repository indexing. 
-                    <br>Create a token with <code>repo</code> scope at 
+                    This token is used to access GitHub API for repository indexing.
+                    <br>Create a token with <code>repo</code> scope at
                     <a href="https://github.com/settings/tokens" target="_blank">GitHub Developer Settings</a>.
                 </p>
             </div>
@@ -129,25 +145,31 @@
 
             <div class="form-group">
                 <label for="openai-token" class="d-block mb-1">OpenAI API Key</label>
-                <input type="password" id="openai-token" class="form-control width-full" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                <input type="password" id="openai-token" class="form-control width-full"
+                    placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
                 <p class="note">
                     This key is used to generate embeddings via the OpenAI Embedding API.
-                    <br>You can create it in your <a href="https://platform.openai.com/account/api-keys" target="_blank">OpenAI dashboard</a>.
+                    <br>You can create it in your <a href="https://platform.openai.com/account/api-keys"
+                        target="_blank">OpenAI dashboard</a>.
                 </p>
             </div>
 
             <div class="form-group">
                 <h3 class="h4 mb-2">Milvus Configuration</h3>
-                <p class="note mb-3">Configure your Milvus vector database connection. Leave blank to use local storage fallback.</p>
-                
+                <p class="note mb-3">Configure your Milvus vector database connection. Leave blank to use local storage
+                    fallback.</p>
+
                 <label for="milvus-address" class="d-block mb-1">Milvus Server Address</label>
-                <input type="url" id="milvus-address" class="form-control width-full" placeholder="http://localhost:19530">
-                <p class="note">The address of your Milvus server (e.g., http://localhost:19530 or https://your-cloud-instance.com)</p>
+                <input type="url" id="milvus-address" class="form-control width-full"
+                    placeholder="http://localhost:19530">
+                <p class="note">The address of your Milvus server (e.g., http://localhost:19530 or
+                    https://your-cloud-instance.com)</p>
             </div>
 
             <div class="form-group">
                 <label for="milvus-token" class="d-block mb-1">Milvus Token (Optional)</label>
-                <input type="password" id="milvus-token" class="form-control width-full" placeholder="Your Milvus authentication token">
+                <input type="password" id="milvus-token" class="form-control width-full"
+                    placeholder="Your Milvus authentication token">
                 <p class="note">Authentication token for Milvus (required for cloud instances)</p>
             </div>
 
@@ -166,7 +188,7 @@
                 <span id="milvus-test-result" class="ml-2 text-small connection-status"></span>
             </div>
         </form>
-        
+
         <div id="debug-area">
             <h3>Debug Information</h3>
             <div id="debug-content"></div>
@@ -174,4 +196,5 @@
     </div>
     <script src="options.js"></script>
 </body>
-</html> 
+
+</html>

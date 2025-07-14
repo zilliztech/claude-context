@@ -8,10 +8,10 @@
   },
   "action": {
     "default_icon": {
-      "16": "icons/icon16.svg",
-      "32": "icons/icon32.svg",
-      "48": "icons/icon48.svg",
-      "128": "icons/icon128.svg"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   },
   "permissions": [
@@ -30,9 +30,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://github.com/*/*"],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "matches": [
+        "https://github.com/*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ]
     }
   ],
   "options_ui": {
@@ -41,8 +47,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": [ "ort-wasm-simd-threaded.wasm", "options.html", "options.js" ],
-      "matches": [ "<all_urls>" ]
+      "resources": [
+        "ort-wasm-simd-threaded.wasm",
+        "options.html",
+        "options.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
-} 
+}
