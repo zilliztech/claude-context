@@ -752,7 +752,6 @@ class CodeIndexerMcpServer {
 async function main() {
     // Parse command line arguments
     const args = process.argv.slice(2);
-    console.log(`[DEBUG] environment variables:`, process.env);
 
     const embeddingProvider = (process.env.EMBEDDING_PROVIDER?.toLowerCase() === 'ollama' ? 'ollama' : 'openai') as 'openai' | 'ollama';
 
