@@ -4,7 +4,6 @@
     "description": "CodeIndexer Chrome extension for web-based code indexing",
     "private": true,
     "scripts": {
-        "prebuild": "node scripts/generate-icons.js",
         "build": "webpack --mode=production",
         "dev": "webpack --mode=development --watch",
         "clean": "rm -rf dist",
