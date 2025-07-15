@@ -59,38 +59,119 @@ npx @code-indexer/mcp@latest
 ### Prerequisites
 
 Before using the MCP server, make sure you have:
-- OpenAI API Key  
+- API key for your chosen embedding provider (OpenAI, VoyageAI, Gemini, or Ollama setup)
 - Milvus vector database (local or cloud)
 
 > 💡 **Setup Help:** See the [main project setup guide](../../README.md#-quick-start) for detailed installation instructions.
 
 ### Prepare Environment Variables
 
-#### Embedding Provider
-You can choose between `openai` and `ollama` as the embedding provider.
+#### Embedding Provider Configuration
+
+CodeIndexer MCP supports multiple embedding providers. Choose the one that best fits your needs:
 
 ```bash
-# Use 'openai' or 'ollama'
-EMBEDDING_PROVIDER=openai
+# Supported providers: OpenAI, VoyageAI, Gemini, Ollama
+EMBEDDING_PROVIDER=OpenAI
 ```
 
-#### OpenAI Configuration (if `EMBEDDING_PROVIDER=openai`)
+#### 1. OpenAI Configuration (Default)
+
+OpenAI provides high-quality embeddings with excellent performance for code understanding.
+
 ```bash
 # Required: Your OpenAI API key
-OPENAI_API_KEY=your-openai-api-key
+OPENAI_API_KEY=sk-your-openai-api-key
 
-# Optional: Specify OpenAI model (default: text-embedding-3-small)
-OPENAI_MODEL=text-embedding-3-large
+# Optional: Specify embedding model (default: text-embedding-3-small)
+EMBEDDING_MODEL=text-embedding-3-small
+
+# Optional: Custom API base URL (for Azure OpenAI or other compatible services)
+OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
-#### Ollama Configuration (if `EMBEDDING_PROVIDER=ollama`)
+**Available Models:**
+- `text-embedding-3-small` (1536 dimensions, faster, lower cost)
+- `text-embedding-3-large` (3072 dimensions, higher quality)
+- `text-embedding-ada-002` (1536 dimensions, legacy model)
+
+**Getting API Key:**
+1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Sign in or create an account
+3. Generate a new API key
+4. Set up billing if needed
+
+#### 2. VoyageAI Configuration
+
+VoyageAI offers specialized code embeddings optimized for programming languages.
+
+```bash
+# Required: Your VoyageAI API key
+VOYAGEAI_API_KEY=pa-your-voyageai-api-key
+
+# Optional: Specify embedding model (default: voyage-code-3)
+EMBEDDING_MODEL=voyage-code-3
+```
+
+**Available Models:**
+- `voyage-code-3` (1024 dimensions, optimized for code)
+- `voyage-3` (1024 dimensions, general purpose)
+- `voyage-3-lite` (512 dimensions, faster inference)
+
+**Getting API Key:**
+1. Visit [VoyageAI Console](https://dash.voyageai.com/)
+2. Sign up for an account
+3. Navigate to API Keys section
+4. Create a new API key
+
+#### 3. Gemini Configuration
+
+Google's Gemini provides competitive embeddings with good multilingual support.
+
+```bash
+# Required: Your Gemini API key
+GEMINI_API_KEY=your-gemini-api-key
+
+# Optional: Specify embedding model (default: gemini-embedding-001)
+EMBEDDING_MODEL=gemini-embedding-001
+```
+
+**Available Models:**
+- `gemini-embedding-001` (3072 dimensions, latest model)
+
+**Getting API Key:**
+1. Visit [Google AI Studio](https://aistudio.google.com/)
+2. Sign in with your Google account
+3. Go to "Get API key" section
+4. Create a new API key
+
+#### 4. Ollama Configuration (Local/Self-hosted)
+
+Ollama allows you to run embeddings locally without sending data to external services.
+
 ```bash
 # Required: Specify which Ollama model to use
-OLLAMA_MODEL=nomic-embed-text
+EMBEDDING_MODEL=nomic-embed-text
 
 # Optional: Specify Ollama host (default: http://127.0.0.1:11434)
-OLLAMA_HOST=http://localhost:11434
+OLLAMA_HOST=http://127.0.0.1:11434
 ```
+
+**Available Models:**
+- `nomic-embed-text` (768 dimensions, recommended for code)
+- `mxbai-embed-large` (1024 dimensions, higher quality)
+- `all-minilm` (384 dimensions, lightweight)
+
+**Setup Instructions:**
+1. Install Ollama from [ollama.ai](https://ollama.ai/)
+2. Pull the embedding model:
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+3. Ensure Ollama is running:
+   ```bash
+   ollama serve
+   ```
 
 #### Milvus Configuration
 Zilliz Cloud (fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
@@ -124,6 +205,7 @@ Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`
 
 Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file is the recommended approach. You may also install in a specific project by creating `.cursor/mcp.json` in your project folder. See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more info.
 
+**OpenAI Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -131,7 +213,62 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
       "command": "npx",
       "args": ["-y", "@code-indexer/mcp@latest"],
       "env": {
+        "EMBEDDING_PROVIDER": "OpenAI",
         "OPENAI_API_KEY": "your-openai-api-key",
+        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+
+**VoyageAI Configuration:**
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "npx",
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "VoyageAI",
+        "VOYAGEAI_API_KEY": "your-voyageai-api-key",
+        "EMBEDDING_MODEL": "voyage-code-3",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+
+**Gemini Configuration:**
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "npx",
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "Gemini",
+        "GEMINI_API_KEY": "your-gemini-api-key",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+
+**Ollama Configuration:**
+```json
+{
+  "mcpServers": {
+    "code-indexer": {
+      "command": "npx",
+      "args": ["-y", "@code-indexer/mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "Ollama",
+        "EMBEDDING_MODEL": "nomic-embed-text",
+        "OLLAMA_HOST": "http://127.0.0.1:11434",
         "MILVUS_ADDRESS": "localhost:19530"
       }
     }

@@ -160,7 +160,8 @@ class SemanticSearchController {
             const defaultProviders = [
                 { value: 'OpenAI', text: 'OpenAI' },
                 { value: 'VoyageAI', text: 'VoyageAI' },
-                { value: 'Ollama', text: 'Ollama' }
+                { value: 'Ollama', text: 'Ollama' },
+                { value: 'Gemini', text: 'Gemini' }
             ];
 
             defaultProviders.forEach(provider => {

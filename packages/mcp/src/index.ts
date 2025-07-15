@@ -1,29 +1,145 @@
 #!/usr/bin/env node
+
+// CRITICAL: Redirect console outputs to stderr IMMEDIATELY to avoid interfering with MCP JSON protocol
+// Only MCP protocol messages should go to stdout
+const originalConsoleLog = console.log;
+const originalConsoleWarn = console.warn;
+
+console.log = (...args: any[]) => {
+    process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+};
+
+console.warn = (...args: any[]) => {
+    process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+};
+
+// console.error already goes to stderr by default
+
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeIndexer, SemanticSearchResult, Embedding } from "@code-indexer/core";
-import { OpenAIEmbedding, OllamaEmbedding } from "@code-indexer/core";
+import { CodeIndexer, SemanticSearchResult } from "@code-indexer/core";
+import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@code-indexer/core";
 import { MilvusVectorDatabase } from "@code-indexer/core";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 
+// Helper function to get default model for each provider
+function getDefaultModelForProvider(provider: string): string {
+    switch (provider) {
+        case 'OpenAI':
+            return 'text-embedding-3-small';
+        case 'VoyageAI':
+            return 'voyage-code-3';
+        case 'Gemini':
+            return 'gemini-embedding-001';
+        case 'Ollama':
+            return 'nomic-embed-text';
+        default:
+            return 'text-embedding-3-small';
+    }
+}
+
+// Helper function to get embedding model with provider-specific environment variable priority
+function getEmbeddingModelForProvider(provider: string): string {
+    switch (provider) {
+        case 'Ollama':
+            // For Ollama, prioritize OLLAMA_MODEL over EMBEDDING_MODEL
+            const ollamaModel = process.env.OLLAMA_MODEL || process.env.EMBEDDING_MODEL || getDefaultModelForProvider(provider);
+            console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${process.env.OLLAMA_MODEL || 'NOT SET'}, EMBEDDING_MODEL=${process.env.EMBEDDING_MODEL || 'NOT SET'}, selected=${ollamaModel}`);
+            return ollamaModel;
+        case 'OpenAI':
+        case 'VoyageAI':
+        case 'Gemini':
+        default:
+            // For other providers, use EMBEDDING_MODEL or default
+            return process.env.EMBEDDING_MODEL || getDefaultModelForProvider(provider);
+    }
+}
+
+// Helper function to create embedding instance based on provider
+function createEmbeddingInstance(config: CodeIndexerMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding {
+    console.log(`[EMBEDDING] Creating ${config.embeddingProvider} embedding instance...`);
+
+    switch (config.embeddingProvider) {
+        case 'OpenAI':
+            if (!config.openaiApiKey) {
+                console.error(`[EMBEDDING] ❌ OpenAI API key is required but not provided`);
+                throw new Error('OPENAI_API_KEY is required for OpenAI embedding provider');
+            }
+            console.log(`[EMBEDDING] 🔧 Configuring OpenAI with model: ${config.embeddingModel}`);
+            const openaiEmbedding = new OpenAIEmbedding({
+                apiKey: config.openaiApiKey,
+                model: config.embeddingModel,
+                ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl })
+            });
+            console.log(`[EMBEDDING] ✅ OpenAI embedding instance created successfully`);
+            return openaiEmbedding;
+
+        case 'VoyageAI':
+            if (!config.voyageaiApiKey) {
+                console.error(`[EMBEDDING] ❌ VoyageAI API key is required but not provided`);
+                throw new Error('VOYAGEAI_API_KEY is required for VoyageAI embedding provider');
+            }
+            console.log(`[EMBEDDING] 🔧 Configuring VoyageAI with model: ${config.embeddingModel}`);
+            const voyageEmbedding = new VoyageAIEmbedding({
+                apiKey: config.voyageaiApiKey,
+                model: config.embeddingModel
+            });
+            console.log(`[EMBEDDING] ✅ VoyageAI embedding instance created successfully`);
+            return voyageEmbedding;
+
+        case 'Gemini':
+            if (!config.geminiApiKey) {
+                console.error(`[EMBEDDING] ❌ Gemini API key is required but not provided`);
+                throw new Error('GEMINI_API_KEY is required for Gemini embedding provider');
+            }
+            console.log(`[EMBEDDING] 🔧 Configuring Gemini with model: ${config.embeddingModel}`);
+            const geminiEmbedding = new GeminiEmbedding({
+                apiKey: config.geminiApiKey,
+                model: config.embeddingModel
+            });
+            console.log(`[EMBEDDING] ✅ Gemini embedding instance created successfully`);
+            return geminiEmbedding;
+
+        case 'Ollama':
+            const ollamaHost = config.ollamaHost || 'http://127.0.0.1:11434';
+            console.log(`[EMBEDDING] 🔧 Configuring Ollama with model: ${config.embeddingModel}, host: ${ollamaHost}`);
+            const ollamaEmbedding = new OllamaEmbedding({
+                model: config.embeddingModel,
+                host: config.ollamaHost
+            });
+            console.log(`[EMBEDDING] ✅ Ollama embedding instance created successfully`);
+            return ollamaEmbedding;
+
+        default:
+            console.error(`[EMBEDDING] ❌ Unsupported embedding provider: ${config.embeddingProvider}`);
+            throw new Error(`Unsupported embedding provider: ${config.embeddingProvider}`);
+    }
+}
+
 interface CodeIndexerMcpConfig {
     name: string;
     version: string;
-    milvusAddress: string;
-    milvusToken?: string;
-    embeddingProvider: 'openai' | 'ollama';
+    // Embedding provider configuration
+    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
+    embeddingModel: string;
+    // Provider-specific API keys
     openaiApiKey?: string;
     openaiBaseUrl?: string;
-    openaiModel?: string;
+    voyageaiApiKey?: string;
+    geminiApiKey?: string;
+    // Ollama configuration
     ollamaModel?: string;
     ollamaHost?: string;
+    // Vector database configuration
+    milvusAddress: string;
+    milvusToken?: string;
 }
 
 interface CodebaseSnapshot {
@@ -42,10 +158,6 @@ class CodeIndexerMcpServer {
     private currentWorkspace: string;
 
     constructor(config: CodeIndexerMcpConfig) {
-        // Redirect console.log and console.warn to stderr to avoid JSON parsing issues
-        // Only MCP protocol messages should go to stdout
-        this.setupConsoleRedirection();
-
         // Get current workspace
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
@@ -67,30 +179,28 @@ class CodeIndexerMcpServer {
         );
 
         // Initialize code indexer with proper configuration
-        let embedding: Embedding;
+        console.log(`[EMBEDDING] Initializing embedding provider: ${config.embeddingProvider}`);
+        console.log(`[EMBEDDING] Using model: ${config.embeddingModel}`);
 
-        console.log(`[CONFIG] Using embedding provider: ${config.embeddingProvider}`);
+        const embedding = createEmbeddingInstance(config);
 
-        if (config.embeddingProvider === 'ollama') {
-            if (!config.ollamaModel) {
-                throw new Error('OLLAMA_MODEL environment variable must be set for Ollama provider');
-            }
-            console.log(`[CONFIG] Using Ollama model: ${config.ollamaModel}, host: ${config.ollamaHost || 'default'}`);
-            embedding = new OllamaEmbedding({
-                model: config.ollamaModel,
-                host: config.ollamaHost,
-            });
-        } else {
-            if (!config.openaiApiKey) {
-                throw new Error('OPENAI_API_KEY environment variable must be set for OpenAI provider');
-            }
-            const model = config.openaiModel || 'text-embedding-3-small';
-            console.log(`[CONFIG] Using OpenAI model: ${model}`);
-            embedding = new OpenAIEmbedding({
-                apiKey: config.openaiApiKey,
-                model: model,
-                ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl })
-            });
+        console.log(`[EMBEDDING] ✅ Successfully initialized ${config.embeddingProvider} embedding provider`);
+        console.log(`[EMBEDDING] Provider details - Model: ${config.embeddingModel}, Dimension: ${embedding.getDimension()}`);
+
+        // Log provider-specific configuration details
+        switch (config.embeddingProvider) {
+            case 'OpenAI':
+                console.log(`[EMBEDDING] OpenAI configuration - API Key: ${config.openaiApiKey ? '✅ Provided' : '❌ Missing'}, Base URL: ${config.openaiBaseUrl || 'Default'}`);
+                break;
+            case 'VoyageAI':
+                console.log(`[EMBEDDING] VoyageAI configuration - API Key: ${config.voyageaiApiKey ? '✅ Provided' : '❌ Missing'}`);
+                break;
+            case 'Gemini':
+                console.log(`[EMBEDDING] Gemini configuration - API Key: ${config.geminiApiKey ? '✅ Provided' : '❌ Missing'}`);
+                break;
+            case 'Ollama':
+                console.log(`[EMBEDDING] Ollama configuration - Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}, Model: ${config.embeddingModel}`);
+                break;
         }
 
         const vectorDatabase = new MilvusVectorDatabase({
@@ -109,19 +219,7 @@ class CodeIndexerMcpServer {
         this.setupTools();
     }
 
-    private setupConsoleRedirection() {
-        // Redirect console.log to stderr to avoid interfering with MCP JSON protocol
-        console.log = (...args: any[]) => {
-            process.stderr.write('[LOG] ' + args.join(' ') + '\n');
-        };
 
-        // Redirect console.warn to stderr
-        console.warn = (...args: any[]) => {
-            process.stderr.write('[WARN] ' + args.join(' ') + '\n');
-        };
-
-        // Keep console.error unchanged as it already goes to stderr
-    }
 
     private loadCodebaseSnapshot() {
         console.log('[SNAPSHOT-DEBUG] Loading codebase snapshot from:', this.snapshotFilePath);
@@ -350,8 +448,14 @@ class CodeIndexerMcpServer {
 
             console.log(`[INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
+            // Log embedding provider information before indexing
+            const embeddingProvider = this.codeIndexer['embedding'];
+            console.log(`[INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
+
             // Start indexing with the appropriate indexer
+            console.log(`[INDEX] 🚀 Beginning codebase indexing process...`);
             const stats = await indexerForThisTask.indexCodebase(absolutePath);
+            console.log(`[INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Store current codebase path and stats
             if (!this.indexedCodebases.includes(absolutePath)) {
@@ -521,6 +625,12 @@ class CodeIndexerMcpServer {
             }
 
             console.log(`[SEARCH] Searching in codebase: ${absolutePath}`);
+            console.log(`[SEARCH] Query: "${query}"`);
+
+            // Log embedding provider information before search
+            const embeddingProvider = this.codeIndexer['embedding'];
+            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for semantic search`);
+            console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
             // Search in the specified codebase
             const searchResults = await this.codeIndexer.semanticSearch(
@@ -529,6 +639,8 @@ class CodeIndexerMcpServer {
                 Math.min(resultLimit, 50),
                 0.3
             );
+
+            console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
 
             if (searchResults.length === 0) {
                 return {
@@ -754,18 +866,33 @@ async function main() {
     const args = process.argv.slice(2);
 
     const embeddingProvider = (process.env.EMBEDDING_PROVIDER?.toLowerCase() === 'ollama' ? 'ollama' : 'openai') as 'openai' | 'ollama';
+    // Debug: Print all environment variables related to CodeIndexer
+    console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
+    console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${process.env.EMBEDDING_PROVIDER || 'NOT SET'}`);
+    console.log(`[DEBUG]   EMBEDDING_MODEL: ${process.env.EMBEDDING_MODEL || 'NOT SET'}`);
+    console.log(`[DEBUG]   OLLAMA_MODEL: ${process.env.OLLAMA_MODEL || 'NOT SET'}`);
+    console.log(`[DEBUG]   GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'SET (length: ' + process.env.OPENAI_API_KEY.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   MILVUS_ADDRESS: ${process.env.MILVUS_ADDRESS || 'NOT SET'}`);
+    console.log(`[DEBUG]   NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
 
     const config: CodeIndexerMcpConfig = {
         name: process.env.MCP_SERVER_NAME || "CodeIndexer MCP Server",
         version: process.env.MCP_SERVER_VERSION || "1.0.0",
-        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
-        milvusToken: process.env.MILVUS_TOKEN,
-        embeddingProvider,
-        openaiApiKey: process.env.OPENAI_API_KEY || "",
+        // Embedding provider configuration
+        embeddingProvider: (process.env.EMBEDDING_PROVIDER as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingModel: getEmbeddingModelForProvider(process.env.EMBEDDING_PROVIDER || 'OpenAI'),
+        // Provider-specific API keys
+        openaiApiKey: process.env.OPENAI_API_KEY,
         openaiBaseUrl: process.env.OPENAI_BASE_URL,
-        openaiModel: process.env.OPENAI_MODEL,
+        voyageaiApiKey: process.env.VOYAGEAI_API_KEY,
+        geminiApiKey: process.env.GEMINI_API_KEY,
+        // Ollama configuration
         ollamaModel: process.env.OLLAMA_MODEL,
         ollamaHost: process.env.OLLAMA_HOST,
+        // Vector database configuration
+        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
+        milvusToken: process.env.MILVUS_TOKEN
     };
 
     // Show help if requested
@@ -781,17 +908,70 @@ Options:
 Environment Variables:
   MCP_SERVER_NAME         Server name
   MCP_SERVER_VERSION      Server version
-  OPENAI_API_KEY          OpenAI API key (required)
+  
+  Embedding Provider Configuration:
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_MODEL         Embedding model name (auto-detected if not specified)
+  
+  Provider-specific API Keys:
+  OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
+  VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
+  GEMINI_API_KEY          Google AI API key (required for Gemini provider)
+  
+  Ollama Configuration:
+  OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
+  OLLAMA_MODEL            Ollama model name (default: nomic-embed-text)
+  
+  Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (default: localhost:19530)
   MILVUS_TOKEN            Milvus token (optional)
 
 Examples:
-  # Start MCP server
-  npx @code-indexer/mcp@latest
+  # Start MCP server with OpenAI (default)
+  OPENAI_API_KEY=sk-xxx npx @code-indexer/mcp@latest
+  
+  # Start MCP server with VoyageAI
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx npx @code-indexer/mcp@latest
+  
+  # Start MCP server with Gemini
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx npx @code-indexer/mcp@latest
+  
+  # Start MCP server with Ollama
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text npx @code-indexer/mcp@latest
         `);
         process.exit(0);
     }
+
+    // Log configuration summary before starting server
+    console.log(`[MCP] 🚀 Starting CodeIndexer MCP Server`);
+    console.log(`[MCP] Configuration Summary:`);
+    console.log(`[MCP]   Server: ${config.name} v${config.version}`);
+    console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
+    console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
+    console.log(`[MCP]   Milvus Address: ${config.milvusAddress}`);
+
+    // Log provider-specific configuration without exposing sensitive data
+    switch (config.embeddingProvider) {
+        case 'OpenAI':
+            console.log(`[MCP]   OpenAI API Key: ${config.openaiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            if (config.openaiBaseUrl) {
+                console.log(`[MCP]   OpenAI Base URL: ${config.openaiBaseUrl}`);
+            }
+            break;
+        case 'VoyageAI':
+            console.log(`[MCP]   VoyageAI API Key: ${config.voyageaiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            break;
+        case 'Gemini':
+            console.log(`[MCP]   Gemini API Key: ${config.geminiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            break;
+        case 'Ollama':
+            console.log(`[MCP]   Ollama Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}`);
+            console.log(`[MCP]   Ollama Model: ${config.embeddingModel}`);
+            break;
+    }
+
+    console.log(`[MCP] 🔧 Initializing server components...`);
 
     const server = new CodeIndexerMcpServer(config);
     await server.start();

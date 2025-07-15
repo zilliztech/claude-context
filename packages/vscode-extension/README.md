@@ -14,7 +14,7 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
 - 🔍 **Semantic Search**: Intelligent code search based on semantic understanding, not just keyword matching
 - 📁 **Codebase Indexing**: Automatically index entire codebase and build semantic vector database
 - 🎯 **Context Search**: Search related code by selecting code snippets
-- 🔧 **Multi-platform Support**: Support for OpenAI and VoyageAI as embedding providers
+- 🔧 **Multi-platform Support**: Support for OpenAI, VoyageAI, Gemini, and Ollama as embedding providers
 - 💾 **Vector Storage**: Integrated with Milvus vector database for efficient storage and retrieval
 
 ## Requirements
@@ -47,8 +47,9 @@ Configure your embedding provider to convert code into semantic vectors.
 - `Custom API endpoint URL`: Optional custom endpoint (defaults to `https://api.openai.com/v1`)
 
 **Other Supported Providers:**
-- VoyageAI: Alternative embedding provider with competitive performance
-- Ollama: For local embedding models
+- **Gemini**: Google's state-of-the-art embedding model with Matryoshka representation learning
+- **VoyageAI**: Alternative embedding provider with competitive performance  
+- **Ollama**: For local embedding models
 
 #### Code Splitter Configuration
 Configure how your code is split into chunks for indexing.
@@ -94,9 +95,10 @@ MILVUS_TOKEN=xxxxxxx
 
 ## Configuration
 
-- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI)
+- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama)
 - `semanticCodeSearch.embeddingProvider.model` - Embedding model to use
 - `semanticCodeSearch.embeddingProvider.apiKey` - API key for embedding provider
+- `semanticCodeSearch.embeddingProvider.outputDimensionality` - Output dimension for Gemini (supports 3072, 1536, 768, 256)
 - `semanticCodeSearch.milvus.address` - Milvus server address
 
 ## Contributing
