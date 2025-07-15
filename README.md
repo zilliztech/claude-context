@@ -163,6 +163,7 @@ All the following packages are built on top of the `@code-indexer/core` engine, 
 
 ### [@code-indexer/mcp](packages/mcp/README.md) 
 Model Context Protocol (MCP) server that enables AI assistants and agents to interact with CodeIndexer through a standardized protocol. Exposes indexing and search capabilities via MCP tools.
+The MCP module supports four embedding model providers: Gemini, OpenAI, Voyage AI, and Ollama. This tutorial uses OpenAI as an example. To configure a different provider, please click [here](packages/mcp/README.md) for more information.
 ![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUfOR-7goqarF653roYT5u_HY_J3VkMMeUPUc2ZVj11ue82_tIzE_lIOuJ27HWcVYjTEQj2S3v9tZtS0-AXpyOP6F9VV_mymssD-57wT_ZVjF2MrS7cm5Ynj0goSEPpy81N4xSqi=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
 
 

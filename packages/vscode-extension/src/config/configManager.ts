@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@code-indexer/core';
+import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, GeminiEmbedding, GeminiEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@code-indexer/core';
 
 // Simplified Milvus configuration interface for frontend
 export interface MilvusWebConfig {
@@ -16,6 +16,9 @@ export type EmbeddingProviderConfig = {
 } | {
     provider: 'Ollama';
     config: OllamaEmbeddingConfig;
+} | {
+    provider: 'Gemini';
+    config: GeminiEmbeddingConfig;
 };
 
 export type SplitterProviderConfig = {
@@ -84,6 +87,20 @@ const EMBEDDING_PROVIDERS = {
             model: 'nomic-embed-text',
             host: 'http://127.0.0.1:11434',
             keepAlive: '5m'
+        }
+    },
+    'Gemini': {
+        name: 'Gemini',
+        class: GeminiEmbedding,
+        requiredFields: [
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select', required: true },
+            { name: 'apiKey', type: 'string', description: 'Google AI API key', inputType: 'password', required: true }
+        ] as FieldDefinition[],
+        optionalFields: [
+            { name: 'outputDimensionality', type: 'number', description: 'Output dimension (supports Matryoshka representation)', inputType: 'text', placeholder: '3072' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            model: 'gemini-embedding-001'
         }
     }
 } as const;
@@ -187,7 +204,7 @@ export class ConfigManager {
         if (!configObject) return undefined;
 
         return {
-            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama',
+            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini',
             config: configObject
         };
     }

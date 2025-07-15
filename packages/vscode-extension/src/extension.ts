@@ -5,7 +5,7 @@ import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
 import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
-import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@code-indexer/core';
+import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@code-indexer/core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;

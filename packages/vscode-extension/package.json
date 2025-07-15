@@ -82,7 +82,8 @@
                     "enum": [
                         "OpenAI",
                         "VoyageAI",
-                        "Ollama"
+                        "Ollama",
+                        "Gemini"
                     ],
                     "description": "Embedding service provider"
                 },
@@ -105,6 +106,10 @@
                 "semanticCodeSearch.embeddingProvider.keepAlive": {
                     "type": "string",
                     "description": "Keep model alive duration for Ollama (optional)"
+                },
+                "semanticCodeSearch.embeddingProvider.outputDimensionality": {
+                    "type": "number",
+                    "description": "Output dimension for Gemini embedding (supports Matryoshka representation: 3072, 1536, 768, 256)"
                 },
                 "semanticCodeSearch.milvus.address": {
                     "type": "string",

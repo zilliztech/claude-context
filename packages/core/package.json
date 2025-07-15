@@ -13,6 +13,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@google/genai": "^1.9.0",
         "@zilliz/milvus2-sdk-node": "^2.5.10",
         "faiss-node": "^0.5.1",
         "fs-extra": "^11.0.0",
@@ -20,7 +21,7 @@
         "langchain": "^0.3.27",
         "ollama": "^0.5.16",
         "openai": "^5.1.1",
-        "tree-sitter": "^0.21.0",
+        "tree-sitter": "^0.21.1",
         "tree-sitter-cpp": "^0.22.0",
         "tree-sitter-go": "^0.21.0",
         "tree-sitter-java": "^0.21.0",
