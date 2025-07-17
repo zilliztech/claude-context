@@ -1,6 +1,6 @@
 # Basic Usage Example
 
-This example demonstrates the basic usage of CodeIndexer.
+This example demonstrates the basic usage of Code Context.
 
 ## Prerequisites
 
@@ -40,14 +40,14 @@ This example demonstrates the basic usage of CodeIndexer.
    ```
 
 ## What This Example Does
-1. **Indexes Codebase**: Indexes the entire CodeIndexer project
+1. **Indexes Codebase**: Indexes the entire Code Context project
 2. **Performs Searches**: Executes semantic searches for different code patterns
 3. **Shows Results**: Displays search results with similarity scores and file locations
 
 ## Expected Output
 
 ```
-🚀 CodeIndexer Real Usage Example
+🚀 Code Context Real Usage Example
 ===============================
 ...
 🔌 Connecting to vector database at: ...

@@ -1,7 +1,7 @@
 {
-    "name": "@code-indexer/mcp",
+    "name": "@zilliz/code-context-mcp",
     "version": "0.0.5",
-    "description": "Model Context Protocol integration for CodeIndexer",
+    "description": "Model Context Protocol integration for Code Context",
     "type": "module",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -18,7 +18,7 @@
         "prepublishOnly": "pnpm build"
     },
     "dependencies": {
-        "@code-indexer/core": "workspace:*",
+        "@zilliz/code-context-core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.12.1",
         "zod": "^3.25.55"
     },
@@ -33,7 +33,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/zilliztech/CodeIndexer.git",
+        "url": "https://github.com/zilliztech/code-context.git",
         "directory": "packages/mcp"
     },
     "license": "MIT",

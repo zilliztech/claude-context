@@ -1,6 +1,6 @@
-# Contributing to @code-indexer/core
+# Contributing to @zilliz/code-context-core
 
-Thanks for your interest in contributing to the CodeIndexer core package!
+Thanks for your interest in contributing to the Code Context core package!
 
 > 📖 **First time contributing?** Please read the [main contributing guide](../../CONTRIBUTING.md) first for general setup and workflow.
 

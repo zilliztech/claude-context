@@ -1,6 +1,6 @@
-# Contributing to @code-indexer/mcp
+# Contributing to @zilliz/code-context-mcp
 
-Thanks for your interest in contributing to the CodeIndexer MCP server!
+Thanks for your interest in contributing to the Code Context MCP server!
 
 > 📖 **First time contributing?** Please read the [main contributing guide](../../CONTRIBUTING.md) first for general setup and workflow.
 
@@ -91,9 +91,9 @@ You can use the following configuration to configure the MCP server with a devel
 ```json
 {
   "mcpServers": {
-    "code-indexer-local": {
+    "code-context-local": {
       "command": "node",
-      "args": ["PATH_TO_CODEINDEXER/packages/mcp/dist/index.js"],
+      "args": ["PATH_TO_CODECONTEXT/packages/mcp/dist/index.js"],
       "env": {
         "OPENAI_API_KEY": "your-key",  
         "MILVUS_ADDRESS": "localhost:19530"

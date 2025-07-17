@@ -1,24 +1,24 @@
-# @code-indexer/mcp
+# @zilliz/code-context-mcp
 
-Model Context Protocol (MCP) integration for CodeIndexer - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
+Model Context Protocol (MCP) integration for Code Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
-[![npm version](https://img.shields.io/npm/v/@code-indexer/mcp.svg)](https://www.npmjs.com/package/@code-indexer/mcp)
-[![npm downloads](https://img.shields.io/npm/dm/@code-indexer/mcp.svg)](https://www.npmjs.com/package/@code-indexer/mcp)
+[![npm version](https://img.shields.io/npm/v/@zilliz/code-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@zilliz/code-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
 
-> 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and setup instructions.
+> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 
-The Model Context Protocol (MCP) is an open protocol that standardizes how AI applications can securely connect to and interact with data sources and tools. This package provides an MCP server that exposes CodeIndexer's semantic search capabilities to any MCP-compatible client.
+The Model Context Protocol (MCP) is an open protocol that standardizes how AI applications can securely connect to and interact with data sources and tools. This package provides an MCP server that exposes Code Context's semantic search capabilities to any MCP-compatible client.
 
 ## Features
 
-- **🔌 MCP Protocol Compliance**: Full compatibility with MCP-enabled AI assistants and agents
-- **🔍 Semantic Code Search**: Natural language queries to find relevant code snippets
-- **📁 Codebase Indexing**: Index entire codebases for fast semantic search
-- **🔄 Auto-Sync**: Automatically detects and synchronizes file changes to keep index up-to-date
-- **🧠 AI-Powered**: Uses OpenAI embeddings and Milvus vector database
-- **⚡ Real-time**: Interactive indexing and searching with progress feedback
-- **🛠️ Tool-based**: Exposes three main tools via MCP protocol
+- 🔌 MCP Protocol Compliance: Full compatibility with MCP-enabled AI assistants and agents
+- 🔍 Semantic Code Search: Natural language queries to find relevant code snippets
+- 📁 Codebase Indexing: Index entire codebases for fast semantic search
+- 🔄 Auto-Sync: Automatically detects and synchronizes file changes to keep index up-to-date
+- 🧠 AI-Powered: Uses OpenAI embeddings and Milvus vector database
+- ⚡ Real-time: Interactive indexing and searching with progress feedback
+- 🛠️ Tool-based: Exposes three main tools via MCP protocol
 
 ## Available Tools
 
@@ -45,13 +45,13 @@ Clear the search index.
 ## Installation
 
 ```bash
-npm install @code-indexer/mcp
+npm install @zilliz/code-context-mcp
 ```
 
 Or run directly with npx:
 
 ```bash
-npx @code-indexer/mcp@latest
+npx @zilliz/code-context-mcp@latest
 ```
 
 ## Quick Start
@@ -68,7 +68,7 @@ Before using the MCP server, make sure you have:
 
 #### Embedding Provider Configuration
 
-CodeIndexer MCP supports multiple embedding providers. Choose the one that best fits your needs:
+Code Context MCP supports multiple embedding providers. Choose the one that best fits your needs:
 
 ```bash
 # Supported providers: OpenAI, VoyageAI, Gemini, Ollama
@@ -209,9 +209,9 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "EMBEDDING_PROVIDER": "OpenAI",
         "OPENAI_API_KEY": "your-openai-api-key",
@@ -227,9 +227,9 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "EMBEDDING_PROVIDER": "VoyageAI",
         "VOYAGEAI_API_KEY": "your-voyageai-api-key",
@@ -245,9 +245,9 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "EMBEDDING_PROVIDER": "Gemini",
         "GEMINI_API_KEY": "your-gemini-api-key",
@@ -262,9 +262,9 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "EMBEDDING_PROVIDER": "Ollama",
         "EMBEDDING_MODEL": "nomic-embed-text",
@@ -286,9 +286,9 @@ Add to your Claude Desktop configuration:
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "localhost:19530"
@@ -303,11 +303,11 @@ Add to your Claude Desktop configuration:
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Use the command line interface to add the CodeIndexer MCP server:
+Use the command line interface to add the CodeContext MCP server:
 
 ```bash
-# Add the CodeIndexer MCP server
-claude mcp add code-indexer -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @code-indexer/mcp@latest
+# Add the CodeContext MCP server
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
 
 ```
 
@@ -323,9 +323,9 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "localhost:19530"
@@ -340,14 +340,14 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 <details>
 <summary><strong>VS Code</strong></summary>
 
-The CodeIndexer MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
+The CodeContext MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
 
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "localhost:19530"
@@ -366,10 +366,10 @@ Cherry Studio allows for visual MCP server configuration through its settings in
 
 1. Navigate to **Settings → MCP Servers → Add Server**.
 2. Fill in the server details:
-   - **Name**: `code-indexer`
+   - **Name**: `code-context`
    - **Type**: `STDIO`
    - **Command**: `npx`
-   - **Arguments**: `["@code-indexer/mcp@latest"]`
+   - **Arguments**: `["@zilliz/code-context-mcp@latest"]`
    - **Environment Variables**:
      - `OPENAI_API_KEY`: `your-openai-api-key`
      - `MILVUS_ADDRESS`: `localhost:19530`
@@ -391,9 +391,9 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "localhost:19530"
@@ -410,7 +410,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 <details>
 <summary><strong>Augment</strong></summary>
 
-To configure Code Indexer MCP in Augment Code, you can use either the graphical interface or manual configuration.
+To configure Code Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
 
 #### **A. Using the Augment Code UI**
 
@@ -425,10 +425,10 @@ To configure Code Indexer MCP in Augment Code, you can use either the graphical 
 5. Enter the following command:
 
    ```
-   npx @code-indexer/mcp@latest
+   npx @zilliz/code-context-mcp@latest
    ```
 
-6. Name the MCP: **Code Indexer**.
+6. Name the MCP: **Code Context**.
 
 7. Click the **Add** button.
 
@@ -445,9 +445,9 @@ To configure Code Indexer MCP in Augment Code, you can use either the graphical 
 "augment.advanced": { 
   "mcpServers": [ 
     { 
-      "name": "code-indexer", 
+      "name": "code-context", 
       "command": "npx", 
-      "args": ["-y", "@code-indexer/mcp@latest"] 
+      "args": ["-y", "@zilliz/code-context-mcp@latest"] 
     } 
   ] 
 }
@@ -467,9 +467,9 @@ Gemini CLI requires manual configuration through a JSON file:
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "localhost:19530"
@@ -495,9 +495,9 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "localhost:19530"
@@ -517,20 +517,20 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 The server uses stdio transport and follows the standard MCP protocol. It can be integrated with any MCP-compatible client by running:
 
 ```bash
-npx @code-indexer/mcp@latest
+npx @zilliz/code-context-mcp@latest
 ```
 
 </details>
 
 ## Contributing
 
-This package is part of the CodeIndexer monorepo. Please see:
+This package is part of the CodeContext monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines  
 - [MCP Package Contributing](CONTRIBUTING.md) - Specific development guide for this package
 
 ## Related Projects
 
-- **[@code-indexer/core](../core)** - Core indexing engine used by this MCP server
+- **[@zilliz/code-context-core](../core)** - Core indexing engine used by this MCP server
 - **[VSCode Extension](../vscode-extension)** - Alternative VSCode integration
 - [Model Context Protocol](https://modelcontextprotocol.io/) - Official MCP documentation
 

@@ -36,12 +36,11 @@ def run_codeindexer_endtoend_test():
     print()
 
     try:
-        # Create executor
         executor = TypeScriptExecutor()
 
         # Call end-to-end test
         result = executor.call_method(
-            "./test_codeindexer.ts", "testCodeIndexerEndToEnd", config
+            "./test_codecontext.ts", "testCodeIndexerEndToEnd", config
         )
 
         # Output results

@@ -1,6 +1,6 @@
-# Contributing to CodeIndexer
+# Contributing to Code Context
 
-Thank you for your interest in contributing to CodeIndexer! This guide will help you get started.
+Thank you for your interest in contributing to Code Context! This guide will help you get started.
 
 ## 🚀 Getting Started
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to CodeIndexer! This guide will help
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/your-username/CodeIndexer.git
-   cd CodeIndexer
+   git clone https://github.com/your-username/code-context.git
+   cd code-context
    ```
 
 2. **Install Dependencies**
@@ -36,7 +36,7 @@ Thank you for your interest in contributing to CodeIndexer! This guide will help
 ## 📁 Project Structure
 
 ```
-CodeIndexer/
+code-context/
 ├── packages/
 │   ├── core/              # Core indexing engine
 │   ├── vscode-extension/  # VSCode extension
@@ -155,8 +155,8 @@ When reporting bugs or requesting features:
 
 ## 📄 License
 
-By contributing to CodeIndexer, you agree that your contributions will be licensed under the MIT License.
+By contributing to Code Context, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-Thank you for contributing to CodeIndexer! 🎉
+Thank you for contributing to Code Context! 🎉
