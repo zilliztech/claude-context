@@ -1,16 +1,16 @@
-# @code-indexer/core
+# @zilliz/code-context-core
 
-The core indexing engine for CodeIndexer - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
+The core indexing engine for Code Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
 
-[![npm version](https://img.shields.io/npm/v/@code-indexer/core.svg)](https://www.npmjs.com/package/@code-indexer/core)
-[![npm downloads](https://img.shields.io/npm/dm/@code-indexer/core.svg)](https://www.npmjs.com/package/@code-indexer/core)
+[![npm version](https://img.shields.io/npm/v/@zilliz/code-context-core.svg)](https://www.npmjs.com/package/@zilliz/code-context-core)
+[![npm downloads](https://img.shields.io/npm/dm/@zilliz/code-context-core.svg)](https://www.npmjs.com/package/@zilliz/code-context-core)
 
-> 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and quick start guide.
+> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and quick start guide.
 
 ## Installation
 
 ```bash
-npm install @code-indexer/core
+npm install @zilliz/code-context-core
 ```
 
 ### Prepare Environment Variables
@@ -21,7 +21,7 @@ OPENAI_API_KEY=your-openai-api-key
 ```
 
 #### Milvus configuration
-Zilliz Cloud(fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+Zilliz Cloud (fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
 
 - `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
 - `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
@@ -39,7 +39,7 @@ import {
   CodeIndexer, 
   OpenAIEmbedding, 
   MilvusVectorDatabase 
-} from '@code-indexer/core';
+} from '@zilliz/code-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -171,7 +171,7 @@ interface SemanticSearchResult {
 ### Using VoyageAI Embeddings
 
 ```typescript
-import { CodeIndexer, MilvusVectorDatabase, VoyageAIEmbedding } from '@code-indexer/core';
+import { CodeIndexer, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/code-context-core';
 
 // Initialize with VoyageAI embedding provider
 const embedding = new VoyageAIEmbedding({
@@ -208,7 +208,7 @@ const indexer = new CodeIndexer({
 
 ## File Synchronization Architecture
 
-CodeIndexer implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
+Code Context implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
 
 ![File Synchronization Architecture](../../assets/file_synchronizer.png)
 
@@ -227,7 +227,7 @@ The file synchronization system uses a **Merkle tree-based approach** combined w
 - Any change to any file will cause the root hash to change
 
 #### 3. Snapshot Management
-- File synchronization state is persisted to `~/.codeindexer/merkle/` directory
+- File synchronization state is persisted to `~/.code-context/merkle/` directory
 - Each codebase gets a unique snapshot file based on its absolute path hash
 - Snapshots contain both file hashes and serialized Merkle tree data
 

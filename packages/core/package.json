@@ -1,7 +1,7 @@
 {
-    "name": "@code-indexer/core",
+    "name": "@zilliz/code-context-core",
     "version": "0.0.5",
-    "description": "Core indexing engine for CodeIndexer",
+    "description": "Core indexing engine for Code Context",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -46,7 +46,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/zilliztech/CodeIndexer.git",
+        "url": "https://github.com/zilliztech/code-context.git",
         "directory": "packages/core"
     },
     "license": "MIT",

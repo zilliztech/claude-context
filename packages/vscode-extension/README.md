@@ -2,9 +2,9 @@
 
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 
-A code indexing and semantic search VSCode extension powered by CodeIndexer.
+A code indexing and semantic search VSCode extension powered by Code Context.
 
-> 📖 **New to CodeIndexer?** Check out the [main project README](../../README.md) for an overview and setup instructions.
+> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
@@ -35,7 +35,7 @@ A code indexing and semantic search VSCode extension powered by CodeIndexer.
 ## Quick Start
 
 ### Configuration
-The first time you open CodeIndexer, you need to click on Settings icon to configure the relevant options.
+The first time you open Code Context, you need to click on Settings icon to configure the relevant options.
 
 #### Embedding Configuration
 Configure your embedding provider to convert code into semantic vectors.
@@ -103,14 +103,14 @@ MILVUS_TOKEN=xxxxxxx
 
 ## Contributing
 
-This VSCode extension is part of the CodeIndexer monorepo. Please see:
+This VSCode extension is part of the Code Context monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines
 - [VSCode Extension Contributing](CONTRIBUTING.md) - Specific development guide for this extension
 
 ## Related Packages
 
-- **[@code-indexer/core](../core)** - Core indexing engine used by this extension
-- **[@code-indexer/mcp](../mcp)** - Alternative MCP server integration
+- **[@zilliz/code-context-core](../core)** - Core indexing engine used by this extension
+- **[@zilliz/code-context-mcp](../mcp)** - Alternative MCP server integration
 
 ## Tech Stack
 
