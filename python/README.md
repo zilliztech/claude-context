@@ -1,15 +1,15 @@
-# Python → TypeScript CodeIndexer Bridge
+# Python → TypeScript Code Context Bridge
 
-A simple utility to call TypeScript CodeIndexer methods from Python.
+A simple utility to call TypeScript Code Context methods from Python.
 
 ## What's This?
 
-This directory contains a basic bridge that allows you to run CodeIndexer TypeScript functions from Python scripts. It's not a full SDK - just a simple way to test and use the TypeScript codebase from Python.
+This directory contains a basic bridge that allows you to run Code Context TypeScript functions from Python scripts. It's not a full SDK - just a simple way to test and use the TypeScript codebase from Python.
 
 ## Files
 
 - `ts_executor.py` - Executes TypeScript methods from Python
-- `test_codeindexer.ts` - TypeScript test script with CodeIndexer workflow
+- `test_codecontext.ts` - TypeScript test script with Code Context workflow
 - `test_endtoend.py` - Python script that calls the TypeScript test
 
 ## Prerequisites
@@ -46,7 +46,7 @@ from ts_executor import TypeScriptExecutor
 
 executor = TypeScriptExecutor()
 result = executor.call_method(
-    './test_codeindexer.ts',
+    './test_codecontext.ts',
     'testCodeIndexerEndToEnd',
     {
         'openaiApiKey': 'sk-your-key',

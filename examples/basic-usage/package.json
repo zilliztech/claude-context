@@ -1,7 +1,7 @@
 {
-    "name": "codeindexer-basic-example",
+    "name": "code-context-basic-example",
     "version": "0.0.5",
-    "description": "Basic usage example for CodeIndexer",
+    "description": "Basic usage example for Code Context",
     "main": "index.ts",
     "scripts": {
         "start": "tsx index.ts",
@@ -9,7 +9,7 @@
         "dev": "tsx --watch index.ts"
     },
     "dependencies": {
-        "@code-indexer/core": "workspace:*"
+        "@zilliz/code-context-core": "workspace:*"
     },
     "devDependencies": {
         "tsx": "^4.0.0",

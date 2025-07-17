@@ -1,3 +1,3 @@
-# CodeIndexer Examples
+# Code Context Examples
 
-This directory contains usage examples for CodeIndexer.
+This directory contains usage examples for Code Context.

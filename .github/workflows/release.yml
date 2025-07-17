@@ -35,10 +35,10 @@ jobs:
       run: pnpm build
       
     - name: Publish core package to npm
-      run: pnpm --filter @code-indexer/core publish --access public --no-git-checks
+      run: pnpm --filter @zilliz/code-context-core publish --access public --no-git-checks
         
     - name: Publish mcp package to npm
-      run: pnpm --filter @code-indexer/mcp publish --access public --no-git-checks
+      run: pnpm --filter @zilliz/code-context-mcp publish --access public --no-git-checks
         
     - name: Publish vscode extension
       run: pnpm release:vscode
