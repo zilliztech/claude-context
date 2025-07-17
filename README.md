@@ -1,17 +1,17 @@
-# 🔍 CodeIndexer
+# 🔍 Code Context
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Extension&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
-[![npm - core](https://img.shields.io/npm/v/@code-indexer/core?label=%40code-indexer%2Fcore&logo=npm)](https://www.npmjs.com/package/@code-indexer/core)
-[![npm - mcp](https://img.shields.io/npm/v/@code-indexer/mcp?label=%40code-indexer%2Fmcp&logo=npm)](https://www.npmjs.com/package/@code-indexer/mcp)
+[![npm - core](https://img.shields.io/npm/v/@zilliz/code-context-core?label=%40zilliz%2Fcode-context-core&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-core)
+[![npm - mcp](https://img.shields.io/npm/v/@zilliz/code-context-mcp?label=%40zilliz%2Fcode-context-mcp&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/CodeIndexer)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/code-context)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord"/></a>
 
 An open-source implementation of the code indexing and context awareness capabilities found in AI-powered IDEs like Cursor and Windsurf, built with Milvus vector database and popular embedding models. You can build your own AI Coding IDE or code search plugin with it, or directly integrate it into your existing IDEs through MCP or VSCode extension.
 
-## 🌟 Why CodeIndexer?
+## 🌟 Why Code Context?
 
 In the **AI-first development era**, traditional keyword-based search is no longer sufficient for modern software development:
 
@@ -28,7 +28,7 @@ In the **AI-first development era**, traditional keyword-based search is no long
 - Traditional search tools can't bridge the gap between **human intent** and **code implementation**
 
 ### ✅ **Our Solution**
-CodeIndexer bridges the gap between human understanding and code discovery through:
+Code Context bridges the gap between human understanding and code discovery through:
 - **Context awareness** - understands relationships between different parts of your codebase
 - **Semantic search** with natural language queries like *"find authentication functions"*
 - **AI-powered understanding** of code meaning and relationships
@@ -54,13 +54,13 @@ CodeIndexer bridges the gap between human understanding and code discovery throu
 ## 🏗️ Architecture
 ![](assets/Architecture.png)
 
-CodeIndexer is a monorepo containing three main packages:
+Code Context is a monorepo containing three main packages:
 
 ### Core Components
 
-- **`@code-indexer/core`**: Core indexing engine with embedding and vector database integration
+- **`@zilliz/code-context-core`**: Core indexing engine with embedding and vector database integration
 - **VSCode Extension**: Semantic Code Search extension for Visual Studio Code
-- **`@code-indexer/mcp`**: Model Context Protocol server for AI agent integration
+- **`@zilliz/code-context-mcp`**: Model Context Protocol server for AI agent integration
 
 ### Supported Technologies
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai)
@@ -82,13 +82,13 @@ CodeIndexer is a monorepo containing three main packages:
 
 ```bash
 # Using npm
-npm install @code-indexer/core
+npm install @zilliz/code-context-core
 
 # Using pnpm
-pnpm add @code-indexer/core
+pnpm add @zilliz/code-context-core
 
 # Using yarn
-yarn add @code-indexer/core
+yarn add @zilliz/code-context-core
 ```
 
 
@@ -110,16 +110,14 @@ Zilliz Cloud(fully managed Milvus vector database as a service, you can [use it 
 MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
 MILVUS_TOKEN=xxxxxxx
 ```
-> Optional: Self-hosted Milvus. See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
-
 
 
 ### Basic Usage
-[@code-indexer/core](packages/core/README.md)
+[@zilliz/code-context-core](packages/core/README.md)
 Core indexing engine that provides the fundamental functionality for code indexing and semantic search. Handles embedding generation, vector storage, and search operations.
 
 ```typescript
-import { CodeIndexer, MilvusVectorDatabase, OpenAIEmbedding } from '@code-indexer/core';
+import { CodeIndexer, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -156,13 +154,13 @@ results.forEach(result => {
 
 ## 📦 Built on Core
 
-All the following packages are built on top of the `@code-indexer/core` engine, extending its capabilities to different platforms and use cases. They leverage the core's semantic search and indexing functionality to provide specialized interfaces and integrations.
+All the following packages are built on top of the `@zilliz/code-context-core` engine, extending its capabilities to different platforms and use cases. They leverage the core's semantic search and indexing functionality to provide specialized interfaces and integrations.
 
 > 📖 Each package has its own detailed documentation and usage examples. Click the links below to learn more.
 
 
-### [@code-indexer/mcp](packages/mcp/README.md) 
-Model Context Protocol (MCP) server that enables AI assistants and agents to interact with CodeIndexer through a standardized protocol. Exposes indexing and search capabilities via MCP tools.
+### [@zilliz/code-context-mcp](packages/mcp/README.md) 
+Model Context Protocol (MCP) server that enables AI assistants and agents to interact with Code Context through a standardized protocol. Exposes indexing and search capabilities via MCP tools.
 The MCP module supports four embedding model providers: Gemini, OpenAI, Voyage AI, and Ollama. This tutorial uses OpenAI as an example. To configure a different provider, please click [here](packages/mcp/README.md) for more information.
 ![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUfOR-7goqarF653roYT5u_HY_J3VkMMeUPUc2ZVj11ue82_tIzE_lIOuJ27HWcVYjTEQj2S3v9tZtS0-AXpyOP6F9VV_mymssD-57wT_ZVjF2MrS7cm5Ynj0goSEPpy81N4xSqi=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
 
@@ -170,7 +168,7 @@ The MCP module supports four embedding model providers: Gemini, OpenAI, Voyage A
 <details>
 <summary><strong>Cursor</strong></summary>
 
-<a href="https://cursor.com/install-mcp?name=code-indexer&config=JTdCJTIyY29tbWFuZCUyMiUzQSUyMm5weCUyMC15JTIwJTQwY29kZS1pbmRleGVyJTJGbWNwJTQwbGF0ZXN0JTIyJTJDJTIyZW52JTIyJTNBJTdCJTIyT1BFTkFJX0FQSV9LRVklMjIlM0ElMjJ5b3VyLW9wZW5haS1hcGkta2V5JTIyJTJDJTIyTUlMVlVTX0FERFJFU1MlMjIlM0ElMjJsb2NhbGhvc3QlM0ExOTUzMCUyMiU3RCU3RA%3D%3D"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add code-indexer MCP server to Cursor" height="32" /></a>
+<a href="https://cursor.com/install-mcp?name=code-context&config=JTdCJTIyY29tbWFuZCUyMiUzQSUyMm5weCUyMC15JTIwJTQwemlsbGl6JTJGY29kZS1jb250ZXh0LW1jcCU0MGxhdGVzdCUyMiUyQyUyMmVudiUyMiUzQSU3QiUyMk9QRU5BSV9BUElfS0VZJTIyJTNBJTIyeW91ci1vcGVuYWktYXBpLWtleSUyMiUyQyUyMk1JTFZVU19BRERSRVNTJTIyJTNBJTIybG9jYWxob3N0JTNBMTk1MzAlMjIlN0QlN0Q%3D"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add code-context MCP server to Cursor" height="32" /></a>
 
 Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`
 
@@ -179,9 +177,9 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -202,9 +200,9 @@ Add to your Claude Desktop configuration:
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -220,11 +218,11 @@ Add to your Claude Desktop configuration:
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Use the command line interface to add the CodeIndexer MCP server:
+Use the command line interface to add the Code Context MCP server:
 
 ```bash
-# Add the CodeIndexer MCP server
-claude mcp add code-indexer -e OPENAI_API_KEY=your-openai-api-key -e OPENAI_BASE_URL=https://your-custom-endpoint.com/v1 -e MILVUS_ADDRESS=localhost:19530 -- npx @code-indexer/mcp@latest
+# Add the Code Context MCP server
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e OPENAI_BASE_URL=https://your-custom-endpoint.com/v1 -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
 
 ```
 
@@ -240,9 +238,9 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -258,14 +256,14 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 <details>
 <summary><strong>VS Code</strong></summary>
 
-The CodeIndexer MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
+The Code Context MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
 
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -285,10 +283,10 @@ Cherry Studio allows for visual MCP server configuration through its settings in
 
 1. Navigate to **Settings → MCP Servers → Add Server**.
 2. Fill in the server details:
-   - **Name**: `code-indexer`
+   - **Name**: `code-context`
    - **Type**: `STDIO`
    - **Command**: `npx`
-   - **Arguments**: `["@code-indexer/mcp@latest"]`
+   - **Arguments**: `["@zilliz/code-context-mcp@latest"]`
    - **Environment Variables**:
      - `OPENAI_API_KEY`: `your-openai-api-key`
      - `OPENAI_BASE_URL`: `https://your-custom-endpoint.com/v1` (optional)
@@ -311,9 +309,9 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -331,7 +329,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 <details>
 <summary><strong>Augment</strong></summary>
 
-To configure Code Indexer MCP in Augment Code, you can use either the graphical interface or manual configuration.
+To configure Code Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
 
 #### **A. Using the Augment Code UI**
 
@@ -346,10 +344,10 @@ To configure Code Indexer MCP in Augment Code, you can use either the graphical 
 5. Enter the following command:
 
    ```
-   npx @code-indexer/mcp@latest
+   npx @zilliz/code-context-mcp@latest
    ```
 
-6. Name the MCP: **Code Indexer**.
+6. Name the MCP: **Code Context**.
 
 7. Click the **Add** button.
 
@@ -366,9 +364,9 @@ To configure Code Indexer MCP in Augment Code, you can use either the graphical 
 "augment.advanced": { 
   "mcpServers": [ 
     { 
-      "name": "code-indexer", 
+      "name": "code-context", 
       "command": "npx", 
-      "args": ["-y", "@code-indexer/mcp@latest"],
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -393,9 +391,9 @@ Gemini CLI requires manual configuration through a JSON file:
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -422,9 +420,9 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 ```json
 {
   "mcpServers": {
-    "code-indexer": {
+    "code-context": {
       "command": "npx",
-      "args": ["@code-indexer/mcp@latest"],
+      "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
@@ -446,13 +444,13 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 The server uses stdio transport and follows the standard MCP protocol. It can be integrated with any MCP-compatible client by running:
 
 ```bash
-npx @code-indexer/mcp@latest
+npx @zilliz/code-context-mcp@latest
 ```
 
 </details>
 
 ### [VSCode Extension](packages/vscode-extension/README.md)
-Visual Studio Code extension that integrates CodeIndexer directly into your IDE. Provides an intuitive interface for semantic code search and navigation.
+Visual Studio Code extension that integrates Code Context directly into your IDE. Provides an intuitive interface for semantic code search and navigation.
 
 1. **Direct Link**: [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 
@@ -472,8 +470,8 @@ Visual Studio Code extension that integrates CodeIndexer directly into your IDE.
 
 ```bash
 # Clone repository
-git clone https://github.com/zilliztech/CodeIndexer.git
-cd CodeIndexer
+git clone https://github.com/zilliztech/code-context.git
+cd code-context
 
 # Install dependencies
 pnpm install
@@ -508,7 +506,7 @@ pnpm dev
 
 ### Supported File Extensions
 
-By default, CodeIndexer supports:
+By default, Code Context supports:
 - Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`
 - Documentation: `.md`, `.markdown`
 
@@ -550,7 +548,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/zilliztech/CodeIndexer)
+- [GitHub Repository](https://github.com/zilliztech/code-context)
 - [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 - [Milvus Documentation](https://milvus.io/docs)
 - [Zilliz Cloud](https://zilliz.com/cloud)
