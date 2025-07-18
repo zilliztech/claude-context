@@ -48,7 +48,7 @@ class AstCodeSplitterStub {
         this.loadedLanguages = new Map();
         // Import LangChain splitter as fallback
         try {
-            const { LangChainCodeSplitter } = require('@code-indexer/core');
+            const { LangChainCodeSplitter } = require('@zilliz/code-context-core');
             this.fallbackSplitter = new LangChainCodeSplitter(chunkSize, chunkOverlap);
         } catch (error) {
             console.error('Failed to initialize LangChain fallback splitter:', error);
@@ -142,7 +142,7 @@ class AstCodeSplitterStub {
     normalizeLanguage(language) {
         const langMap = {
             'js': 'javascript',
-            'ts': 'typescript', 
+            'ts': 'typescript',
             'py': 'python',
             'c++': 'cpp',
             'c': 'cpp',
@@ -158,7 +158,7 @@ class AstCodeSplitterStub {
                 console.log('[AST Splitter] web-tree-sitter not available, using LangChain fallback');
                 return this.fallbackSplitter.split(code, language, filePath);
             }
-            
+
             const languageParser = await this.loadLanguage(language);
             if (!languageParser) {
                 console.log(`[AST Splitter] Language ${language} not supported by web AST, using LangChain fallback for: ${filePath || 'unknown'}`);
@@ -180,13 +180,13 @@ class AstCodeSplitterStub {
             }
 
             console.log(`🌳 [AST Splitter] Using web-tree-sitter for ${language} file: ${filePath || 'unknown'}`);
-            
+
             const normalizedLang = this.normalizeLanguage(language);
             const nodeTypes = SPLITTABLE_NODE_TYPES[normalizedLang] || [];
-            
+
             // Extract chunks based on AST nodes
             const chunks = this.extractChunks(tree.rootNode, code, nodeTypes, language, filePath);
-            
+
             // If chunks are too large, split them further
             const refinedChunks = await this.refineChunks(chunks, code);
 
@@ -203,7 +203,7 @@ class AstCodeSplitterStub {
 
         // Find all splittable nodes
         const splittableNodes = this.findSplittableNodes(node, nodeTypes);
-        
+
         if (splittableNodes.length === 0) {
             // No splittable nodes found, treat as single chunk
             return [{
@@ -222,7 +222,7 @@ class AstCodeSplitterStub {
         for (const astNode of splittableNodes) {
             const startLine = astNode.startPosition.row + 1;
             const endLine = astNode.endPosition.row + 1;
-            
+
             // Add any content between previous node and current node
             if (startLine > lastEndLine + 1) {
                 const betweenContent = lines.slice(lastEndLine, startLine - 1).join('\n');
@@ -276,7 +276,7 @@ class AstCodeSplitterStub {
 
     findSplittableNodes(node, nodeTypes) {
         const nodes = [];
-        
+
         // Check if current node is splittable
         if (nodeTypes.includes(node.type)) {
             nodes.push(node);
@@ -303,11 +303,11 @@ class AstCodeSplitterStub {
                 // Chunk is too large, split it using LangChain splitter
                 console.log(`📏 [AST Splitter] Chunk too large (${chunk.content.length} chars), using LangChain for refinement`);
                 const subChunks = await this.fallbackSplitter.split(
-                    chunk.content, 
-                    chunk.metadata.language, 
+                    chunk.content,
+                    chunk.metadata.language,
                     chunk.metadata.filePath
                 );
-                
+
                 // Adjust line numbers for sub-chunks
                 let currentStartLine = chunk.metadata.startLine;
                 for (const subChunk of subChunks) {

@@ -18,10 +18,10 @@
         "allowSyntheticDefaultImports": true,
         "baseUrl": ".",
         "paths": {
-            "@code-indexer/core": [
+            "@zilliz/code-context-core": [
                 "./packages/core/src"
             ],
-            "@code-indexer/core/*": [
+            "@zilliz/code-context-core/*": [
                 "./packages/core/src/*"
             ]
         }
