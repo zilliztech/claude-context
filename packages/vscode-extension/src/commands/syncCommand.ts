@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CodeIndexer } from '@code-indexer/core';
+import { CodeIndexer } from '@zilliz/code-context-core';
 import * as fs from 'fs';
 
 export class SyncCommand {
@@ -43,7 +43,7 @@ export class SyncCommand {
         }
 
         console.log(`[SYNC] Starting sync for current workspace: ${codebasePath}`);
-        
+
         this.isSyncing = true;
 
         try {
@@ -75,7 +75,7 @@ export class SyncCommand {
 
             if (syncStats) {
                 const totalChanges = syncStats.added + syncStats.removed + syncStats.modified;
-                
+
                 if (totalChanges > 0) {
                     vscode.window.showInformationMessage(
                         `✅ Sync complete!\n\nAdded: ${syncStats.added}, Removed: ${syncStats.removed}, Modified: ${syncStats.modified} files.`
@@ -101,9 +101,9 @@ export class SyncCommand {
      */
     async startAutoSync(intervalMinutes: number = 5): Promise<vscode.Disposable> {
         console.log(`[AUTO-SYNC] Starting auto-sync with ${intervalMinutes} minute interval`);
-        
+
         const intervalMs = intervalMinutes * 60 * 1000;
-        
+
         const interval = setInterval(async () => {
             try {
                 console.log('[AUTO-SYNC] Running periodic sync...');
@@ -144,17 +144,17 @@ export class SyncCommand {
         }
 
         console.log(`[AUTO-SYNC] Starting silent sync for: ${codebasePath}`);
-        
+
         this.isSyncing = true;
 
         try {
             const syncStats = await this.codeIndexer.reindexByChange(codebasePath);
-            
+
             const totalChanges = syncStats.added + syncStats.removed + syncStats.modified;
-            
+
             if (totalChanges > 0) {
                 console.log(`[AUTO-SYNC] Silent sync complete for '${codebasePath}'. Added: ${syncStats.added}, Removed: ${syncStats.removed}, Modified: ${syncStats.modified}`);
-                
+
                 // Show a subtle notification for auto-sync changes
                 vscode.window.showInformationMessage(
                     `🔄 Index auto-updated: ${totalChanges} file changes detected`,

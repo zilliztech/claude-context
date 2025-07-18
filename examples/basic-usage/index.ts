@@ -1,4 +1,4 @@
-import { CodeIndexer, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@code-indexer/core';
+import { CodeIndexer, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/code-context-core';
 import * as path from 'path';
 
 // Try to load .env file

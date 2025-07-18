@@ -25,10 +25,10 @@ module.exports = {
         // support reading TypeScript and JavaScript files
         extensions: ['.ts', '.js'],
         alias: {
-            '@code-indexer/core': path.resolve(__dirname, '../core/dist/index.js'),
-            '@code-indexer/core/dist/splitter': path.resolve(__dirname, '../core/dist/splitter'),
-            '@code-indexer/core/dist/embedding': path.resolve(__dirname, '../core/dist/embedding'),
-            '@code-indexer/core/dist/vectordb': path.resolve(__dirname, '../core/dist/vectordb')
+            '@zilliz/code-context-core': path.resolve(__dirname, '../core/dist/index.js'),
+            '@zilliz/code-context-core/dist/splitter': path.resolve(__dirname, '../core/dist/splitter'),
+            '@zilliz/code-context-core/dist/embedding': path.resolve(__dirname, '../core/dist/embedding'),
+            '@zilliz/code-context-core/dist/vectordb': path.resolve(__dirname, '../core/dist/vectordb')
         }
     },
     module: {

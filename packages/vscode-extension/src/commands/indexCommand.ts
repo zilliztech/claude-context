@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CodeIndexer } from '@code-indexer/core';
+import { CodeIndexer } from '@zilliz/code-context-core';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
@@ -118,7 +118,7 @@ export class IndexCommand {
 
                 // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
-                const { FileSynchronizer } = await import("@code-indexer/core");
+                const { FileSynchronizer } = await import("@zilliz/code-context-core");
                 const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.codeIndexer['ignorePatterns'] || []);
                 await synchronizer.initialize();
                 // Store synchronizer in the indexer's internal map using the same collection name generation logic
