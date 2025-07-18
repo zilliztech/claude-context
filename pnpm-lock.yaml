@@ -71,7 +71,7 @@ importers:
 
   examples/basic-usage:
     dependencies:
-      '@code-indexer/core':
+      '@zilliz/code-context-core':
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
@@ -90,7 +90,7 @@ importers:
 
   packages/chrome-extension:
     dependencies:
-      '@code-indexer/core':
+      '@zilliz/code-context-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -236,12 +236,12 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@code-indexer/core':
-        specifier: workspace:*
-        version: link:../core
       '@modelcontextprotocol/sdk':
         specifier: ^1.12.1
         version: 1.12.1
+      '@zilliz/code-context-core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^3.25.55
         version: 3.25.55
@@ -258,7 +258,7 @@ importers:
 
   packages/vscode-extension:
     dependencies:
-      '@code-indexer/core':
+      '@zilliz/code-context-core':
         specifier: workspace:*
         version: link:../core
       web-tree-sitter:
