@@ -21,9 +21,9 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeIndexer, SemanticSearchResult } from "@code-indexer/core";
-import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@code-indexer/core";
-import { MilvusVectorDatabase } from "@code-indexer/core";
+import { CodeIndexer, SemanticSearchResult } from "@zilliz/code-context-core";
+import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@zilliz/code-context-core";
+import { MilvusVectorDatabase } from "@zilliz/code-context-core";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -430,7 +430,7 @@ class CodeIndexerMcpServer {
             }
 
             // Initialize file synchronizer with proper ignore patterns
-            const { FileSynchronizer } = await import("@code-indexer/core");
+            const { FileSynchronizer } = await import("@zilliz/code-context-core");
             const ignorePatterns = this.codeIndexer['ignorePatterns'] || [];
             console.log(`[INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
