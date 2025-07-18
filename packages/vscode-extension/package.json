@@ -3,7 +3,7 @@
     "displayName": "Semantic Code Search",
     "publisher": "zilliz",
     "description": "Code indexing and semantic search (built by Code Context)",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "private": true,
     "engines": {
         "vscode": "^1.74.0"

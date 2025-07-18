@@ -1,6 +1,6 @@
 {
     "name": "code-context",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "description": "A powerful code indexing tool with multi-platform support",
     "private": true,
     "scripts": {
