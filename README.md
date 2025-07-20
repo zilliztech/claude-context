@@ -9,52 +9,56 @@
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/code-context)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord" /></a>
 
-**Code Context** is an MCP plugin for semantic code search for Claude Code, Gemini CLI, or Cursor. It adds semantic search and code analysis, providing improved context awareness in code generation.
+**Code Context** is an MCP plugin that brings semantic code search to Claude Code, Gemini CLI, or any AI coding agent. By indexing your entire codebase, it gives your assistant deep context awareness for better code generation.
 
-This plugin allows your coding assistant to perform semantic searches on your codebase, enabling it to answer questions and generate code with a deeper understanding of the project's context. For example, you can ask *"Where are all the authentication checks?"* and the agent will find the relevant code snippets based on meaning, not just keyword matches.
-
-- **Search code by meaning, not just keywords**—thanks to powerful embedding models and Zilliz Cloud vector database integration.
-- **Understand and navigate massive codebases** with semantic search, context-aware discovery, and AI-powered code writing.
-- **Accelerate your workflow** by combining the best of Gemini CLI's AI capabilities with deep, actionable code insights.
-
-> *"Code Context is a tool for code comprehension, search, and development. Unlock the full potential of your codebase, no matter its size."*
+AI coding assistants like Claude Code are limited by their context window and can only see part of your codebase. Code Context uses semantic search with a scalable vector database Zilliz Cloud so your assistant can find and understand relevant code from your whole project using natural language, not just keywords. This gives your AI assistant real context awareness.
 
 ---
 
-## 🌟 Why Code Context?
-
-In the era of AI-first development, codebases are growing faster than ever. Traditional tools can't keep up:
-
-- **Claude Code** or **Gemini CLI** lacked full context of the entire codebase. No LLM can fit millions of lines of code in context, and `grep` doesn't work unless you can remember all variable names.
-- **Code Context** provides semantic search, allowing you to find, understand, and reuse code using natural language rather than just `grep`. It offers true context awareness by understanding relationships, structure, and intent across your entire codebase.
-- **Powered by Zilliz Cloud**, you get blazing-fast, scalable vector search for all your code.
-
-**Code Context provides the essential connection between AI code generation and understanding a codebase.**
-
----
-
-## 🚀 Quick Start: MCP Integration
+## 🚀 Use Code Context as MCP in Claude Code and others
 
 Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants.
 
 ### Prerequisites
 
-- Node.js >= 20.0.0
-- pnpm >= 10.0.0
-- (Optional) Milvus database
-- (Optional) API key for OpenAI, VoyageAI, or other embedding providers.
+<details>
+<summary><strong>Get a free vector database on Zilliz Cloud</strong></summary>
 
-### Environment Variables (Optional)
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
 
-If you want to use cloud embedding/vector DBs:
+After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
+These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
 
-```bash
-OPENAI_API_KEY=your-openai-api-key
-MILVUS_ADDRESS=your-milvus-endpoint
-MILVUS_TOKEN=your-milvus-token
-```
+![Zilliz Cloud Dashboard](assets/zilliz_cloud_dashboard.jpeg)
+
+Keep both values handy for the configuration steps below.
+
+If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
+
+</details>
+
+<details>
+<summary><strong>Get OpenAI API Key for embedding model</strong></summary>
+
+You need an OpenAI API key for the embedding model. You can get one by signing up at [OpenAI](https://platform.openai.com/api-keys).  
+
+Your API key will look like this: it always starts with `sk-`.  
+Copy your key and use it in the configuration examples below as `your-openai-api-key`.
+
+</details>
 
 ### Configure MCP for your AI Assistant
+
+#### Claude Code
+
+Use the command line interface to add the Code Context MCP server:
+
+```bash
+# Add the Code Context MCP server
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/code-context-mcp@latest
+```
+
+See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
 #### Gemini CLI
 
@@ -71,7 +75,8 @@ Gemini CLI requires manual configuration through a JSON file:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -79,19 +84,7 @@ Gemini CLI requires manual configuration through a JSON file:
 ```
 3. Save the file and restart Gemini CLI to apply the changes.
 
-#### Claude Code
-
-Use the command line interface to add the Code Context MCP server:
-
-```bash
-# Add the Code Context MCP server
-claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
-```
-
-See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
-
-<details>
-<summary><strong>Other MCP Client Configurations (Cursor, Windsurf, etc.)</strong></summary>
+### Other MCP Client Configurations (Cursor, Windsurf, etc.)
 
 <details>
 <summary><strong>Cursor</strong></summary>
@@ -110,8 +103,8 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -133,8 +126,8 @@ Add to your Claude Desktop configuration:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -156,8 +149,8 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -179,8 +172,8 @@ The Code Context MCP server can be used with VS Code through MCP-compatible exte
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -202,8 +195,8 @@ Cherry Studio allows for visual MCP server configuration through its settings in
    - **Arguments**: `["@zilliz/code-context-mcp@latest"]`
    - **Environment Variables**:
      - `OPENAI_API_KEY`: `your-openai-api-key`
-     - `OPENAI_BASE_URL`: `https://your-custom-endpoint.com/v1` (optional)
-     - `MILVUS_ADDRESS`: `localhost:19530`
+     - `MILVUS_ADDRESS`: `your-zilliz-cloud-public-endpoint`
+     - `MILVUS_TOKEN`: `your-zilliz-cloud-api-key`
 3. Save the configuration to activate the server.
 
 </details>
@@ -227,8 +220,8 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -282,8 +275,8 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   ]
@@ -309,8 +302,8 @@ Roo Code utilizes a JSON configuration file for MCP servers:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -340,15 +333,13 @@ npx @zilliz/code-context-mcp@latest
 ## ✨ Features
 
 - 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
--  **Context-Aware Discovery**: Understand how different parts of your codebase relate, even across millions of lines.
--  **AI-Assisted Programming**: Generate, refactor, or extend code using natural language prompts.
--  **Local & Cloud Indexing**: Index your codebase locally or leverage Zilliz Cloud for scalable, privacy-respecting search.
+- 🧠 **Context-Aware Discovery**: Understand how different parts of your codebase relate, even across millions of lines.
+- 🤖 **AI-Assisted Programming**: Generate, refactor, or extend code using natural language prompts.
 - ⚡ **Incremental File Synchronization**: Efficiently re-index only changed files using Merkle trees.
--  **Smart Chunking**: AST-based code splitting for context-preserving search and generation.
--  **Productivity**: Reduce time spent searching and writing boilerplate code—focus on what matters.
--  **Pluggable Embedding Providers**: Support for OpenAI, VoyageAI, Ollama, and more.
--  **Vector Storage**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
--  **Customizable**: Configure file extensions, ignore patterns, and embedding models.
+- 🧩 **Smart Chunking**: AST-based code splitting for context-preserving search and generation.
+- 🔌 **Pluggable Embedding Providers**: Support for OpenAI, VoyageAI, Ollama, and more.
+- 🗄️ **Vector Storage**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
+- 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
 
 ---
 
@@ -391,8 +382,8 @@ const embedding = new OpenAIEmbedding({
 
 // Initialize vector database
 const vectorDatabase = new MilvusVectorDatabase({
-    address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-    token: process.env.MILVUS_TOKEN || ''
+    address: process.env.MILVUS_ADDRESS || 'your-zilliz-cloud-public-endpoint',
+    token: process.env.MILVUS_TOKEN || 'your-zilliz-cloud-api-key'
 });
 
 // Create indexer instance
