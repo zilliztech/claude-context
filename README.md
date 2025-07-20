@@ -7,163 +7,91 @@
 [![npm - mcp](https://img.shields.io/npm/v/@zilliz/code-context-mcp?label=%40zilliz%2Fcode-context-mcp&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/code-context)
-<a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord"/></a>
+<a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord" /></a>
 
-An open-source implementation of the code indexing and context awareness capabilities found in AI-powered IDEs like Cursor and Windsurf, built with Milvus vector database and popular embedding models. You can build your own AI Coding IDE or code search plugin with it, or directly integrate it into your existing IDEs through MCP or VSCode extension.
+**Code Context** is an MCP plugin for semantic code search for Claude Code, Gemini CLI, or Cursor. It adds semantic search and code analysis, providing improved context awareness in code generation.
+
+This plugin allows your coding assistant to perform semantic searches on your codebase, enabling it to answer questions and generate code with a deeper understanding of the project's context. For example, you can ask *"Where are all the authentication checks?"* and the agent will find the relevant code snippets based on meaning, not just keyword matches.
+
+- **Search code by meaning, not just keywords**—thanks to powerful embedding models and Zilliz Cloud vector database integration.
+- **Understand and navigate massive codebases** with semantic search, context-aware discovery, and AI-powered code writing.
+- **Accelerate your workflow** by combining the best of Gemini CLI's AI capabilities with deep, actionable code insights.
+
+> *"Code Context is a tool for code comprehension, search, and development. Unlock the full potential of your codebase, no matter its size."*
+
+---
 
 ## 🌟 Why Code Context?
 
-In the **AI-first development era**, traditional keyword-based search is no longer sufficient for modern software development:
+In the era of AI-first development, codebases are growing faster than ever. Traditional tools can't keep up:
 
-### 🚀 **The AI Coding Revolution**
-- **AI-Powered IDEs** like Cursor and Claude Code are transforming development workflows
-- **Growing demand** for intelligent code assistance and semantic understanding
-- **Modern codebases** contain millions of lines across hundreds of files, making manual navigation inefficient
+- **Claude Code** or **Gemini CLI** lacked full context of the entire codebase. No LLM can fit millions of lines of code in context, and `grep` doesn't work unless you can remember all variable names.
+- **Code Context** provides semantic search, allowing you to find, understand, and reuse code using natural language rather than just `grep`. It offers true context awareness by understanding relationships, structure, and intent across your entire codebase.
+- **Powered by Zilliz Cloud**, you get blazing-fast, scalable vector search for all your code.
 
-### ❌ **Current Limitations**
-- LLMs have **limited context windows** and can't process entire large codebases at once
-- Regex and keyword-based search miss **contextual relationships**
-- Some IDEs lack **context awareness** - they can't understand how different parts of your codebase relate to each other
-- Developers waste time navigating large codebases manually  
-- Traditional search tools can't bridge the gap between **human intent** and **code implementation**
+**Code Context provides the essential connection between AI code generation and understanding a codebase.**
 
-### ✅ **Our Solution**
-Code Context bridges the gap between human understanding and code discovery through:
-- **Context awareness** - understands relationships between different parts of your codebase
-- **Semantic search** with natural language queries like *"find authentication functions"*
-- **AI-powered understanding** of code meaning and relationships
-- **Universal integration** across multiple platforms and development environments through MCP and VSCode extension
+---
 
-> 💡 **Find code by describing functionality, not just keywords** - Discover existing solutions before writing duplicate code. Give your AI tools the context they need to understand your entire codebase.
+## 🚀 Quick Start: MCP Integration
 
-## ✨ Features
-
-- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* instead of guessing keywords
-- 📁 **Intelligent Indexing**: Automatically index entire codebases and build semantic vector databases with contextual understanding
-- 🎯 **Context-Aware Discovery**: Find related code snippets based on meaning, not just text matching
-- ⚡ **Incremental File Synchronization**: Efficient change detection using Merkle trees to only re-index modified files
-- 🧩 **Smart Chunking**: AST-based code splitting that preserves context and structure
-- 🚀 **Developer Productivity**: Significantly reduce time spent searching for relevant code and discovering existing solutions
-- 🔧 **Embedding Providers**: Support for OpenAI, VoyageAI, Ollama as embedding providers
-- 💾 **Vector Storage**: Integrated with Milvus/Zilliz Cloud for efficient storage and retrieval
-- 🛠️ **VSCode Integration**: Built-in VSCode extension for seamless development workflow
-- 🤖 **MCP Support**: Model Context Protocol integration for AI agent interactions
-- 📊 **Progress Tracking**: Real-time progress feedback during indexing operations
-- 🎨 **Customizable**: Configurable file extensions, ignore patterns, and embedding models
-
-## 🏗️ Architecture
-![](assets/Architecture.png)
-
-Code Context is a monorepo containing three main packages:
-
-### Core Components
-
-- **`@zilliz/code-context-core`**: Core indexing engine with embedding and vector database integration
-- **VSCode Extension**: Semantic Code Search extension for Visual Studio Code
-- **`@zilliz/code-context-mcp`**: Model Context Protocol server for AI agent integration
-
-### Supported Technologies
-- **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai)
-- **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
-- **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
-- **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
-- **Development Tools**: VSCode, Model Context Protocol
-
-## 🚀 Quick Start (for the core package)
+Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants.
 
 ### Prerequisites
 
 - Node.js >= 20.0.0
 - pnpm >= 10.0.0
-- Milvus database
-- OpenAI or VoyageAI API key
+- (Optional) Milvus database
+- (Optional) API key for OpenAI, VoyageAI, or other embedding providers.
 
-### Installation
+### Environment Variables (Optional)
 
-```bash
-# Using npm
-npm install @zilliz/code-context-core
+If you want to use cloud embedding/vector DBs:
 
-# Using pnpm
-pnpm add @zilliz/code-context-core
-
-# Using yarn
-yarn add @zilliz/code-context-core
-```
-
-
-### Prepare Environment Variables
-#### OpenAI API key
-See [OpenAI Documentation](https://platform.openai.com/docs/api-reference) for more details to get your API key.
 ```bash
 OPENAI_API_KEY=your-openai-api-key
-# Optional: Custom OpenAI API endpoint (for OpenAI-compatible services)
-OPENAI_BASE_URL=https://your-custom-endpoint.com/v1
+MILVUS_ADDRESS=your-milvus-endpoint
+MILVUS_TOKEN=your-milvus-token
 ```
 
-#### Milvus configuration
-Zilliz Cloud(fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+### Configure MCP for your AI Assistant
 
-- `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
-- `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
+#### Gemini CLI
+
+Gemini CLI requires manual configuration through a JSON file:
+
+1. Create or edit the `~/.gemini/settings.json` file.
+2. Add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["@zilliz/code-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "localhost:19530"
+      }
+    }
+  }
+}
+```
+3. Save the file and restart Gemini CLI to apply the changes.
+
+#### Claude Code
+
+Use the command line interface to add the Code Context MCP server:
+
 ```bash
-MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
-MILVUS_TOKEN=xxxxxxx
+# Add the Code Context MCP server
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
 ```
 
+See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
-### Basic Usage
-[@zilliz/code-context-core](packages/core/README.md)
-Core indexing engine that provides the fundamental functionality for code indexing and semantic search. Handles embedding generation, vector storage, and search operations.
-
-```typescript
-import { CodeIndexer, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
-
-// Initialize embedding provider
-const embedding = new OpenAIEmbedding({
-    apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
-    model: 'text-embedding-3-small'
-});
-
-// Initialize vector database
-const vectorDatabase = new MilvusVectorDatabase({
-    address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-    token: process.env.MILVUS_TOKEN || ''
-});
-
-// Create indexer instance
-const indexer = new CodeIndexer({
-    embedding,
-    vectorDatabase
-});
-
-// Index your codebase with progress tracking
-const stats = await indexer.indexCodebase('./your-project', (progress) => {
-    console.log(`${progress.phase} - ${progress.percentage}%`);
-});
-console.log(`Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks`);
-
-// Perform semantic search
-const results = await indexer.semanticSearch('./your-project', 'vector database operations', 5);
-results.forEach(result => {
-    console.log(`File: ${result.relativePath}:${result.startLine}-${result.endLine}`);
-    console.log(`Score: ${(result.score * 100).toFixed(2)}%`);
-    console.log(`Content: ${result.content.substring(0, 100)}...`);
-});
-```
-
-## 📦 Built on Core
-
-All the following packages are built on top of the `@zilliz/code-context-core` engine, extending its capabilities to different platforms and use cases. They leverage the core's semantic search and indexing functionality to provide specialized interfaces and integrations.
-
-> 📖 Each package has its own detailed documentation and usage examples. Click the links below to learn more.
-
-
-### [@zilliz/code-context-mcp](packages/mcp/README.md) 
-Model Context Protocol (MCP) server that enables AI assistants and agents to interact with Code Context through a standardized protocol. Exposes indexing and search capabilities via MCP tools.
-The MCP module supports four embedding model providers: Gemini, OpenAI, Voyage AI, and Ollama. This tutorial uses OpenAI as an example. To configure a different provider, please click [here](packages/mcp/README.md) for more information.
-![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUfOR-7goqarF653roYT5u_HY_J3VkMMeUPUc2ZVj11ue82_tIzE_lIOuJ27HWcVYjTEQj2S3v9tZtS0-AXpyOP6F9VV_mymssD-57wT_ZVjF2MrS7cm5Ynj0goSEPpy81N4xSqi=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
-
+<details>
+<summary><strong>Other MCP Client Configurations (Cursor, Windsurf, etc.)</strong></summary>
 
 <details>
 <summary><strong>Cursor</strong></summary>
@@ -212,21 +140,6 @@ Add to your Claude Desktop configuration:
   }
 }
 ```
-
-</details>
-
-<details>
-<summary><strong>Claude Code</strong></summary>
-
-Use the command line interface to add the Code Context MCP server:
-
-```bash
-# Add the Code Context MCP server
-claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e OPENAI_BASE_URL=https://your-custom-endpoint.com/v1 -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
-
-```
-
-See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
 </details>
 
@@ -380,35 +293,6 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
 </details>
 
 <details>
-<summary><strong>Gemini CLI</strong></summary>
-
-Gemini CLI requires manual configuration through a JSON file:
-
-1. Create or edit the `~/.gemini/settings.json` file.
-
-2. Add the following configuration:
-
-```json
-{
-  "mcpServers": {
-    "code-context": {
-      "command": "npx",
-      "args": ["@zilliz/code-context-mcp@latest"],
-      "env": {
-        "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
-      }
-    }
-  }
-}
-```
-
-3. Save the file and restart Gemini CLI to apply the changes.
-
-</details>
-
-<details>
 <summary><strong>Roo Code</strong></summary>
 
 Roo Code utilizes a JSON configuration file for MCP servers:
@@ -449,20 +333,102 @@ npx @zilliz/code-context-mcp@latest
 
 </details>
 
-### [VSCode Extension](packages/vscode-extension/README.md)
-Visual Studio Code extension that integrates Code Context directly into your IDE. Provides an intuitive interface for semantic code search and navigation.
+</details>
+
+---
+
+## ✨ Features
+
+- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
+-  **Context-Aware Discovery**: Understand how different parts of your codebase relate, even across millions of lines.
+-  **AI-Assisted Programming**: Generate, refactor, or extend code using natural language prompts.
+-  **Local & Cloud Indexing**: Index your codebase locally or leverage Zilliz Cloud for scalable, privacy-respecting search.
+- ⚡ **Incremental File Synchronization**: Efficiently re-index only changed files using Merkle trees.
+-  **Smart Chunking**: AST-based code splitting for context-preserving search and generation.
+-  **Productivity**: Reduce time spent searching and writing boilerplate code—focus on what matters.
+-  **Pluggable Embedding Providers**: Support for OpenAI, VoyageAI, Ollama, and more.
+-  **Vector Storage**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
+-  **Customizable**: Configure file extensions, ignore patterns, and embedding models.
+
+---
+
+## 🏗️ Architecture
+![](assets/Architecture.png)
+
+Code Context is a monorepo containing three main packages:
+
+### Core Components
+
+- **`@zilliz/code-context-core`**: Core indexing engine with embedding and vector database integration
+- **VSCode Extension**: Semantic Code Search extension for Visual Studio Code
+- **`@zilliz/code-context-mcp`**: Model Context Protocol server for AI agent integration
+
+### Supported Technologies
+- **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai)
+- **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
+- **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
+- **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
+- **Development Tools**: VSCode, Model Context Protocol
+
+---
+
+## 📦 Other Ways to Use Code Context
+
+While MCP is the recommended way to use Code Context with AI assistants, you can also use it directly or through the VSCode extension.
+
+### Core Package Usage
+
+The `@zilliz/code-context-core` package provides the fundamental functionality for code indexing and semantic search.
+
+```typescript
+import { CodeIndexer, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
+
+// Initialize embedding provider
+const embedding = new OpenAIEmbedding({
+    apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
+    model: 'text-embedding-3-small'
+});
+
+// Initialize vector database
+const vectorDatabase = new MilvusVectorDatabase({
+    address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+    token: process.env.MILVUS_TOKEN || ''
+});
+
+// Create indexer instance
+const indexer = new CodeIndexer({
+    embedding,
+    vectorDatabase
+});
+
+// Index your codebase with progress tracking
+const stats = await indexer.indexCodebase('./your-project', (progress) => {
+    console.log(`${progress.phase} - ${progress.percentage}%`);
+});
+console.log(`Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks`);
+
+// Perform semantic search
+const results = await indexer.semanticSearch('./your-project', 'vector database operations', 5);
+results.forEach(result => {
+    console.log(`File: ${result.relativePath}:${result.startLine}-${result.endLine}`);
+    console.log(`Score: ${(result.score * 100).toFixed(2)}%`);
+    console.log(`Content: ${result.content.substring(0, 100)}...`);
+});
+```
+
+### VSCode Extension
+
+Integrates Code Context directly into your IDE. Provides an intuitive interface for semantic code search and navigation.
 
 1. **Direct Link**: [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
-
 2. **Manual Search**:
     - Open Extensions view in VSCode (Ctrl+Shift+X or Cmd+Shift+X on Mac)
     - Search for "Semantic Code Search"
     - Click Install
 
-
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
 
-
+---
 
 ## 🛠️ Development
 
@@ -503,7 +469,6 @@ cd examples/basic-usage
 pnpm dev
 ```
 
-
 ### Supported File Extensions
 
 By default, Code Context supports:
@@ -517,11 +482,15 @@ Common directories and files are automatically ignored:
 - `.git/**`, `.vscode/**`, `.idea/**`
 - `*.log`, `*.min.js`, `*.map`
 
+---
+
 ## 📖 Examples
 
 Check the `/examples` directory for complete usage examples:
 
 - **Basic Usage**: Simple indexing and search example
+
+---
 
 ## 🤝 Contributing
 
@@ -532,6 +501,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - [MCP Server Contributing](packages/mcp/CONTRIBUTING.md)  
 - [VSCode Extension Contributing](packages/vscode-extension/CONTRIBUTING.md)
 
+---
 
 ## 🗺️ Roadmap
 
@@ -542,9 +512,13 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - [ ] Search result ranking optimization
 - [ ] Robust Chrome Extension
 
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## 🔗 Links
 
