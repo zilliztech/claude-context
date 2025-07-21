@@ -1,4 +1,4 @@
-import { CodeIndexer, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/code-context-core';
+import { CodeContext, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/code-context-core';
 import * as path from 'path';
 
 // Try to load .env file
@@ -9,7 +9,7 @@ try {
 }
 
 async function main() {
-    console.log('🚀 CodeIndexer Real Usage Example');
+    console.log('🚀 CodeContext Real Usage Example');
     console.log('===============================');
 
     try {
@@ -39,14 +39,14 @@ async function main() {
             });
         }
 
-        // 2. Create CodeIndexer instance
+        // 2. Create CodeContext instance
         let codeSplitter;
         if (splitterType === 'langchain') {
             codeSplitter = new LangChainCodeSplitter(1000, 200);
         } else {
             codeSplitter = new AstCodeSplitter(2500, 300);
         }
-        const indexer = new CodeIndexer({
+        const context = new CodeContext({
             vectorDatabase,
             codeSplitter,
             supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp', '.go', '.rs']
@@ -57,14 +57,14 @@ async function main() {
         const codebasePath = path.join(__dirname, '../..'); // Index entire project
 
         // Check if index already exists
-        const hasExistingIndex = await indexer.hasIndex(codebasePath);
+        const hasExistingIndex = await context.hasIndex(codebasePath);
         if (hasExistingIndex) {
             console.log('🗑️  Existing index found, clearing it first...');
-            await indexer.clearIndex(codebasePath);
+            await context.clearIndex(codebasePath);
         }
 
         // Index with progress tracking
-        const indexStats = await indexer.indexCodebase(codebasePath);
+        const indexStats = await context.indexCodebase(codebasePath);
 
         // 4. Show indexing statistics
         console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
@@ -81,7 +81,7 @@ async function main() {
 
         for (const query of queries) {
             console.log(`\n🔎 Search: "${query}"`);
-            const results = await indexer.semanticSearch(codebasePath, query, 3, 0.3);
+            const results = await context.semanticSearch(codebasePath, query, 3, 0.3);
 
             if (results.length > 0) {
                 results.forEach((result, index) => {

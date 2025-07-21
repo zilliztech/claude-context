@@ -1,20 +1,20 @@
-import { CodeIndexer } from '../packages/core/src/indexer';
+import { CodeContext } from '../packages/core/src/context';
 import { OpenAIEmbedding } from '../packages/core/src/embedding/openai-embedding';
 import { MilvusVectorDatabase } from '../packages/core/src/vectordb/milvus-vectordb';
 import { AstCodeSplitter } from '../packages/core/src/splitter/ast-splitter';
 
 /**
- * CodeIndexer End-to-End Test - Complete Workflow
- * Includes: Configure Embedding → Configure Vector Database → Create Indexer → Index Codebase → Semantic Search
+ * CodeContext End-to-End Test - Complete Workflow
+ * Includes: Configure Embedding → Configure Vector Database → Create Context → Index Codebase → Semantic Search
  */
-export async function testCodeIndexerEndToEnd(config: {
+export async function testCodeContextEndToEnd(config: {
     openaiApiKey: string;
     milvusAddress: string;
     codebasePath: string;
     searchQuery: string;
 }) {
     try {
-        console.log('🚀 Starting CodeIndexer end-to-end test...');
+        console.log('🚀 Starting CodeContext end-to-end test...');
 
         // 1. Create embedding instance
         console.log('📝 Creating OpenAI embedding instance...');
@@ -29,10 +29,10 @@ export async function testCodeIndexerEndToEnd(config: {
             address: config.milvusAddress
         });
 
-        // 3. Create CodeIndexer instance
-        console.log('🔧 Creating CodeIndexer instance...');
+        // 3. Create CodeContext instance
+        console.log('🔧 Creating CodeContext instance...');
         const codeSplitter = new AstCodeSplitter(1000, 200);
-        const indexer = new CodeIndexer({
+        const context = new CodeContext({
             embedding: embedding,
             vectorDatabase: vectorDB,
             codeSplitter: codeSplitter
@@ -40,14 +40,14 @@ export async function testCodeIndexerEndToEnd(config: {
 
         // 4. Check if index already exists
         console.log('🔍 Checking existing index...');
-        const hasIndex = await indexer.hasIndex(config.codebasePath);
+        const hasIndex = await context.hasIndex(config.codebasePath);
         console.log(`Existing index status: ${hasIndex}`);
 
         // 5. Index codebase
         let indexStats;
         if (!hasIndex) {
             console.log('📚 Starting codebase indexing...');
-            indexStats = await indexer.indexCodebase(config.codebasePath, (progress) => {
+            indexStats = await context.indexCodebase(config.codebasePath, (progress) => {
                 console.log(`Indexing progress: ${progress.phase} - ${progress.percentage}%`);
             });
             console.log('✅ Indexing completed');
@@ -58,7 +58,7 @@ export async function testCodeIndexerEndToEnd(config: {
 
         // 6. Execute semantic search
         console.log('🔎 Executing semantic search...');
-        const searchResults = await indexer.semanticSearch(
+        const searchResults = await context.semanticSearch(
             config.codebasePath,
             config.searchQuery,
             5, // topK

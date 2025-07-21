@@ -1,19 +1,19 @@
 import * as vscode from 'vscode';
-import { CodeIndexer, SearchQuery, SemanticSearchResult } from '@zilliz/code-context-core';
+import { CodeContext, SearchQuery, SemanticSearchResult } from '@zilliz/code-context-core';
 import * as path from 'path';
 
 export class SearchCommand {
-    private codeIndexer: CodeIndexer;
+    private codeContext: CodeContext;
 
-    constructor(codeIndexer: CodeIndexer) {
-        this.codeIndexer = codeIndexer;
+    constructor(codeContext: CodeContext) {
+        this.codeContext = codeContext;
     }
 
     /**
-     * Update the CodeIndexer instance (used when configuration changes)
+     * Update the CodeContext instance (used when configuration changes)
      */
-    updateCodeIndexer(codeIndexer: CodeIndexer): void {
-        this.codeIndexer = codeIndexer;
+    updateCodeContext(codeContext: CodeContext): void {
+        this.codeContext = codeContext;
     }
 
     async execute(preSelectedText?: string): Promise<void> {
@@ -59,7 +59,7 @@ export class SearchCommand {
                     limit: 20
                 };
 
-                const results = await this.codeIndexer.semanticSearch(
+                const results = await this.codeContext.semanticSearch(
                     codebasePath,
                     query.term,
                     query.limit || 20,
@@ -136,7 +136,7 @@ export class SearchCommand {
         const codebasePath = workspaceFolders[0].uri.fsPath;
 
         // Use the semantic search service
-        return await this.codeIndexer.semanticSearch(
+        return await this.codeContext.semanticSearch(
             codebasePath,
             searchTerm,
             limit,
@@ -148,7 +148,7 @@ export class SearchCommand {
      * Check if index exists for the given codebase path
      */
     async hasIndex(codebasePath: string): Promise<boolean> {
-        return await this.codeIndexer.hasIndex(codebasePath);
+        return await this.codeContext.hasIndex(codebasePath);
     }
 
     /**

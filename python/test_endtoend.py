@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-CodeIndexer End-to-End Test
-Use TypeScriptExecutor to call complete CodeIndexer workflow
+CodeContext End-to-End Test
+Use TypeScriptExecutor to call complete CodeContext workflow
 """
 
 import os
@@ -14,18 +14,20 @@ sys.path.append(str(Path(__file__).parent))
 from ts_executor import TypeScriptExecutor
 
 
-def run_codeindexer_endtoend_test():
-    """Run CodeIndexer end-to-end test"""
+def run_codecontext_endtoend_test():
+    """Run CodeContext end-to-end test"""
 
     # Configuration parameters
     config = {
         "openaiApiKey": os.environ.get("OPENAI_API_KEY", "your-openai-api-key"),
         "milvusAddress": os.environ.get("MILVUS_ADDRESS", "localhost:19530"),
-        "codebasePath": "../packages/core/src",  # Index core source code
+        "codebasePath": str(
+            Path(__file__).parent.parent / "packages" / "core" / "src"
+        ),  # Index core source code
         "searchQuery": "embedding creation and vector database configuration",
     }
 
-    print("🚀 Starting CodeIndexer end-to-end test")
+    print("🚀 Starting CodeContext end-to-end test")
     print(f"📊 Configuration:")
     print(f"   - Codebase path: {config['codebasePath']}")
     print(f"   - Vector database: {config['milvusAddress']}")
@@ -40,7 +42,7 @@ def run_codeindexer_endtoend_test():
 
         # Call end-to-end test
         result = executor.call_method(
-            "./test_codecontext.ts", "testCodeIndexerEndToEnd", config
+            "./test_codecontext.ts", "testCodeContextEndToEnd", config
         )
 
         # Output results
@@ -102,19 +104,19 @@ def run_codeindexer_endtoend_test():
 def main():
     """Main function"""
     print("=" * 60)
-    print("🧪 CodeIndexer End-to-End Test")
+    print("🧪 CodeContext End-to-End Test")
     print("=" * 60)
     print()
 
-    success = run_codeindexer_endtoend_test()
+    success = run_codecontext_endtoend_test()
 
     print()
     print("=" * 60)
     if success:
-        print("🎉 Test completed! CodeIndexer end-to-end workflow runs successfully!")
+        print("🎉 Test completed! CodeContext end-to-end workflow runs successfully!")
         print()
         print("💡 This proves:")
-        print("   ✅ Can call TypeScript CodeIndexer from Python")
+        print("   ✅ Can call TypeScript CodeContext from Python")
         print("   ✅ Supports complete indexing and search workflow")
         print("   ✅ Supports complex configuration and parameter passing")
         print("   ✅ Can get detailed execution results and statistics")

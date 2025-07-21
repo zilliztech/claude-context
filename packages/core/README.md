@@ -45,7 +45,7 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 
 ```typescript
 import { 
-  CodeIndexer, 
+  CodeContext, 
   OpenAIEmbedding, 
   MilvusVectorDatabase 
 } from '@zilliz/code-context-core';
@@ -62,21 +62,21 @@ const vectorDatabase = new MilvusVectorDatabase({
   token: process.env.MILVUS_TOKEN || ''
 });
 
-// Create indexer instance
-const indexer = new CodeIndexer({
+// Create context instance
+const context = new CodeContext({
   embedding,
   vectorDatabase
 });
 
 // Index a codebase
-const stats = await indexer.indexCodebase('./my-project', (progress) => {
+const stats = await context.indexCodebase('./my-project', (progress) => {
   console.log(`${progress.phase} - ${progress.percentage}%`);
 });
 
 console.log(`Indexed ${stats.indexedFiles} files with ${stats.totalChunks} chunks`);
 
 // Search the codebase
-const results = await indexer.semanticSearch(
+const results = await context.semanticSearch(
   './my-project',
   'function that handles user authentication',
   5
@@ -115,10 +115,10 @@ results.forEach(result => {
 
 ## Configuration
 
-### CodeIndexerConfig
+### CodeContextConfig
 
 ```typescript
-interface CodeIndexerConfig {
+interface CodeContextConfig {
   embedding?: Embedding;           // Embedding provider
   vectorDatabase?: VectorDatabase; // Vector database instance (required)
   codeSplitter?: Splitter;        // Code splitting strategy
@@ -148,7 +148,7 @@ interface CodeIndexerConfig {
 
 ## API Reference
 
-### CodeIndexer
+### CodeContext
 
 #### Methods
 
@@ -180,7 +180,7 @@ interface SemanticSearchResult {
 ### Using VoyageAI Embeddings
 
 ```typescript
-import { CodeIndexer, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/code-context-core';
+import { CodeContext, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/code-context-core';
 
 // Initialize with VoyageAI embedding provider
 const embedding = new VoyageAIEmbedding({
@@ -193,7 +193,7 @@ const vectorDatabase = new MilvusVectorDatabase({
   token: process.env.MILVUS_TOKEN || ''
 });
 
-const indexer = new CodeIndexer({
+const context = new CodeContext({
   embedding,
   vectorDatabase
 });
@@ -202,7 +202,7 @@ const indexer = new CodeIndexer({
 ### Custom File Filtering
 
 ```typescript
-const indexer = new CodeIndexer({
+const context = new CodeContext({
   embedding,
   vectorDatabase,
   supportedExtensions: ['.ts', '.js', '.py', '.java'],
@@ -257,13 +257,13 @@ The file synchronization system uses a **Merkle tree-based approach** combined w
 
 ## Contributing
 
-This package is part of the CodeIndexer monorepo. Please see:
+This package is part of the CodeContext monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines
 - [Core Package Contributing](CONTRIBUTING.md) - Specific development guide for this package
 
 ## Related Packages
 
-- **[@code-indexer/mcp](../mcp)** - MCP server that uses this core engine
+- **[@code-context/mcp](../mcp)** - MCP server that uses this core engine
 - **[VSCode Extension](../vscode-extension)** - VSCode extension built on this core
 
 

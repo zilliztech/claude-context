@@ -27,7 +27,7 @@ pnpm dev:core
 
 ## Project Structure
 
-- `src/indexer.ts` - Main CodeIndexer class
+- `src/context.ts` - Main CodeContext class
 - `src/embedding/` - Embedding providers (OpenAI, VoyageAI, Ollama)
 - `src/vectordb/` - Vector database implementations (Milvus)
 - `src/splitter/` - Code splitting logic

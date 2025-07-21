@@ -1,21 +1,21 @@
 import * as vscode from 'vscode';
-import { CodeIndexer } from '@zilliz/code-context-core';
+import { CodeContext } from '@zilliz/code-context-core';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 
 export class IndexCommand {
-    private codeIndexer: CodeIndexer;
+    private codeContext: CodeContext;
 
-    constructor(codeIndexer: CodeIndexer) {
-        this.codeIndexer = codeIndexer;
+    constructor(codeContext: CodeContext) {
+        this.codeContext = codeContext;
     }
 
     /**
-     * Update the CodeIndexer instance (used when configuration changes)
+     * Update the CodeContext instance (used when configuration changes)
      */
-    updateCodeIndexer(codeIndexer: CodeIndexer): void {
-        this.codeIndexer = codeIndexer;
+    updateCodeContext(codeContext: CodeContext): void {
+        this.codeContext = codeContext;
     }
 
     /**
@@ -30,12 +30,12 @@ export class IndexCommand {
             if (fs.existsSync(gitignorePath)) {
                 console.log(`📄 Found .gitignore file at: ${gitignorePath}`);
 
-                // Use the static method from CodeIndexer to read ignore patterns
-                const ignorePatterns = await CodeIndexer.getIgnorePatternsFromFile(gitignorePath);
+                // Use the static method from CodeContext to read ignore patterns
+                const ignorePatterns = await CodeContext.getIgnorePatternsFromFile(gitignorePath);
 
                 if (ignorePatterns.length > 0) {
-                    // Update the CodeIndexer instance with new patterns
-                    this.codeIndexer.updateIgnorePatterns(ignorePatterns);
+                    // Update the CodeContext instance with new patterns
+                    this.codeContext.updateIgnorePatterns(ignorePatterns);
                     console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from .gitignore`);
 
                     vscode.window.showInformationMessage(
@@ -46,13 +46,13 @@ export class IndexCommand {
                 }
             } else {
                 console.log('📄 No .gitignore file found, using default ignore patterns only');
-                // No need to update patterns - CodeIndexer will use defaults
+                // No need to update patterns - CodeContext will use defaults
             }
         } catch (error) {
             console.warn(`⚠️ Failed to load .gitignore patterns: ${error}`);
             vscode.window.showWarningMessage(`⚠️ Failed to load .gitignore: ${error}`);
             // Continue with default patterns on error
-            this.codeIndexer.updateIgnorePatterns([]);
+            this.codeContext.updateIgnorePatterns([]);
         }
     }
 
@@ -108,7 +108,7 @@ export class IndexCommand {
                 await this.loadGitignorePatterns(selectedFolder.uri.fsPath);
 
                 // Clear existing index first
-                await this.codeIndexer.clearIndex(
+                await this.codeContext.clearIndex(
                     selectedFolder.uri.fsPath,
                     (progressInfo) => {
                         // Clear index progress is usually fast, just show the message
@@ -119,16 +119,16 @@ export class IndexCommand {
                 // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
                 const { FileSynchronizer } = await import("@zilliz/code-context-core");
-                const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.codeIndexer['ignorePatterns'] || []);
+                const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.codeContext['ignorePatterns'] || []);
                 await synchronizer.initialize();
-                // Store synchronizer in the indexer's internal map using the same collection name generation logic
+                // Store synchronizer in the context's internal map using the same collection name generation logic
                 const normalizedPath = path.resolve(selectedFolder.uri.fsPath);
                 const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
                 const collectionName = `code_chunks_${hash.substring(0, 8)}`;
-                this.codeIndexer['synchronizers'].set(collectionName, synchronizer);
+                this.codeContext['synchronizers'].set(collectionName, synchronizer);
 
                 // Start indexing with progress callback
-                indexStats = await this.codeIndexer.indexCodebase(
+                indexStats = await this.codeContext.indexCodebase(
                     selectedFolder.uri.fsPath,
                     (progressInfo) => {
                         // Calculate increment from last reported percentage
@@ -178,7 +178,7 @@ export class IndexCommand {
                 title: 'Clearing Index',
                 cancellable: false
             }, async (progress) => {
-                await this.codeIndexer.clearIndex(
+                await this.codeContext.clearIndex(
                     workspaceFolders[0].uri.fsPath,
                     (progressInfo) => {
                         progress.report({

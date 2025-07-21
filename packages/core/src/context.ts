@@ -79,7 +79,7 @@ const DEFAULT_IGNORE_PATTERNS = [
     '*.map', // source map files
 ];
 
-export interface CodeIndexerConfig {
+export interface CodeContextConfig {
     embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
     codeSplitter?: Splitter;
@@ -87,7 +87,7 @@ export interface CodeIndexerConfig {
     ignorePatterns?: string[];
 }
 
-export class CodeIndexer {
+export class CodeContext {
     private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: Splitter;
@@ -95,7 +95,7 @@ export class CodeIndexer {
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
 
-    constructor(config: CodeIndexerConfig = {}) {
+    constructor(config: CodeContextConfig = {}) {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
