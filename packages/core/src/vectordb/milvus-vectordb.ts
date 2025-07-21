@@ -86,7 +86,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         const createCollectionParams = {
             collection_name: collectionName,
-            description: description || `Code indexer collection: ${collectionName}`,
+            description: description || `Code context collection: ${collectionName}`,
             fields: schema,
         };
 

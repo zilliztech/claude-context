@@ -2,7 +2,7 @@
 
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 
-A code indexing and semantic search VSCode extension powered by Code Context.
+A code indexing and semantic search VSCode extension powered by [Code Context](https://github.com/zilliztech/code-context).
 
 > 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 

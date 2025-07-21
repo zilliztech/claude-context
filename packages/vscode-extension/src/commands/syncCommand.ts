@@ -1,20 +1,20 @@
 import * as vscode from 'vscode';
-import { CodeIndexer } from '@zilliz/code-context-core';
+import { CodeContext } from '@zilliz/code-context-core';
 import * as fs from 'fs';
 
 export class SyncCommand {
-    private codeIndexer: CodeIndexer;
+    private codeContext: CodeContext;
     private isSyncing: boolean = false;
 
-    constructor(codeIndexer: CodeIndexer) {
-        this.codeIndexer = codeIndexer;
+    constructor(codeContext: CodeContext) {
+        this.codeContext = codeContext;
     }
 
     /**
-     * Update the CodeIndexer instance (used when configuration changes)
+     * Update the CodeContext instance (used when configuration changes)
      */
-    updateCodeIndexer(codeIndexer: CodeIndexer): void {
-        this.codeIndexer = codeIndexer;
+    updateCodeContext(codeContext: CodeContext): void {
+        this.codeContext = codeContext;
     }
 
     /**
@@ -57,7 +57,7 @@ export class SyncCommand {
                 progress.report({ increment: 0, message: 'Checking for file changes...' });
 
                 try {
-                    syncStats = await this.codeIndexer.reindexByChange(
+                    syncStats = await this.codeContext.reindexByChange(
                         codebasePath,
                         (progressInfo) => {
                             const increment = progressInfo.percentage;
@@ -148,7 +148,7 @@ export class SyncCommand {
         this.isSyncing = true;
 
         try {
-            const syncStats = await this.codeIndexer.reindexByChange(codebasePath);
+            const syncStats = await this.codeContext.reindexByChange(codebasePath);
 
             const totalChanges = syncStats.added + syncStats.removed + syncStats.modified;
 
