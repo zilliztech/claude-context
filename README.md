@@ -374,7 +374,7 @@ While MCP is the recommended way to use Code Context with AI assistants, you can
 The `@zilliz/code-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
 ```typescript
-import { CodeIndexer, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
+import { CodeContext, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -388,20 +388,20 @@ const vectorDatabase = new MilvusVectorDatabase({
     token: process.env.MILVUS_TOKEN || 'your-zilliz-cloud-api-key'
 });
 
-// Create indexer instance
-const indexer = new CodeIndexer({
+// Create context instance
+const context = new CodeContext({
     embedding,
     vectorDatabase
 });
 
 // Index your codebase with progress tracking
-const stats = await indexer.indexCodebase('./your-project', (progress) => {
+const stats = await context.indexCodebase('./your-project', (progress) => {
     console.log(`${progress.phase} - ${progress.percentage}%`);
 });
 console.log(`Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks`);
 
 // Perform semantic search
-const results = await indexer.semanticSearch('./your-project', 'vector database operations', 5);
+const results = await context.semanticSearch('./your-project', 'vector database operations', 5);
 results.forEach(result => {
     console.log(`File: ${result.relativePath}:${result.startLine}-${result.endLine}`);
     console.log(`Score: ${(result.score * 100).toFixed(2)}%`);

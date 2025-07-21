@@ -47,7 +47,7 @@ from ts_executor import TypeScriptExecutor
 executor = TypeScriptExecutor()
 result = executor.call_method(
     './test_codecontext.ts',
-    'testCodeIndexerEndToEnd',
+    'testCodeContextEndToEnd',
     {
         'openaiApiKey': 'sk-your-key',
         'milvusAddress': 'localhost:19530',

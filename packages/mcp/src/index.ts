@@ -21,7 +21,7 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeIndexer, SemanticSearchResult } from "@zilliz/code-context-core";
+import { CodeContext, SemanticSearchResult } from "@zilliz/code-context-core";
 import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@zilliz/code-context-core";
 import { MilvusVectorDatabase } from "@zilliz/code-context-core";
 import * as path from "path";
@@ -63,7 +63,7 @@ function getEmbeddingModelForProvider(provider: string): string {
 }
 
 // Helper function to create embedding instance based on provider
-function createEmbeddingInstance(config: CodeIndexerMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding {
+function createEmbeddingInstance(config: CodeContextMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding {
     console.log(`[EMBEDDING] Creating ${config.embeddingProvider} embedding instance...`);
 
     switch (config.embeddingProvider) {
@@ -123,7 +123,7 @@ function createEmbeddingInstance(config: CodeIndexerMcpConfig): OpenAIEmbedding 
     }
 }
 
-interface CodeIndexerMcpConfig {
+interface CodeContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
@@ -147,9 +147,9 @@ interface CodebaseSnapshot {
     lastUpdated: string;
 }
 
-class CodeIndexerMcpServer {
+class CodeContextMcpServer {
     private server: Server;
-    private codeIndexer: CodeIndexer;
+    private codeContext: CodeContext;
     private activeCodebasePath: string | null = null;
     private indexedCodebases: string[] = [];
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
@@ -157,13 +157,13 @@ class CodeIndexerMcpServer {
     private snapshotFilePath: string;
     private currentWorkspace: string;
 
-    constructor(config: CodeIndexerMcpConfig) {
+    constructor(config: CodeContextMcpConfig) {
         // Get current workspace
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
 
         // Initialize snapshot file path
-        this.snapshotFilePath = path.join(os.homedir(), '.code-indexer-mcp', 'codebase-snapshot.json');
+        this.snapshotFilePath = path.join(os.homedir(), '.code-context-mcp', 'codebase-snapshot.json');
 
         // Initialize MCP server
         this.server = new Server(
@@ -178,7 +178,7 @@ class CodeIndexerMcpServer {
             }
         );
 
-        // Initialize code indexer with proper configuration
+        // Initialize code context with proper configuration
         console.log(`[EMBEDDING] Initializing embedding provider: ${config.embeddingProvider}`);
         console.log(`[EMBEDDING] Using model: ${config.embeddingModel}`);
 
@@ -208,7 +208,7 @@ class CodeIndexerMcpServer {
             ...(config.milvusToken && { token: config.milvusToken })
         });
 
-        this.codeIndexer = new CodeIndexer({
+        this.codeContext = new CodeContext({
             embedding,
             vectorDatabase
         });
@@ -419,11 +419,11 @@ class CodeIndexerMcpServer {
 
             // Clear index if force is true
             if (forceReindex) {
-                await this.codeIndexer.clearIndex(absolutePath);
+                await this.codeContext.clearIndex(absolutePath);
             }
 
-            // Use the existing CodeIndexer instance for indexing.
-            let indexerForThisTask = this.codeIndexer;
+            // Use the existing CodeContext instance for indexing.
+            let contextForThisTask = this.codeContext;
 
             if (splitterType !== 'ast') {
                 console.warn(`[INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
@@ -431,30 +431,30 @@ class CodeIndexerMcpServer {
 
             // Initialize file synchronizer with proper ignore patterns
             const { FileSynchronizer } = await import("@zilliz/code-context-core");
-            const ignorePatterns = this.codeIndexer['ignorePatterns'] || [];
+            const ignorePatterns = this.codeContext['ignorePatterns'] || [];
             console.log(`[INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
-            // Store synchronizer in the indexer's internal map using the same collection name generation logic
+            // Store synchronizer in the context's internal map using the same collection name generation logic
             const normalizedPath = path.resolve(absolutePath);
             const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
             const collectionName = `code_chunks_${hash.substring(0, 8)}`;
 
-            // Store synchronizer in both indexers if using a custom one
-            this.codeIndexer['synchronizers'].set(collectionName, synchronizer);
-            if (indexerForThisTask !== this.codeIndexer) {
-                indexerForThisTask['synchronizers'].set(collectionName, synchronizer);
+            // Store synchronizer in both contexts if using a custom one
+            this.codeContext['synchronizers'].set(collectionName, synchronizer);
+            if (contextForThisTask !== this.codeContext) {
+                contextForThisTask['synchronizers'].set(collectionName, synchronizer);
             }
 
             console.log(`[INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
             // Log embedding provider information before indexing
-            const embeddingProvider = this.codeIndexer['embedding'];
+            const embeddingProvider = this.codeContext['embedding'];
             console.log(`[INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
-            // Start indexing with the appropriate indexer
+            // Start indexing with the appropriate context
             console.log(`[INDEX] 🚀 Beginning codebase indexing process...`);
-            const stats = await indexerForThisTask.indexCodebase(absolutePath);
+            const stats = await contextForThisTask.indexCodebase(absolutePath);
             console.log(`[INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Store current codebase path and stats
@@ -533,8 +533,8 @@ class CodeIndexerMcpServer {
                 }
 
                 try {
-                    console.log(`[SYNC-DEBUG] Calling codeIndexer.reindexByChange() for '${codebasePath}'`);
-                    const stats = await this.codeIndexer.reindexByChange(codebasePath);
+                    console.log(`[SYNC-DEBUG] Calling codeContext.reindexByChange() for '${codebasePath}'`);
+                    const stats = await this.codeContext.reindexByChange(codebasePath);
                     const codebaseElapsed = Date.now() - codebaseStartTime;
 
                     console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
@@ -628,12 +628,12 @@ class CodeIndexerMcpServer {
             console.log(`[SEARCH] Query: "${query}"`);
 
             // Log embedding provider information before search
-            const embeddingProvider = this.codeIndexer['embedding'];
+            const embeddingProvider = this.codeContext['embedding'];
             console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for semantic search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
             // Search in the specified codebase
-            const searchResults = await this.codeIndexer.semanticSearch(
+            const searchResults = await this.codeContext.semanticSearch(
                 absolutePath,
                 query,
                 Math.min(resultLimit, 50),
@@ -734,7 +734,7 @@ class CodeIndexerMcpServer {
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
             try {
-                await this.codeIndexer.clearIndex(absolutePath);
+                await this.codeContext.clearIndex(absolutePath);
                 console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
             } catch (error: any) {
                 const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;
@@ -818,7 +818,7 @@ class CodeIndexerMcpServer {
 
     async start() {
         console.log('[SYNC-DEBUG] MCP server start() method called');
-        console.log('Starting CodeIndexer MCP server...');
+        console.log('Starting CodeContext MCP server...');
 
         const transport = new StdioServerTransport();
         console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
@@ -866,7 +866,7 @@ async function main() {
     const args = process.argv.slice(2);
 
     const embeddingProvider = (process.env.EMBEDDING_PROVIDER?.toLowerCase() === 'ollama' ? 'ollama' : 'openai') as 'openai' | 'ollama';
-    // Debug: Print all environment variables related to CodeIndexer
+    // Debug: Print all environment variables related to CodeContext
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
     console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${process.env.EMBEDDING_PROVIDER || 'NOT SET'}`);
     console.log(`[DEBUG]   EMBEDDING_MODEL: ${process.env.EMBEDDING_MODEL || 'NOT SET'}`);
@@ -876,8 +876,8 @@ async function main() {
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${process.env.MILVUS_ADDRESS || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
 
-    const config: CodeIndexerMcpConfig = {
-        name: process.env.MCP_SERVER_NAME || "CodeIndexer MCP Server",
+    const config: CodeContextMcpConfig = {
+        name: process.env.MCP_SERVER_NAME || "CodeContext MCP Server",
         version: process.env.MCP_SERVER_VERSION || "1.0.0",
         // Embedding provider configuration
         embeddingProvider: (process.env.EMBEDDING_PROVIDER as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
@@ -898,9 +898,9 @@ async function main() {
     // Show help if requested
     if (args.includes('--help') || args.includes('-h')) {
         console.log(`
-CodeIndexer MCP Server
+CodeContext MCP Server
 
-Usage: npx @code-indexer/mcp@latest [options]
+Usage: npx @zilliz/code-context-mcp@latest [options]
 
 Options:
   --help, -h                          Show this help message
@@ -929,22 +929,22 @@ Environment Variables:
 
 Examples:
   # Start MCP server with OpenAI (default)
-  OPENAI_API_KEY=sk-xxx npx @code-indexer/mcp@latest
+  OPENAI_API_KEY=sk-xxx npx @zilliz/code-context-mcp@latest
   
   # Start MCP server with VoyageAI
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx npx @code-indexer/mcp@latest
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx npx @zilliz/code-context-mcp@latest
   
   # Start MCP server with Gemini
-  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx npx @code-indexer/mcp@latest
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx npx @zilliz/code-context-mcp@latest
   
   # Start MCP server with Ollama
-  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text npx @code-indexer/mcp@latest
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text npx @zilliz/code-context-mcp@latest
         `);
         process.exit(0);
     }
 
     // Log configuration summary before starting server
-    console.log(`[MCP] 🚀 Starting CodeIndexer MCP Server`);
+    console.log(`[MCP] 🚀 Starting CodeContext MCP Server`);
     console.log(`[MCP] Configuration Summary:`);
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
@@ -973,7 +973,7 @@ Examples:
 
     console.log(`[MCP] 🔧 Initializing server components...`);
 
-    const server = new CodeIndexerMcpServer(config);
+    const server = new CodeContextMcpServer(config);
     await server.start();
 }
 

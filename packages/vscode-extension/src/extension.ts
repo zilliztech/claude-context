@@ -5,29 +5,29 @@ import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
 import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
-import { CodeIndexer, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/code-context-core';
+import { CodeContext, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/code-context-core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;
 let indexCommand: IndexCommand;
 let syncCommand: SyncCommand;
 let configManager: ConfigManager;
-let codeIndexer: CodeIndexer;
+let codeContext: CodeContext;
 let autoSyncDisposable: vscode.Disposable | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('CodeIndexer extension is now active!');
+    console.log('CodeContext extension is now active!');
 
     // Initialize config manager
     configManager = new ConfigManager(context);
 
-    // Initialize shared codeIndexer instance with embedding configuration
-    codeIndexer = createCodeIndexerWithConfig(configManager);
+    // Initialize shared codeContext instance with embedding configuration
+    codeContext = createCodeContextWithConfig(configManager);
 
     // Initialize providers and commands
-    searchCommand = new SearchCommand(codeIndexer);
-    indexCommand = new IndexCommand(codeIndexer);
-    syncCommand = new SyncCommand(codeIndexer);
+    searchCommand = new SearchCommand(codeContext);
+    indexCommand = new IndexCommand(codeContext);
+    syncCommand = new SyncCommand(codeContext);
     semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri, searchCommand, indexCommand, syncCommand, configManager);
 
     // Register command handlers
@@ -45,8 +45,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 event.affectsConfiguration('semanticCodeSearch.milvus') ||
                 event.affectsConfiguration('semanticCodeSearch.splitter') ||
                 event.affectsConfiguration('semanticCodeSearch.autoSync')) {
-                console.log('CodeIndexer configuration changed, reloading...');
-                reloadCodeIndexerConfiguration();
+                console.log('CodeContext configuration changed, reloading...');
+                reloadCodeContextConfiguration();
             }
         }),
 
@@ -59,7 +59,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('semanticCodeSearch.indexCodebase', () => indexCommand.execute()),
         vscode.commands.registerCommand('semanticCodeSearch.clearIndex', () => indexCommand.clearIndex()),
-        vscode.commands.registerCommand('semanticCodeSearch.reloadConfiguration', () => reloadCodeIndexerConfiguration())
+        vscode.commands.registerCommand('semanticCodeSearch.reloadConfiguration', () => reloadCodeContextConfiguration())
     ];
 
     context.subscriptions.push(...disposables);
@@ -72,7 +72,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Show status bar item
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.text = `$(search) CodeIndexer`;
+    statusBarItem.text = `$(search) CodeContext`;
     statusBarItem.tooltip = 'Click to open semantic search';
     statusBarItem.command = 'semanticCodeSearch.semanticSearch';
     statusBarItem.show();
@@ -117,7 +117,7 @@ function setupAutoSync() {
     }
 }
 
-function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer {
+function createCodeContextWithConfig(configManager: ConfigManager): CodeContext {
     const embeddingConfig = configManager.getEmbeddingProviderConfig();
     const milvusConfig = configManager.getMilvusFullConfig();
     const splitterConfig = configManager.getSplitterConfig();
@@ -126,13 +126,13 @@ function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer 
         let embedding;
         let vectorDatabase;
 
-        const codeIndexerConfig: any = {};
+        const codeContextConfig: any = {};
 
         // Create embedding instance
         if (embeddingConfig) {
             embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
             console.log(`Embedding initialized with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
-            codeIndexerConfig.embedding = embedding;
+            codeContextConfig.embedding = embedding;
         } else {
             console.log('No embedding configuration found');
         }
@@ -141,14 +141,14 @@ function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer 
         if (milvusConfig) {
             vectorDatabase = new MilvusRestfulVectorDatabase(milvusConfig);
             console.log(`Vector database initialized with Milvus REST API (address: ${milvusConfig.address})`);
-            codeIndexerConfig.vectorDatabase = vectorDatabase;
+            codeContextConfig.vectorDatabase = vectorDatabase;
         } else {
             vectorDatabase = new MilvusRestfulVectorDatabase({
                 address: process.env.MILVUS_ADDRESS || 'http://localhost:19530',
                 token: process.env.MILVUS_TOKEN || ''
             });
             console.log('No Milvus configuration found, using default REST API configuration');
-            codeIndexerConfig.vectorDatabase = vectorDatabase;
+            codeContextConfig.vectorDatabase = vectorDatabase;
         }
 
         // Create splitter instance
@@ -165,23 +165,23 @@ function createCodeIndexerWithConfig(configManager: ConfigManager): CodeIndexer 
                     splitterConfig.chunkOverlap ?? 300
                 );
             }
-            codeIndexerConfig.codeSplitter = codeSplitter;
+            codeContextConfig.codeSplitter = codeSplitter;
             console.log(`Splitter configured: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
         } else {
             codeSplitter = new AstCodeSplitter(2500, 300);
-            codeIndexerConfig.codeSplitter = codeSplitter;
+            codeContextConfig.codeSplitter = codeSplitter;
             console.log('No splitter configuration found, using default AST splitter (chunkSize: 2500, overlap: 300)');
         }
-        return new CodeIndexer(codeIndexerConfig);
+        return new CodeContext(codeContextConfig);
     } catch (error) {
-        console.error('Failed to create CodeIndexer with user config:', error);
-        vscode.window.showErrorMessage(`Failed to initialize CodeIndexer: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('Failed to create CodeContext with user config:', error);
+        vscode.window.showErrorMessage(`Failed to initialize CodeContext: ${error instanceof Error ? error.message : 'Unknown error'}`);
         throw error;
     }
 }
 
-function reloadCodeIndexerConfiguration() {
-    console.log('Reloading CodeIndexer configuration...');
+function reloadCodeContextConfiguration() {
+    console.log('Reloading CodeContext configuration...');
 
     const embeddingConfig = configManager.getEmbeddingProviderConfig();
     const milvusConfig = configManager.getMilvusFullConfig();
@@ -191,14 +191,14 @@ function reloadCodeIndexerConfiguration() {
         // Update embedding if configuration exists
         if (embeddingConfig) {
             const embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
-            codeIndexer.updateEmbedding(embedding);
+            codeContext.updateEmbedding(embedding);
             console.log(`Embedding updated with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
         }
 
         // Update vector database if configuration exists
         if (milvusConfig) {
             const vectorDatabase = new MilvusRestfulVectorDatabase(milvusConfig);
-            codeIndexer.updateVectorDatabase(vectorDatabase);
+            codeContext.updateVectorDatabase(vectorDatabase);
             console.log(`Vector database updated with Milvus REST API (address: ${milvusConfig.address})`);
         }
 
@@ -216,32 +216,32 @@ function reloadCodeIndexerConfiguration() {
                     splitterConfig.chunkOverlap ?? 300
                 );
             }
-            codeIndexer.updateSplitter(newSplitter);
+            codeContext.updateSplitter(newSplitter);
             console.log(`Splitter updated: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
         } else {
             const defaultSplitter = new AstCodeSplitter(2500, 300);
-            codeIndexer.updateSplitter(defaultSplitter);
+            codeContext.updateSplitter(defaultSplitter);
             console.log('No splitter configuration found, using default AST splitter (chunkSize: 2500, overlap: 300)');
         }
 
-        // Update command instances with new codeIndexer
-        searchCommand.updateCodeIndexer(codeIndexer);
-        indexCommand.updateCodeIndexer(codeIndexer);
-        syncCommand.updateCodeIndexer(codeIndexer);
+        // Update command instances with new codeContext
+        searchCommand.updateCodeContext(codeContext);
+        indexCommand.updateCodeContext(codeContext);
+        syncCommand.updateCodeContext(codeContext);
 
         // Restart auto-sync if it was enabled
         setupAutoSync();
 
-        console.log('CodeIndexer configuration reloaded successfully');
+        console.log('CodeContext configuration reloaded successfully');
         vscode.window.showInformationMessage('Configuration reloaded successfully!');
     } catch (error) {
-        console.error('Failed to reload CodeIndexer configuration:', error);
+        console.error('Failed to reload CodeContext configuration:', error);
         vscode.window.showErrorMessage(`Failed to reload configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 
 export function deactivate() {
-    console.log('CodeIndexer extension is now deactivated');
+    console.log('CodeContext extension is now deactivated');
 
     // Stop auto-sync if running
     if (autoSyncDisposable) {

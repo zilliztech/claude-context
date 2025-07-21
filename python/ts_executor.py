@@ -61,39 +61,64 @@ class TypeScriptExecutor:
                 f.write(wrapper_code)
 
             # Execute TypeScript code using ts-node
-            result = subprocess.run(
+            # Use subprocess.Popen to capture output in real-time
+            process = subprocess.Popen(
                 ["npx", "ts-node", temp_file],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                check=True,
                 cwd=self.working_dir,
+                bufsize=1,  # Line buffering
+                universal_newlines=True,
             )
 
-            # Parse results
-            if result.stdout.strip():
-                # Try to extract JSON part from output
-                import re
+            stdout_lines = []
+            stderr_lines = []
 
-                output = result.stdout.strip()
-                # Find the last complete JSON object - improved regex
-                json_match = re.search(
-                    r"\{.*\}(?=\s*$)", output, re.DOTALL | re.MULTILINE
-                )
-                if json_match:
+            # Read output line by line and display console.log in real-time
+            while True:
+                output = process.stdout.readline()
+                if output == "" and process.poll() is not None:
+                    break
+                if output:
+                    line = output.strip()
+                    stdout_lines.append(line)
+
+                    # Try to parse as JSON to see if it's the final result
                     try:
-                        return json.loads(json_match.group())
+                        json.loads(line)
+                        # If it parses as JSON, it might be the final result, don't print it yet
                     except json.JSONDecodeError:
-                        pass
-                # If no JSON found, try direct parsing
-                try:
-                    return json.loads(output)
-                except json.JSONDecodeError:
-                    return output  # Return raw output
-            else:
-                return None
+                        # If it's not JSON, it's likely a console.log, so print it
+                        print(line)
 
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"TypeScript execution failed: {e.stderr}")
+            # Get any remaining stderr
+            stderr_output = process.stderr.read()
+            if stderr_output:
+                stderr_lines.append(stderr_output.strip())
+
+            return_code = process.poll()
+
+            if return_code != 0:
+                error_msg = "\n".join(stderr_lines) if stderr_lines else "Unknown error"
+                raise RuntimeError(f"TypeScript execution failed: {error_msg}")
+
+            # Parse results from the last line that looks like JSON
+            for line in reversed(stdout_lines):
+                if line.strip():
+                    try:
+                        # Try to parse as JSON
+                        return json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+            # If no JSON found, return the last non-empty line
+            for line in reversed(stdout_lines):
+                if line.strip():
+                    return line
+
+            return None
+
         except Exception as e:
             raise RuntimeError(f"Execution error: {str(e)}")
         finally:
