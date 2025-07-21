@@ -653,14 +653,14 @@ class CodeIndexerMcpServer {
 
             // Format results
             const formattedResults = searchResults.map((result: any, index: number) => {
-                const location = `${result.relativePath}:${result.startLine}`;
-                const context = this.truncateContent(result.content, 150);
+                const location = `${result.relativePath}:${result.startLine}-${result.endLine}`;
+                const context = this.truncateContent(result.content, 5000);
                 const codebaseInfo = path.basename(absolutePath);
 
                 return `${index + 1}. Code snippet (${result.language}) [${codebaseInfo}]\n` +
                     `   Location: ${location}\n` +
                     `   Score: ${result.score.toFixed(3)}\n` +
-                    `   Context: ${context}\n`;
+                    `   Context: \n\`\`\`${result.language}\n${context}\n\`\`\`\n`;
             }).join('\n');
 
             return {
