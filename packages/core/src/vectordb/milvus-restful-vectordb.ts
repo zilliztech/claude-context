@@ -1,4 +1,4 @@
-import { VectorDatabase, VectorDocument, SearchOptions, VectorSearchResult } from './index';
+import { VectorDatabase, VectorDocument, SearchOptions, VectorSearchResult, COLLECTION_LIMIT_MESSAGE } from './index';
 
 export interface MilvusRestfulConfig {
     address: string;
@@ -6,6 +6,28 @@ export interface MilvusRestfulConfig {
     username?: string;
     password?: string;
     database?: string;
+}
+
+/**
+ * Wrapper function to handle collection creation with limit detection
+ * This is the single point where collection limit errors are detected and handled
+ */
+async function createCollectionWithLimitCheck(
+    makeRequestFn: (endpoint: string, method: 'GET' | 'POST', data?: any) => Promise<any>,
+    collectionSchema: any
+): Promise<void> {
+    try {
+        await makeRequestFn('/collections/create', 'POST', collectionSchema);
+    } catch (error: any) {
+        // Check if the error message contains the collection limit exceeded pattern
+        const errorMessage = error.message || error.toString() || '';
+        if (/exceeded the limit number of collections/i.test(errorMessage)) {
+            // Throw the exact message string, not an Error object
+            throw COLLECTION_LIMIT_MESSAGE;
+        }
+        // Re-throw other errors as-is
+        throw error;
+    }
 }
 
 /**
@@ -145,7 +167,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             };
 
             // Step 1: Create collection with schema
-            await this.makeRequest('/collections/create', 'POST', collectionSchema);
+            await createCollectionWithLimitCheck(this.makeRequest.bind(this), collectionSchema);
 
             // Step 2: Create index for vector field (separate API call)
             await this.createIndex(collectionName);
