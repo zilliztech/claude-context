@@ -3,7 +3,8 @@ import {
     VectorDatabase,
     VectorDocument,
     SearchOptions,
-    VectorSearchResult
+    VectorSearchResult,
+    COLLECTION_LIMIT_MESSAGE
 } from './index';
 
 export interface MilvusConfig {
@@ -12,6 +13,28 @@ export interface MilvusConfig {
     password?: string;
     token?: string;
     ssl?: boolean;
+}
+
+/**
+ * Wrapper function to handle collection creation with limit detection for gRPC client
+ * This is the single point where collection limit errors are detected and handled
+ */
+async function createCollectionWithLimitCheck(
+    client: MilvusClient,
+    createCollectionParams: any
+): Promise<void> {
+    try {
+        await client.createCollection(createCollectionParams);
+    } catch (error: any) {
+        // Check if the error message contains the collection limit exceeded pattern
+        const errorMessage = error.message || error.toString() || '';
+        if (/exceeded the limit number of collections/i.test(errorMessage)) {
+            // Throw the exact message string, not an Error object
+            throw COLLECTION_LIMIT_MESSAGE;
+        }
+        // Re-throw other errors as-is
+        throw error;
+    }
 }
 
 export class MilvusVectorDatabase implements VectorDatabase {
@@ -33,7 +56,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
 
     async createCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
-
+        console.log('Beginning collection creation:', collectionName);
+        console.log('Collection dimension:', dimension);
         const schema = [
             {
                 name: 'id',
@@ -90,7 +114,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             fields: schema,
         };
 
-        await this.client.createCollection(createCollectionParams);
+        await createCollectionWithLimitCheck(this.client, createCollectionParams);
 
         // Create index
         const indexParams = {
@@ -128,6 +152,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
     }
 
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
+        console.log('Inserting documents into collection:', collectionName);
         const data = documents.map(doc => ({
             id: doc.id,
             vector: doc.vector,
@@ -200,4 +225,4 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw error;
         }
     }
-} 
+}

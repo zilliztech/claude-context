@@ -101,12 +101,12 @@ export class MilvusRestfulVectorDatabase {
             return result;
         } catch (error) {
             console.error(`❌ Milvus REST API request failed to ${url}:`, error);
-            
+
             // Enhance error messages for common issues
             if (error instanceof TypeError && error.message.includes('fetch')) {
                 throw new Error(`Network error: Unable to connect to Milvus server at ${this.config.address}. Please check the server address and ensure it's running.`);
             }
-            
+
             throw error;
         }
     }
@@ -174,8 +174,8 @@ export class MilvusRestfulVectorDatabase {
                 }
             };
 
-            // Create collection
-            await this.makeRequest('/collections/create', 'POST', collectionSchema);
+            // Create collection with limit check
+            await createCollectionWithLimitCheck(this.makeRequest.bind(this), collectionSchema);
 
             // Create index
             await this.createIndex(collectionName);
@@ -280,7 +280,7 @@ export class MilvusRestfulVectorDatabase {
                 limit: topK,
                 outputFields: [
                     "content",
-                    "relativePath", 
+                    "relativePath",
                     "startLine",
                     "endLine",
                     "fileExtension",
@@ -323,7 +323,7 @@ export class MilvusRestfulVectorDatabase {
             });
 
             // Filter by threshold if provided
-            const filteredResults = options?.threshold !== undefined 
+            const filteredResults = options?.threshold !== undefined
                 ? results.filter(result => result.score >= options.threshold!)
                 : results;
 
@@ -366,11 +366,40 @@ export class MilvusRestfulVectorDatabase {
 
             // Extract entity count from response (may vary based on Milvus version)
             const entityCount = response.data?.numEntities || response.data?.entityCount || 0;
-            
+
             return { entityCount };
         } catch (error) {
             console.error(`❌ Failed to get collection stats for '${collectionName}':`, error);
             return { entityCount: 0 };
         }
+    }
+}
+
+/**
+ * Special error type for collection limit exceeded
+ * This allows us to distinguish it from other errors
+ */
+export const COLLECTION_LIMIT_MESSAGE = "[Error]: Your Zilliz Cloud account has hit its collection limit. To continue creating collections, you'll need to expand your capacity. We recommend visiting https://zilliz.com/pricing to explore options for dedicated or serverless clusters.";
+
+/**
+ * Wrapper function to handle collection creation with limit detection
+ * This is the single point where collection limit errors are detected and handled
+ */
+async function createCollectionWithLimitCheck(
+    makeRequestFn: (endpoint: string, method: 'GET' | 'POST', data?: any) => Promise<any>,
+    collectionSchema: any
+): Promise<void> {
+    try {
+        await makeRequestFn('/collections/create', 'POST', collectionSchema);
+    } catch (error: any) {
+        // Check if the error message contains the collection limit exceeded pattern
+        const errorMessage = error.message || error.toString() || '';
+        console.error(`❌ Error creating collection:`, errorMessage);
+        if (/exceeded the limit number of collections/i.test(errorMessage)) {
+            // Throw the exact message string, not an Error object
+            throw COLLECTION_LIMIT_MESSAGE;
+        }
+        // Re-throw other errors as-is
+        throw error;
     }
 }

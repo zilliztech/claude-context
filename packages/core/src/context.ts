@@ -132,11 +132,12 @@ export class CodeContext {
     async indexCodebase(
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
-    ): Promise<{ indexedFiles: number; totalChunks: number }> {
+    ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
 
         // 1. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
+        console.log(`Debug2: Preparing vector collection for codebase`);
         await this.prepareCollection(codebasePath);
 
         // 2. Recursively traverse codebase to get all supported files
@@ -146,7 +147,7 @@ export class CodeContext {
 
         if (codeFiles.length === 0) {
             progressCallback?.({ phase: 'No files to index', current: 100, total: 100, percentage: 100 });
-            return { indexedFiles: 0, totalChunks: 0 };
+            return { indexedFiles: 0, totalChunks: 0, status: 'completed' };
         }
 
         // 3. Process each file with streaming chunk processing
@@ -183,7 +184,8 @@ export class CodeContext {
 
         return {
             indexedFiles: result.processedFiles,
-            totalChunks: result.totalChunks
+            totalChunks: result.totalChunks,
+            status: result.status
         };
     }
 
@@ -393,6 +395,7 @@ export class CodeContext {
      */
     private async prepareCollection(codebasePath: string): Promise<void> {
         // Create new collection
+        console.log(`🔧 Preparing vector collection for codebase: ${codebasePath}`);
         const collectionName = this.getCollectionName(codebasePath);
 
         // For Ollama embeddings, ensure dimension is detected before creating collection
@@ -463,13 +466,15 @@ export class CodeContext {
         filePaths: string[],
         codebasePath: string,
         onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void
-    ): Promise<{ processedFiles: number; totalChunks: number }> {
+    ): Promise<{ processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(process.env.EMBEDDING_BATCH_SIZE || '100', 10));
+        const CHUNK_LIMIT = 450000;
         console.log(`🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
 
         let chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
         let processedFiles = 0;
         let totalChunks = 0;
+        let limitReached = false;
 
         for (let i = 0; i < filePaths.length; i++) {
             const filePath = filePaths[i];
@@ -496,15 +501,27 @@ export class CodeContext {
                         try {
                             await this.processChunkBuffer(chunkBuffer);
                         } catch (error) {
+                            // TODO: 
                             console.error(`❌ Failed to process chunk batch: ${error}`);
                         } finally {
                             chunkBuffer = []; // Always clear buffer, even on failure
                         }
                     }
+
+                    // Check if chunk limit is reached
+                    if (totalChunks >= CHUNK_LIMIT) {
+                        console.warn(`⚠️  Chunk limit of ${CHUNK_LIMIT} reached. Stopping indexing.`);
+                        limitReached = true;
+                        break; // Exit the inner loop (over chunks)
+                    }
                 }
 
                 processedFiles++;
                 onFileProcessed?.(filePath, i + 1, filePaths.length);
+
+                if (limitReached) {
+                    break; // Exit the outer loop (over files)
+                }
 
             } catch (error) {
                 console.warn(`⚠️  Skipping file ${filePath}: ${error}`);
@@ -521,7 +538,11 @@ export class CodeContext {
             }
         }
 
-        return { processedFiles, totalChunks };
+        return {
+            processedFiles,
+            totalChunks,
+            status: limitReached ? 'limit_reached' : 'completed'
+        };
     }
 
     /**

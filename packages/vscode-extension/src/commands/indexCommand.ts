@@ -94,7 +94,7 @@ export class IndexCommand {
         }
 
         try {
-            let indexStats: { indexedFiles: number; totalChunks: number } | undefined;
+            let indexStats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' } | undefined;
 
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -144,14 +144,35 @@ export class IndexCommand {
             });
 
             if (indexStats) {
-                vscode.window.showInformationMessage(
-                    `✅ Indexing complete!\n\nIndexed ${indexStats.indexedFiles} files with ${indexStats.totalChunks} code chunks.\n\nYou can now use semantic search.`
-                );
+                const { indexedFiles, totalChunks, status } = indexStats;
+                if (status === 'limit_reached') {
+                    vscode.window.showWarningMessage(
+                        `⚠️ Indexing paused. Reached chunk limit of 450,000.\n\nIndexed ${indexedFiles} files with ${totalChunks} code chunks.`
+                    );
+                } else {
+                    vscode.window.showInformationMessage(
+                        `✅ Indexing complete!\n\nIndexed ${indexedFiles} files with ${totalChunks} code chunks.\n\nYou can now use semantic search.`
+                    );
+                }
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Indexing failed:', error);
-            vscode.window.showErrorMessage(`❌ Indexing failed: ${error}`);
+            const errorString = typeof error === 'string' ? error : (error.message || error.toString() || '');
+            
+            // Check for collection limit message from the core library
+            if (errorString.includes('collection limit') || errorString.includes('zilliz.com/pricing')) {
+                const message = 'Your Zilliz Cloud account has hit its collection limit. To continue creating collections, you\'ll need to expand your capacity. We recommend visiting https://zilliz.com/pricing to explore options for dedicated or serverless clusters.';
+                const openButton = 'Explore Pricing Options';
+                
+                vscode.window.showErrorMessage(message, { modal: true }, openButton).then(selection => {
+                    if (selection === openButton) {
+                        vscode.env.openExternal(vscode.Uri.parse('https://zilliz.com/pricing'));
+                    }
+                });
+            } else {
+                vscode.window.showErrorMessage(`❌ Indexing failed: ${errorString}`);
+            }
         }
     }
 
