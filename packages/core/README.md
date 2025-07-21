@@ -20,17 +20,26 @@ See [OpenAI Documentation](https://platform.openai.com/docs/api-reference) for m
 OPENAI_API_KEY=your-openai-api-key
 ```
 
-#### Milvus configuration
-Zilliz Cloud (fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+#### Zilliz Cloud configuration
+Get a free Milvus vector database on Zilliz Cloud. 
 
-- `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
-- `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
+
+![](../../assets/signup_and_create_cluster.jpeg)
+
+After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
+These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
+
+![Zilliz Cloud Dashboard](../../assets/zilliz_cloud_dashboard.jpeg)
+
+Keep both values handy for the configuration steps below.
+
+If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
+
 ```bash
-MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
-MILVUS_TOKEN=xxxxxxx
-```
-> Optional: Self-hosted Milvus. See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
-
+MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint
+MILVUS_TOKEN=your-zilliz-cloud-api-key
+``` 
 
 ## Quick Start
 
