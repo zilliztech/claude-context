@@ -1,6 +1,6 @@
 {
     "name": "@zilliz/code-context-mcp",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "Model Context Protocol integration for Code Context",
     "type": "module",
     "main": "dist/index.js",
