@@ -75,7 +75,8 @@ Code Context MCP supports multiple embedding providers. Choose the one that best
 EMBEDDING_PROVIDER=OpenAI
 ```
 
-#### 1. OpenAI Configuration (Default)
+<details>
+<summary><strong>1. OpenAI Configuration (Default)</strong></summary>
 
 OpenAI provides high-quality embeddings with excellent performance for code understanding.
 
@@ -101,7 +102,10 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 3. Generate a new API key
 4. Set up billing if needed
 
-#### 2. VoyageAI Configuration
+</details>
+
+<details>
+<summary><strong>2. VoyageAI Configuration</strong></summary>
 
 VoyageAI offers specialized code embeddings optimized for programming languages.
 
@@ -124,7 +128,10 @@ EMBEDDING_MODEL=voyage-code-3
 3. Navigate to API Keys section
 4. Create a new API key
 
-#### 3. Gemini Configuration
+</details>
+
+<details>
+<summary><strong>3. Gemini Configuration</strong></summary>
 
 Google's Gemini provides competitive embeddings with good multilingual support.
 
@@ -145,7 +152,10 @@ EMBEDDING_MODEL=gemini-embedding-001
 3. Go to "Get API key" section
 4. Create a new API key
 
-#### 4. Ollama Configuration (Local/Self-hosted)
+</details>
+
+<details>
+<summary><strong>4. Ollama Configuration (Local/Self-hosted)</strong></summary>
 
 Ollama allows you to run embeddings locally without sending data to external services.
 
@@ -173,19 +183,29 @@ OLLAMA_HOST=http://127.0.0.1:11434
    ollama serve
    ```
 
-#### Milvus Configuration
-Zilliz Cloud (fully managed Milvus vector database as a service, you can [use it for free](https://zilliz.com/cloud))
+</details>
 
-- `MILVUS_ADDRESS` is the Public Endpoint of your Zilliz Cloud instance
-- `MILVUS_TOKEN` is the token of your Zilliz Cloud instance.
+#### Zilliz Cloud configuration
+Get a free Milvus vector database on Zilliz Cloud. 
+
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
+
+![](../../assets/signup_and_create_cluster.jpeg)
+
+After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
+These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
+
+![Zilliz Cloud Dashboard](../../assets/zilliz_cloud_dashboard.jpeg)
+
+Keep both values handy for the configuration steps below.
+
+If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
+
 ```bash
-# Required: Milvus address
-MILVUS_ADDRESS=https://xxx-xxxxxxxxxxxx.serverless.gcp-us-west1.cloud.zilliz.com
+MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint
+MILVUS_TOKEN=your-zilliz-cloud-api-key
+``` 
 
-# Required for Zilliz Cloud: Milvus token
-MILVUS_TOKEN=xxxxxxx
-```
-> Optional: Self-hosted Milvus. See [Milvus Documentation](https://milvus.io/docs/install_standalone-docker-compose.md) for more details to install Milvus.
 
 #### Embedding Batch Size
 You can set the embedding batch size to optimize the performance of the MCP server, depending on your embedding model throughput. The default value is 100.
