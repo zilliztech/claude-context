@@ -17,7 +17,9 @@ AI coding assistants like Claude Code are limited by their context window and ca
 
 ## 🚀 Use Code Context as MCP in Claude Code and others
 
-Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants.
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeUgHZrQT1xNXvPLa5DuPQLpnK5yhHk6yJvLwcq5ZBAaUWo69tcyqalcChWFF4sjQ1mjUSBZgKqLKtD1edKnCPq2af6D_jGRNvwyTEc2UcGnJbsFw1mu_uSmdZHxTLdLO6dFAa8kg?key=_L-CtW461S9w7NRqzdFOIg)
+
+Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants, e.g. Claude Code.
 
 ### Prerequisites
 
@@ -419,7 +421,7 @@ Integrates Code Context directly into your IDE. Provides an intuitive interface 
     - Search for "Semantic Code Search"
     - Click Install
 
-![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXddRXEWLX9uzbAZa9FgHo77leAgYneIclqWObTM9To_Deo4fBIOZFrsM8_IVjCnJQeuOO1FgtI_IFj9S8MWnUX3aej98QvhlGrCbGALQ-d2c0DgyJEj3-Nsg-ufX39-951DamHmkA?key=_L-CtW461S9w7NRqzdFOIg)
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdphYH31AdG2Z5FdtLYbedPTGXHvwtDbNwUduYRl7j7sR_WhtiUTdnUALNw-dsABnJkZxxnsRcDA1G37qsaXm9KAW4MiCXY_bStpaaeG-KCfEfmMG4kPFQmoO33yQ_6OlLyjIsPvQ?key=_L-CtW461S9w7NRqzdFOIg)
 
 ---
 
