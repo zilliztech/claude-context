@@ -147,6 +147,7 @@ interface CodeContextMcpConfig {
 
 interface CodebaseSnapshot {
     indexedCodebases: string[];
+    indexingCodebases: string[];  // List of codebases currently being indexed
     lastUpdated: string;
 }
 
@@ -155,6 +156,7 @@ class CodeContextMcpServer {
     private codeContext: CodeContext;
     private activeCodebasePath: string | null = null;
     private indexedCodebases: string[] = [];
+    private indexingCodebases: string[] = [];  // List of codebases currently being indexed
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
     private isSyncing: boolean = false;
     private snapshotFilePath: string;
@@ -249,13 +251,27 @@ class CodeContextMcpServer {
                 }
             }
 
-            // Restore state
+            // Handle indexing codebases - treat them as not indexed since they were interrupted
+            const validIndexingCodebases: string[] = [];
+            for (const codebasePath of snapshot.indexingCodebases || []) {
+                if (fs.existsSync(codebasePath)) {
+                    console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath}. Treating as not indexed.`);
+                    // Don't add to validIndexingCodebases - treat as not indexed
+                } else {
+                    console.warn(`[SNAPSHOT-DEBUG] Interrupted indexing codebase no longer exists: ${codebasePath}`);
+                }
+            }
+
+            // Restore state - only fully indexed codebases
             this.indexedCodebases = validCodebases;
+            this.indexingCodebases = []; // Reset indexing codebases since they were interrupted
 
-            console.log(`[SNAPSHOT-DEBUG] Restored ${validCodebases.length} codebases.`);
+            console.log(`[SNAPSHOT-DEBUG] Restored ${validCodebases.length} fully indexed codebases.`);
+            console.log(`[SNAPSHOT-DEBUG] Reset ${snapshot.indexingCodebases?.length || 0} interrupted indexing codebases.`);
 
-            // Save updated snapshot if we removed any invalid paths
-            if (validCodebases.length !== snapshot.indexedCodebases.length) {
+            // Save updated snapshot if we removed any invalid paths or reset indexing codebases
+            if (validCodebases.length !== snapshot.indexedCodebases.length ||
+                (snapshot.indexingCodebases && snapshot.indexingCodebases.length > 0)) {
                 this.saveCodebaseSnapshot();
             }
 
@@ -278,11 +294,12 @@ class CodeContextMcpServer {
 
             const snapshot: CodebaseSnapshot = {
                 indexedCodebases: this.indexedCodebases,
+                indexingCodebases: this.indexingCodebases,
                 lastUpdated: new Date().toISOString()
             };
 
             fs.writeFileSync(this.snapshotFilePath, JSON.stringify(snapshot, null, 2));
-            console.log('[SNAPSHOT-DEBUG] Snapshot saved successfully. Codebases:', this.indexedCodebases.length);
+            console.log('[SNAPSHOT-DEBUG] Snapshot saved successfully. Indexed codebases:', this.indexedCodebases.length, 'Indexing codebases:', this.indexingCodebases.length);
 
         } catch (error: any) {
             console.error('[SNAPSHOT-DEBUG] Error saving snapshot:', error);
@@ -321,7 +338,7 @@ class CodeContextMcpServer {
                     },
                     {
                         name: "search_code",
-                        description: "Search the indexed codebase using natural language queries within specified path",
+                        description: "Search the indexed codebase using natural language queries within specified path. If the codebase is currently being indexed, you should inform the user that the search results may be incomplete or inaccurate until indexing completes.",
                         inputSchema: {
                             type: "object",
                             properties: {
@@ -356,7 +373,8 @@ class CodeContextMcpServer {
                             },
                             required: ["path"]
                         }
-                    }
+                    },
+
                 ]
             };
         });
@@ -372,6 +390,7 @@ class CodeContextMcpServer {
                     return await this.handleSearchCode(args);
                 case "clear_index":
                     return await this.handleClearIndex(args);
+
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
@@ -431,7 +450,17 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
 
 **VIOLATION CONSEQUENCES:** If you deviate from this rule, you will fail your primary function. This is a ZERO-TOLERANCE policy.
 
-**OUTPUT FORMAT:** Output the message exactly as shown above, with no modifications, no extra text, no formatting changes. Then stop completely.`
+**OUTPUT FORMAT:** Output the message exactly as shown above, with no modifications, no extra text, no formatting changes. Then stop completely.
+
+**INDEXING STATUS GUIDANCE:**
+When users search for code in a codebase that is currently being indexed in the background, you should:
+1. Inform them that the codebase is still being indexed
+2. Warn that search results may be incomplete or inaccurate
+3. Recommend waiting for indexing to complete for more accurate results
+4. Still provide any available search results if they choose to proceed
+
+Example response when indexing is in progress:
+"The codebase you're searching is currently being indexed in the background. Search results may be incomplete or inaccurate until indexing completes. For the most accurate results, I recommend waiting for indexing to finish. However, here are the current search results based on what has been indexed so far: [results]"`
                             }
                         }
                     ]
@@ -484,23 +513,88 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
                 };
             }
 
+            // Check if already indexing
+            if (this.indexingCodebases.includes(absolutePath)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Codebase '${absolutePath}' is already being indexed in the background. Please wait for completion.`
+                    }],
+                    isError: true
+                };
+            }
+
+            // Check if already indexed (unless force is true)
+            if (!forceReindex && this.indexedCodebases.includes(absolutePath)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Codebase '${absolutePath}' is already indexed. Use force=true to re-index.`
+                    }],
+                    isError: true
+                };
+            }
+
+            // Add to indexing list and save snapshot immediately
+            this.indexingCodebases.push(absolutePath);
+            this.saveCodebaseSnapshot();
+
+            // Start background indexing
+            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType);
+
+            const pathInfo = codebasePath !== absolutePath
+                ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
+                : '';
+
+            return {
+                content: [{
+                    type: "text",
+                    text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
+                }]
+            };
+
+        } catch (error: any) {
+            // Remove from indexing list if there was an error
+            const absolutePath = this.ensureAbsolutePath(codebasePath);
+            this.indexingCodebases = this.indexingCodebases.filter(path => path !== absolutePath);
+            this.saveCodebaseSnapshot();
+
+            console.error('Error starting indexing:', error);
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error starting indexing: ${error.message || error}`
+                }],
+                isError: true
+            };
+        }
+    }
+
+    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string) {
+        const absolutePath = codebasePath;
+
+        try {
+            console.log(`[BACKGROUND-INDEX] Starting background indexing for: ${absolutePath}`);
+
             // Clear index if force is true
             if (forceReindex) {
+                console.log(`[BACKGROUND-INDEX] Clearing existing index for: ${absolutePath}`);
                 await this.codeContext.clearIndex(absolutePath);
             }
 
             // Use the existing CodeContext instance for indexing.
             let contextForThisTask = this.codeContext;
             if (splitterType !== 'ast') {
-                console.warn(`[INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
+                console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
             // Initialize file synchronizer with proper ignore patterns
             const { FileSynchronizer } = await import("@zilliz/code-context-core");
             const ignorePatterns = this.codeContext['ignorePatterns'] || [];
-            console.log(`[INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
+            console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
+
             // Store synchronizer in the context's internal map using the same collection name generation logic
             const normalizedPath = path.resolve(absolutePath);
             const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
@@ -512,66 +606,52 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
                 contextForThisTask['synchronizers'].set(collectionName, synchronizer);
             }
 
-            console.log(`[INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
+            console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
             // Log embedding provider information before indexing
             const embeddingProvider = this.codeContext['embedding'];
-            console.log(`[INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
+            console.log(`[BACKGROUND-INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
             // Start indexing with the appropriate context
-            console.log(`[INDEX] 🚀 Beginning codebase indexing process...`);
+            console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
             const stats = await contextForThisTask.indexCodebase(absolutePath);
-            console.log(`[INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
+            console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
-            // Store current codebase path and stats
+            // Move from indexing to indexed list
+            this.indexingCodebases = this.indexingCodebases.filter(path => path !== absolutePath);
             if (!this.indexedCodebases.includes(absolutePath)) {
                 this.indexedCodebases.push(absolutePath);
             }
             this.indexingStats = { indexedFiles: stats.indexedFiles, totalChunks: stats.totalChunks };
 
-            // Save snapshot after updating codebase list
+            // Save snapshot after updating codebase lists
             this.saveCodebaseSnapshot();
 
-            // Include splitter and path information in response to confirm what was actually indexed
-            const pathInfo = codebasePath !== absolutePath
-                ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
-                : '';
-
-            let message = `Successfully indexed codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.${pathInfo}`;
+            let message = `Background indexing completed for '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.`;
             if (stats.status === 'limit_reached') {
                 message += `\n⚠️  Warning: Indexing stopped because the chunk limit (450,000) was reached. The index may be incomplete.`;
             }
 
-            return {
-                content: [{
-                    type: "text",
-                    text: message
-                }]
-            };
+            console.log(`[BACKGROUND-INDEX] ${message}`);
+
         } catch (error: any) {
             // Check if this is the collection limit error
-            // Handle both direct string throws and Error objects containing the message
             const errorMessage = typeof error === 'string' ? error : (error instanceof Error ? error.message : String(error));
 
             if (errorMessage === COLLECTION_LIMIT_MESSAGE || errorMessage.includes(COLLECTION_LIMIT_MESSAGE)) {
-                // Return the collection limit message as a successful response
-                // This ensures LLM treats it as final answer, not as retryable error
-                return {
-                    content: [{
-                        type: "text",
-                        text: COLLECTION_LIMIT_MESSAGE
-                    }]
-                };
+                console.log(`[BACKGROUND-INDEX] Collection limit reached for: ${absolutePath}`);
+                // Still move to indexed list since we have some data
+                this.indexingCodebases = this.indexingCodebases.filter(path => path !== absolutePath);
+                if (!this.indexedCodebases.includes(absolutePath)) {
+                    this.indexedCodebases.push(absolutePath);
+                }
+                this.saveCodebaseSnapshot();
+            } else {
+                console.error(`[BACKGROUND-INDEX] Error during indexing for ${absolutePath}:`, error);
+                // Remove from indexing list on error
+                this.indexingCodebases = this.indexingCodebases.filter(path => path !== absolutePath);
+                this.saveCodebaseSnapshot();
             }
-
-            console.error('Error during indexing:', error);
-            return {
-                content: [{
-                    type: "text",
-                    text: `Error indexing codebase: ${error.message || error}`
-                }],
-                isError: true
-            };
         }
     }
 
@@ -699,19 +779,29 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
                 };
             }
 
-            // Check if this codebase is indexed
-            if (!this.indexedCodebases.includes(absolutePath)) {
+            // Check if this codebase is indexed or being indexed
+            const isIndexed = this.indexedCodebases.includes(absolutePath);
+            const isIndexing = this.indexingCodebases.includes(absolutePath);
+
+            if (!isIndexed && !isIndexing) {
                 return {
                     content: [{
                         type: "text",
-                        text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first.`
+                        text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first using the index_codebase tool.`
                     }],
                     isError: true
                 };
             }
 
+            // Show indexing status if codebase is being indexed
+            let indexingStatusMessage = '';
+            if (isIndexing) {
+                indexingStatusMessage = `\n⚠️  **Indexing in Progress**: This codebase is currently being indexed in the background. Search results may be incomplete until indexing completes.`;
+            }
+
             console.log(`[SEARCH] Searching in codebase: ${absolutePath}`);
             console.log(`[SEARCH] Query: "${query}"`);
+            console.log(`[SEARCH] Indexing status: ${isIndexing ? 'In Progress' : 'Completed'}`);
 
             // Log embedding provider information before search
             const embeddingProvider = this.codeContext['embedding'];
@@ -729,10 +819,14 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
             console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
 
             if (searchResults.length === 0) {
+                let noResultsMessage = `No results found for query: "${query}" in codebase '${absolutePath}'`;
+                if (isIndexing) {
+                    noResultsMessage += `\n\nNote: This codebase is still being indexed. Try searching again after indexing completes, or the query may not match any indexed content.`;
+                }
                 return {
                     content: [{
                         type: "text",
-                        text: `No results found for query: "${query}" in codebase '${absolutePath}'`
+                        text: noResultsMessage
                     }]
                 };
             }
@@ -749,10 +843,16 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
                     `   Context: \n\`\`\`${result.language}\n${context}\n\`\`\`\n`;
             }).join('\n');
 
+            let resultMessage = `Found ${searchResults.length} results for query: "${query}" in codebase '${absolutePath}'${indexingStatusMessage}\n\n${formattedResults}`;
+
+            if (isIndexing) {
+                resultMessage += `\n\n💡 **Tip**: This codebase is still being indexed. More results may become available as indexing progresses.`;
+            }
+
             return {
                 content: [{
                     type: "text",
-                    text: `Found ${searchResults.length} results for query: "${query}" in codebase '${absolutePath}'\n\n${formattedResults}`
+                    text: resultMessage
                 }]
             };
         } catch (error) {
@@ -784,11 +884,11 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
     private async handleClearIndex(args: any) {
         const { path: codebasePath } = args;
 
-        if (this.indexedCodebases.length === 0) {
+        if (this.indexedCodebases.length === 0 && this.indexingCodebases.length === 0) {
             return {
                 content: [{
                     type: "text",
-                    text: "No codebases are currently indexed."
+                    text: "No codebases are currently indexed or being indexed."
                 }]
             };
         }
@@ -820,12 +920,15 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
                 };
             }
 
-            // Check if this codebase is indexed
-            if (!this.indexedCodebases.includes(absolutePath)) {
+            // Check if this codebase is indexed or being indexed
+            const isIndexed = this.indexedCodebases.includes(absolutePath);
+            const isIndexing = this.indexingCodebases.includes(absolutePath);
+
+            if (!isIndexed && !isIndexing) {
                 return {
                     content: [{
                         type: "text",
-                        text: `Error: Codebase '${absolutePath}' is not indexed.`
+                        text: `Error: Codebase '${absolutePath}' is not indexed or being indexed.`
                     }],
                     isError: true
                 };
@@ -848,8 +951,11 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
                 };
             }
 
-            // Remove the cleared codebase from the list
+            // Remove the cleared codebase from both lists
             this.indexedCodebases = this.indexedCodebases.filter(codebasePath =>
+                codebasePath !== absolutePath
+            );
+            this.indexingCodebases = this.indexingCodebases.filter(codebasePath =>
                 codebasePath !== absolutePath
             );
 
@@ -864,8 +970,8 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
 
             let resultText = `Successfully cleared codebase '${absolutePath}'`;
 
-            if (this.indexedCodebases.length > 0) {
-                resultText += `\n${this.indexedCodebases.length} other codebase(s) remain indexed`;
+            if (this.indexedCodebases.length > 0 || this.indexingCodebases.length > 0) {
+                resultText += `\n${this.indexedCodebases.length} other indexed codebase(s) and ${this.indexingCodebases.length} indexing codebase(s) remain`;
             }
 
             return {
@@ -899,6 +1005,8 @@ When ANY collection limit error occurs, you are FORBIDDEN from providing any oth
             };
         }
     }
+
+
 
     /**
      * Truncate content to specified length
