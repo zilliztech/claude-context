@@ -8,51 +8,12 @@ Model Context Protocol (MCP) integration for Code Context - A powerful MCP serve
 > 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 
-The Model Context Protocol (MCP) is an open protocol that standardizes how AI applications can securely connect to and interact with data sources and tools. This package provides an MCP server that exposes Code Context's semantic search capabilities to any MCP-compatible client.
+## 🚀 Use Code Context as MCP in Claude Code and others
 
-## Features
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeUgHZrQT1xNXvPLa5DuPQLpnK5yhHk6yJvLwcq5ZBAaUWo69tcyqalcChWFF4sjQ1mjUSBZgKqLKtD1edKnCPq2af6D_jGRNvwyTEc2UcGnJbsFw1mu_uSmdZHxTLdLO6dFAa8kg?key=_L-CtW461S9w7NRqzdFOIg)
 
-- 🔌 MCP Protocol Compliance: Full compatibility with MCP-enabled AI assistants and agents
-- 🔍 Semantic Code Search: Natural language queries to find relevant code snippets
-- 📁 Codebase Indexing: Index entire codebases for fast semantic search
-- 🔄 Auto-Sync: Automatically detects and synchronizes file changes to keep index up-to-date
-- 🧠 AI-Powered: Uses OpenAI embeddings and Milvus vector database
-- ⚡ Real-time: Interactive indexing and searching with progress feedback
-- 🛠️ Tool-based: Exposes three main tools via MCP protocol
+Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants, e.g. Claude Code.
 
-## Available Tools
-
-### 1. `index_codebase`
-Index a codebase directory for semantic search.
-
-**Parameters:**
-- `path` (required): Path to the codebase directory to index
-- `force` (optional): Force re-indexing even if already indexed (default: false)
-
-### 2. `search_code`
-Search the indexed codebase using natural language queries.
-
-**Parameters:**
-- `query` (required): Natural language query to search for in the codebase
-- `limit` (optional): Maximum number of results to return (default: 10, max: 50)
-
-### 3. `clear_index`
-Clear the search index.
-
-**Parameters:**
-- `confirm` (required): Confirmation flag to prevent accidental clearing
-
-## Installation
-
-```bash
-npm install @zilliz/code-context-mcp
-```
-
-Or run directly with npx:
-
-```bash
-npx @zilliz/code-context-mcp@latest
-```
 
 ## Quick Start
 
@@ -214,8 +175,6 @@ EMBEDDING_BATCH_SIZE=512
 ```
 
 ## Usage with MCP Clients
-
-![img](https://lh7-rt.googleusercontent.com/slidesz/AGV_vUfOR-7goqarF653roYT5u_HY_J3VkMMeUPUc2ZVj11ue82_tIzE_lIOuJ27HWcVYjTEQj2S3v9tZtS0-AXpyOP6F9VV_mymssD-57wT_ZVjF2MrS7cm5Ynj0goSEPpy81N4xSqi=s2048?key=DDtZSt7cnK5OdJgxQI2Ysg)
 
 
 <details>
@@ -541,6 +500,39 @@ npx @zilliz/code-context-mcp@latest
 ```
 
 </details>
+
+## Features
+
+- 🔌 MCP Protocol Compliance: Full compatibility with MCP-enabled AI assistants and agents
+- 🔍 Semantic Code Search: Natural language queries to find relevant code snippets
+- 📁 Codebase Indexing: Index entire codebases for fast semantic search
+- 🔄 Auto-Sync: Automatically detects and synchronizes file changes to keep index up-to-date
+- 🧠 AI-Powered: Uses OpenAI embeddings and Milvus vector database
+- ⚡ Real-time: Interactive indexing and searching with progress feedback
+- 🛠️ Tool-based: Exposes three main tools via MCP protocol
+
+## Available Tools
+
+### 1. `index_codebase`
+Index a codebase directory for semantic search.
+
+**Parameters:**
+- `path` (required): Path to the codebase directory to index
+- `force` (optional): Force re-indexing even if already indexed (default: false)
+
+### 2. `search_code`
+Search the indexed codebase using natural language queries.
+
+**Parameters:**
+- `query` (required): Natural language query to search for in the codebase
+- `limit` (optional): Maximum number of results to return (default: 10, max: 50)
+
+### 3. `clear_index`
+Clear the search index.
+
+**Parameters:**
+- `confirm` (required): Confirmation flag to prevent accidental clearing
+
 
 ## Contributing
 

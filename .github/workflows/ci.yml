@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master, main, refactor_class_name ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master, main, refactor_class_name ]
+    branches: [ master, main ]
 
 jobs:
   lint_and_build:
