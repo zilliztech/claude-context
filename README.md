@@ -26,7 +26,7 @@ Model Context Protocol (MCP) allows you to integrate Code Context with your favo
 <details>
 <summary><strong>Get a free vector database on Zilliz Cloud</strong></summary>
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
 ![](assets/signup_and_create_cluster.jpeg)
 
