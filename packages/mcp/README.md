@@ -149,7 +149,7 @@ OLLAMA_HOST=http://127.0.0.1:11434
 #### Zilliz Cloud configuration
 Get a free Milvus vector database on Zilliz Cloud. 
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
 ![](../../assets/signup_and_create_cluster.jpeg)
 

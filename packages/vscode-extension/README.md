@@ -65,7 +65,7 @@ Configure how your code is split into chunks for indexing.
 #### Zilliz Cloud configuration
 Get a free Milvus vector database on Zilliz Cloud. 
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
 ![](https://raw.githubusercontent.com/zilliztech/code-context/master/assets/signup_and_create_cluster.jpeg)
 
