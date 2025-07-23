@@ -178,6 +178,29 @@ EMBEDDING_BATCH_SIZE=512
 
 
 <details>
+<summary><strong>Qwen Code</strong></summary>
+
+Create or edit the `~/.qwen/settings.json` file and add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["@zilliz/code-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
 <summary><strong>Cursor</strong></summary>
 
 Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`

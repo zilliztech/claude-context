@@ -90,6 +90,32 @@ Gemini CLI requires manual configuration through a JSON file:
 
 ### Other MCP Client Configurations (Cursor, Windsurf, etc.)
 
+
+
+<details>
+<summary><strong>Qwen Code</strong></summary>
+
+Create or edit the `~/.qwen/settings.json` file and add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["@zilliz/code-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+
 <details>
 <summary><strong>Cursor</strong></summary>
 
