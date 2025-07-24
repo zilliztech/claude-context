@@ -31,7 +31,7 @@ export class AstCodeSplitter implements Splitter {
         if (chunkSize) this.chunkSize = chunkSize;
         if (chunkOverlap) this.chunkOverlap = chunkOverlap;
         this.parser = new Parser();
-        
+
         // Initialize fallback splitter
         const { LangChainCodeSplitter } = require('./langchain-splitter');
         this.langchainFallback = new LangChainCodeSplitter(chunkSize, chunkOverlap);
@@ -47,7 +47,7 @@ export class AstCodeSplitter implements Splitter {
 
         try {
             console.log(`🌳 Using AST splitter for ${language} file: ${filePath || 'unknown'}`);
-            
+
             this.parser.setLanguage(langConfig.parser);
             const tree = this.parser.parse(code);
 
@@ -58,7 +58,7 @@ export class AstCodeSplitter implements Splitter {
 
             // Extract chunks based on AST nodes
             const chunks = this.extractChunks(tree.rootNode, code, langConfig.nodeTypes, language, filePath);
-            
+
             // If chunks are too large, split them further
             const refinedChunks = await this.refineChunks(chunks, code);
 
@@ -100,8 +100,8 @@ export class AstCodeSplitter implements Splitter {
     }
 
     private extractChunks(
-        node: Parser.SyntaxNode, 
-        code: string, 
+        node: Parser.SyntaxNode,
+        code: string,
         splittableTypes: string[],
         language: string,
         filePath?: string
@@ -255,7 +255,7 @@ export class AstCodeSplitter implements Splitter {
      */
     static isLanguageSupported(language: string): boolean {
         const supportedLanguages = [
-            'javascript', 'js', 'typescript', 'ts', 'python', 'py', 
+            'javascript', 'js', 'typescript', 'ts', 'python', 'py',
             'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs'
         ];
         return supportedLanguages.includes(language.toLowerCase());

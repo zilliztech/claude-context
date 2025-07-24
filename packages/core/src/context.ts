@@ -351,7 +351,10 @@ export class CodeContext {
     updateIgnorePatterns(ignorePatterns: string[]): void {
         // Merge with default patterns, avoiding duplicates
         const mergedPatterns = [...DEFAULT_IGNORE_PATTERNS, ...ignorePatterns];
-        this.ignorePatterns = [...new Set(mergedPatterns)]; // Remove duplicates
+        const uniquePatterns: string[] = [];
+        const patternSet = new Set(mergedPatterns);
+        patternSet.forEach(pattern => uniquePatterns.push(pattern));
+        this.ignorePatterns = uniquePatterns;
         console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} from .gitignore + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total patterns`);
     }
 

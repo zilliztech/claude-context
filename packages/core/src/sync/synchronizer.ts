@@ -1,12 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { MerkleTree } from './merkle';
+import { MerkleDAG } from './merkle';
 import * as os from 'os';
 
 export class FileSynchronizer {
     private fileHashes: Map<string, string>;
-    private merkleTree: MerkleTree;
+    private merkleDAG: MerkleDAG;
     private rootDir: string;
     private snapshotPath: string;
     private ignorePatterns: string[];
@@ -15,7 +15,7 @@ export class FileSynchronizer {
         this.rootDir = rootDir;
         this.snapshotPath = this.getSnapshotPath(rootDir);
         this.fileHashes = new Map();
-        this.merkleTree = new MerkleTree([]);
+        this.merkleDAG = new MerkleDAG();
         this.ignorePatterns = ignorePatterns;
     }
 
@@ -72,7 +72,9 @@ export class FileSynchronizer {
                 // Verify it's really a directory and not ignored
                 if (!this.shouldIgnore(relativePath, true)) {
                     const subHashes = await this.generateFileHashes(fullPath);
-                    for (const [p, h] of subHashes) {
+                    const entries = Array.from(subHashes.entries());
+                    for (let i = 0; i < entries.length; i++) {
+                        const [p, h] = entries[i];
                         fileHashes.set(p, h);
                     }
                 }
@@ -184,16 +186,32 @@ export class FileSynchronizer {
         return regex.test(text);
     }
 
-    private buildMerkleTree(fileHashes: Map<string, string>): MerkleTree {
-        const sortedPaths = Array.from(fileHashes.keys()).sort();
-        const data = sortedPaths.map(p => p + fileHashes.get(p));
-        return new MerkleTree(data);
+    private buildMerkleDAG(fileHashes: Map<string, string>): MerkleDAG {
+        const dag = new MerkleDAG();
+        const keys = Array.from(fileHashes.keys());
+        const sortedPaths = keys.slice().sort(); // Create a sorted copy
+        
+        // Create a root node for the entire directory
+        let valuesString = "";
+        keys.forEach(key => {
+            valuesString += fileHashes.get(key);
+        });
+        const rootNodeData = "root:" + valuesString;
+        const rootNodeId = dag.addNode(rootNodeData);
+        
+        // Add each file as a child of the root
+        for (const path of sortedPaths) {
+            const fileData = path + ":" + fileHashes.get(path);
+            dag.addNode(fileData, rootNodeId);
+        }
+        
+        return dag;
     }
 
     public async initialize() {
         console.log(`Initializing file synchronizer for ${this.rootDir}`);
         await this.loadSnapshot();
-        this.merkleTree = this.buildMerkleTree(this.fileHashes);
+        this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
         console.log(`File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
     }
 
@@ -201,27 +219,26 @@ export class FileSynchronizer {
         console.log('Checking for file changes...');
 
         const newFileHashes = await this.generateFileHashes(this.rootDir);
-        const newMerkleTree = this.buildMerkleTree(newFileHashes);
+        const newMerkleDAG = this.buildMerkleDAG(newFileHashes);
 
-        if (this.merkleTree.getRootHash() === newMerkleTree.getRootHash()) {
-            console.log('No changes detected based on Merkle root hash.');
-            return { added: [], removed: [], modified: [] };
-        }
+        // Compare the DAGs
+        const changes = MerkleDAG.compare(this.merkleDAG, newMerkleDAG);
 
-        console.log('Merkle root hash has changed. Comparing file states...');
-        const changes = this.compareStates(this.fileHashes, newFileHashes);
-
-        this.fileHashes = newFileHashes;
-        this.merkleTree = newMerkleTree;
-        await this.saveSnapshot();
-
+        // If there are any changes in the DAG, we should also do a file-level comparison
         if (changes.added.length > 0 || changes.removed.length > 0 || changes.modified.length > 0) {
-            console.log(`Found changes: ${changes.added.length} added, ${changes.removed.length} removed, ${changes.modified.length} modified.`);
-        } else {
-            console.log('No file-level changes detected after detailed comparison.');
+            console.log('Merkle DAG has changed. Comparing file states...');
+            const fileChanges = this.compareStates(this.fileHashes, newFileHashes);
+            
+            this.fileHashes = newFileHashes;
+            this.merkleDAG = newMerkleDAG;
+            await this.saveSnapshot();
+            
+            console.log(`Found changes: ${fileChanges.added.length} added, ${fileChanges.removed.length} removed, ${fileChanges.modified.length} modified.`);
+            return fileChanges;
         }
 
-        return changes;
+        console.log('No changes detected based on Merkle DAG comparison.');
+        return { added: [], removed: [], modified: [] };
     }
 
     private compareStates(oldHashes: Map<string, string>, newHashes: Map<string, string>): { added: string[], removed: string[], modified: string[] } {
@@ -229,7 +246,9 @@ export class FileSynchronizer {
         const removed: string[] = [];
         const modified: string[] = [];
 
-        for (const [file, hash] of newHashes.entries()) {
+        const newEntries = Array.from(newHashes.entries());
+        for (let i = 0; i < newEntries.length; i++) {
+            const [file, hash] = newEntries[i];
             if (!oldHashes.has(file)) {
                 added.push(file);
             } else if (oldHashes.get(file) !== hash) {
@@ -237,7 +256,9 @@ export class FileSynchronizer {
             }
         }
 
-        for (const file of oldHashes.keys()) {
+        const oldKeys = Array.from(oldHashes.keys());
+        for (let i = 0; i < oldKeys.length; i++) {
+            const file = oldKeys[i];
             if (!newHashes.has(file)) {
                 removed.push(file);
             }
@@ -253,9 +274,17 @@ export class FileSynchronizer {
     private async saveSnapshot(): Promise<void> {
         const merkleDir = path.dirname(this.snapshotPath);
         await fs.mkdir(merkleDir, { recursive: true });
+        
+        // Convert Map to array without using iterator
+        const fileHashesArray: [string, string][] = [];
+        const keys = Array.from(this.fileHashes.keys());
+        keys.forEach(key => {
+            fileHashesArray.push([key, this.fileHashes.get(key)!]);
+        });
+        
         const data = JSON.stringify({
-            fileHashes: Array.from(this.fileHashes.entries()),
-            merkleTree: this.merkleTree.serialize()
+            fileHashes: fileHashesArray,
+            merkleDAG: this.merkleDAG.serialize()
         });
         await fs.writeFile(this.snapshotPath, data, 'utf-8');
         console.log(`Saved snapshot to ${this.snapshotPath}`);
@@ -265,16 +294,22 @@ export class FileSynchronizer {
         try {
             const data = await fs.readFile(this.snapshotPath, 'utf-8');
             const obj = JSON.parse(data);
-            this.fileHashes = new Map(obj.fileHashes);
-            if (obj.merkleTree) {
-                this.merkleTree = MerkleTree.deserialize(obj.merkleTree);
+            
+            // Reconstruct Map without using constructor with iterator
+            this.fileHashes = new Map();
+            for (const [key, value] of obj.fileHashes) {
+                this.fileHashes.set(key, value);
+            }
+            
+            if (obj.merkleDAG) {
+                this.merkleDAG = MerkleDAG.deserialize(obj.merkleDAG);
             }
             console.log(`Loaded snapshot from ${this.snapshotPath}`);
         } catch (error: any) {
             if (error.code === 'ENOENT') {
                 console.log(`Snapshot file not found at ${this.snapshotPath}. Generating new one.`);
                 this.fileHashes = await this.generateFileHashes(this.rootDir);
-                this.merkleTree = this.buildMerkleTree(this.fileHashes);
+                this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
                 await this.saveSnapshot();
             } else {
                 throw error;

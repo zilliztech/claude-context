@@ -17,6 +17,7 @@
         "resolveJsonModule": true,
         "allowSyntheticDefaultImports": true,
         "baseUrl": ".",
+        "downlevelIteration": true,
         "paths": {
             "@zilliz/code-context-core": [
                 "./packages/core/src"
