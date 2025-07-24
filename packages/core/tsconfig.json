@@ -16,7 +16,8 @@
         "forceConsistentCasingInFileNames": true,
         "moduleResolution": "node",
         "composite": true,
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "downlevelIteration": true
     },
     "include": [
         "src/**/*"
