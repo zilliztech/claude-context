@@ -539,6 +539,9 @@ Example response when indexing is in progress:
             this.indexingCodebases.push(absolutePath);
             this.saveCodebaseSnapshot();
 
+            // Track the codebase path for syncing
+            this.trackCodebasePath(absolutePath);
+
             // Start background indexing
             this.startBackgroundIndexing(absolutePath, forceReindex, splitterType);
 
@@ -778,6 +781,9 @@ Example response when indexing is in progress:
                     isError: true
                 };
             }
+
+            // Track the codebase path for syncing (even if not indexed yet)
+            this.trackCodebasePath(absolutePath);
 
             // Check if this codebase is indexed or being indexed
             const isIndexed = this.indexedCodebases.includes(absolutePath);
@@ -1079,6 +1085,15 @@ Example response when indexing is in progress:
         console.warn(`Resolved relative path '${inputPath}' to '${resolved}'. If this is incorrect, please provide an absolute path.`);
 
         return resolved;
+    }
+
+    private trackCodebasePath(codebasePath: string) {
+        const absolutePath = this.ensureAbsolutePath(codebasePath);
+        if (!this.indexedCodebases.includes(absolutePath)) {
+            this.indexedCodebases.push(absolutePath);
+            this.saveCodebaseSnapshot();
+            console.log(`[TRACKING] Added codebase path to indexedCodebases: ${absolutePath}`);
+        }
     }
 }
 

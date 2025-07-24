@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { CodeContext } from '@zilliz/code-context-core';
 import * as path from 'path';
-import * as fs from 'fs';
 import * as crypto from 'crypto';
 
 export class IndexCommand {
@@ -16,44 +15,6 @@ export class IndexCommand {
      */
     updateCodeContext(codeContext: CodeContext): void {
         this.codeContext = codeContext;
-    }
-
-    /**
-     * Load .gitignore patterns from the codebase root directory
-     * @param codebasePath Path to the codebase
-     */
-    private async loadGitignorePatterns(codebasePath: string): Promise<void> {
-        try {
-            const gitignorePath = path.join(codebasePath, '.gitignore');
-
-            // Check if .gitignore exists
-            if (fs.existsSync(gitignorePath)) {
-                console.log(`📄 Found .gitignore file at: ${gitignorePath}`);
-
-                // Use the static method from CodeContext to read ignore patterns
-                const ignorePatterns = await CodeContext.getIgnorePatternsFromFile(gitignorePath);
-
-                if (ignorePatterns.length > 0) {
-                    // Update the CodeContext instance with new patterns
-                    this.codeContext.updateIgnorePatterns(ignorePatterns);
-                    console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from .gitignore`);
-
-                    vscode.window.showInformationMessage(
-                        `📄 Loaded ${ignorePatterns.length} ignore patterns from .gitignore`
-                    );
-                } else {
-                    console.log('📄 .gitignore file found but no valid patterns detected');
-                }
-            } else {
-                console.log('📄 No .gitignore file found, using default ignore patterns only');
-                // No need to update patterns - CodeContext will use defaults
-            }
-        } catch (error) {
-            console.warn(`⚠️ Failed to load .gitignore patterns: ${error}`);
-            vscode.window.showWarningMessage(`⚠️ Failed to load .gitignore: ${error}`);
-            // Continue with default patterns on error
-            this.codeContext.updateIgnorePatterns([]);
-        }
     }
 
     async execute(): Promise<void> {
@@ -102,10 +63,6 @@ export class IndexCommand {
                 cancellable: false
             }, async (progress) => {
                 let lastPercentage = 0;
-
-                // Load .gitignore patterns before indexing
-                progress.report({ increment: 0, message: 'Loading .gitignore patterns...' });
-                await this.loadGitignorePatterns(selectedFolder.uri.fsPath);
 
                 // Clear existing index first
                 await this.codeContext.clearIndex(
@@ -159,12 +116,12 @@ export class IndexCommand {
         } catch (error: any) {
             console.error('Indexing failed:', error);
             const errorString = typeof error === 'string' ? error : (error.message || error.toString() || '');
-            
+
             // Check for collection limit message from the core library
             if (errorString.includes('collection limit') || errorString.includes('zilliz.com/pricing')) {
                 const message = 'Your Zilliz Cloud account has hit its collection limit. To continue creating collections, you\'ll need to expand your capacity. We recommend visiting https://zilliz.com/pricing to explore options for dedicated or serverless clusters.';
                 const openButton = 'Explore Pricing Options';
-                
+
                 vscode.window.showErrorMessage(message, { modal: true }, openButton).then(selection => {
                     if (selection === openButton) {
                         vscode.env.openExternal(vscode.Uri.parse('https://zilliz.com/pricing'));
