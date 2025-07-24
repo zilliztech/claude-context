@@ -23,7 +23,7 @@ OPENAI_API_KEY=your-openai-api-key
 #### Zilliz Cloud configuration
 Get a free Milvus vector database on Zilliz Cloud. 
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
 ![](../../assets/signup_and_create_cluster.jpeg)
 
