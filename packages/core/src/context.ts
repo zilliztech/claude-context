@@ -77,6 +77,9 @@ const DEFAULT_IGNORE_PATTERNS = [
     '*.polyfills.js',
     '*.runtime.js',
     '*.map', // source map files
+    'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
+    'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
+    'coverage', '.nyc_output', 'logs', 'tmp', 'temp'
 ];
 
 export interface CodeContextConfig {
@@ -135,12 +138,15 @@ export class CodeContext {
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
 
-        // 1. Check and prepare vector collection
+        // 1. Load .gitignore patterns if not already loaded
+        await this.loadGitignorePatterns(codebasePath);
+
+        // 2. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
         console.log(`Debug2: Preparing vector collection for codebase`);
         await this.prepareCollection(codebasePath);
 
-        // 2. Recursively traverse codebase to get all supported files
+        // 3. Recursively traverse codebase to get all supported files
         progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
         const codeFiles = await this.getCodeFiles(codebasePath);
         console.log(`📁 Found ${codeFiles.length} code files`);
@@ -429,10 +435,7 @@ export class CodeContext {
                 }
 
                 if (entry.isDirectory()) {
-                    // Skip common ignored directories
-                    if (!this.shouldIgnoreDirectory(entry.name)) {
-                        await traverseDirectory(fullPath);
-                    }
+                    await traverseDirectory(fullPath);
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
                     if (this.supportedExtensions.includes(ext)) {
@@ -444,18 +447,6 @@ export class CodeContext {
 
         await traverseDirectory(codebasePath);
         return files;
-    }
-
-    /**
-     * Determine whether directory should be ignored
-     */
-    private shouldIgnoreDirectory(dirName: string): boolean {
-        const ignoredDirs = [
-            'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
-            'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
-            'coverage', '.nyc_output', 'logs', 'tmp', 'temp'
-        ];
-        return ignoredDirs.includes(dirName) || dirName.startsWith('.');
     }
 
     /**
@@ -667,6 +658,40 @@ export class CodeContext {
         } catch (error) {
             console.warn(`⚠️  Could not read ignore file ${filePath}: ${error}`);
             return [];
+        }
+    }
+
+    /**
+     * Load .gitignore patterns from the codebase root directory
+     * @param codebasePath Path to the codebase
+     */
+    private async loadGitignorePatterns(codebasePath: string): Promise<void> {
+        try {
+            const gitignorePath = path.join(codebasePath, '.gitignore');
+
+            // Check if .gitignore exists
+            try {
+                await fs.promises.access(gitignorePath);
+                console.log(`📄 Found .gitignore file at: ${gitignorePath}`);
+
+                // Use the static method from CodeContext to read ignore patterns
+                const ignorePatterns = await CodeContext.getIgnorePatternsFromFile(gitignorePath);
+
+                if (ignorePatterns.length > 0) {
+                    // Update the CodeContext instance with new patterns
+                    this.updateIgnorePatterns(ignorePatterns);
+                    console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from .gitignore`);
+                } else {
+                    console.log('📄 .gitignore file found but no valid patterns detected');
+                }
+            } catch (error) {
+                console.log('📄 No .gitignore file found, using default ignore patterns only');
+                // No need to update patterns - CodeContext will use defaults
+            }
+        } catch (error) {
+            console.warn(`⚠️ Failed to load .gitignore patterns: ${error}`);
+            // Continue with default patterns on error
+            this.updateIgnorePatterns([]);
         }
     }
 

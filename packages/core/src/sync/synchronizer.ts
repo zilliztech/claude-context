@@ -96,6 +96,12 @@ export class FileSynchronizer {
     }
 
     private shouldIgnore(relativePath: string, isDirectory: boolean = false): boolean {
+        // Always ignore hidden files and directories (starting with .)
+        const pathParts = relativePath.split(path.sep);
+        if (pathParts.some(part => part.startsWith('.'))) {
+            return true;
+        }
+
         if (this.ignorePatterns.length === 0) {
             return false;
         }
@@ -115,15 +121,15 @@ export class FileSynchronizer {
         }
 
         // Check if any parent directory is ignored
-        const pathParts = normalizedPath.split('/');
-        for (let i = 0; i < pathParts.length; i++) {
-            const partialPath = pathParts.slice(0, i + 1).join('/');
+        const normalizedPathParts = normalizedPath.split('/');
+        for (let i = 0; i < normalizedPathParts.length; i++) {
+            const partialPath = normalizedPathParts.slice(0, i + 1).join('/');
             for (const pattern of this.ignorePatterns) {
                 // Check directory patterns
                 if (pattern.endsWith('/')) {
                     const dirPattern = pattern.slice(0, -1);
                     if (this.simpleGlobMatch(partialPath, dirPattern) ||
-                        this.simpleGlobMatch(pathParts[i], dirPattern)) {
+                        this.simpleGlobMatch(normalizedPathParts[i], dirPattern)) {
                         return true;
                     }
                 }
@@ -135,7 +141,7 @@ export class FileSynchronizer {
                 }
                 // Check filename patterns against any path component
                 else {
-                    if (this.simpleGlobMatch(pathParts[i], pattern)) {
+                    if (this.simpleGlobMatch(normalizedPathParts[i], pattern)) {
                         return true;
                     }
                 }
@@ -190,7 +196,7 @@ export class FileSynchronizer {
         const dag = new MerkleDAG();
         const keys = Array.from(fileHashes.keys());
         const sortedPaths = keys.slice().sort(); // Create a sorted copy
-        
+
         // Create a root node for the entire directory
         let valuesString = "";
         keys.forEach(key => {
@@ -198,13 +204,13 @@ export class FileSynchronizer {
         });
         const rootNodeData = "root:" + valuesString;
         const rootNodeId = dag.addNode(rootNodeData);
-        
+
         // Add each file as a child of the root
         for (const path of sortedPaths) {
             const fileData = path + ":" + fileHashes.get(path);
             dag.addNode(fileData, rootNodeId);
         }
-        
+
         return dag;
     }
 
@@ -228,11 +234,11 @@ export class FileSynchronizer {
         if (changes.added.length > 0 || changes.removed.length > 0 || changes.modified.length > 0) {
             console.log('Merkle DAG has changed. Comparing file states...');
             const fileChanges = this.compareStates(this.fileHashes, newFileHashes);
-            
+
             this.fileHashes = newFileHashes;
             this.merkleDAG = newMerkleDAG;
             await this.saveSnapshot();
-            
+
             console.log(`Found changes: ${fileChanges.added.length} added, ${fileChanges.removed.length} removed, ${fileChanges.modified.length} modified.`);
             return fileChanges;
         }
@@ -274,14 +280,14 @@ export class FileSynchronizer {
     private async saveSnapshot(): Promise<void> {
         const merkleDir = path.dirname(this.snapshotPath);
         await fs.mkdir(merkleDir, { recursive: true });
-        
+
         // Convert Map to array without using iterator
         const fileHashesArray: [string, string][] = [];
         const keys = Array.from(this.fileHashes.keys());
         keys.forEach(key => {
             fileHashesArray.push([key, this.fileHashes.get(key)!]);
         });
-        
+
         const data = JSON.stringify({
             fileHashes: fileHashesArray,
             merkleDAG: this.merkleDAG.serialize()
@@ -294,13 +300,13 @@ export class FileSynchronizer {
         try {
             const data = await fs.readFile(this.snapshotPath, 'utf-8');
             const obj = JSON.parse(data);
-            
+
             // Reconstruct Map without using constructor with iterator
             this.fileHashes = new Map();
             for (const [key, value] of obj.fileHashes) {
                 this.fileHashes.set(key, value);
             }
-            
+
             if (obj.merkleDAG) {
                 this.merkleDAG = MerkleDAG.deserialize(obj.merkleDAG);
             }
@@ -339,4 +345,4 @@ export class FileSynchronizer {
             }
         }
     }
-} 
+}
