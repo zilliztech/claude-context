@@ -4,3 +4,4 @@ export * from './vectordb';
 export * from './types';
 export * from './context';
 export * from './sync/synchronizer';
+export * from './utils';

@@ -24,6 +24,7 @@ import {
 import { CodeContext, SemanticSearchResult } from "@zilliz/code-context-core";
 import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@zilliz/code-context-core";
 import { MilvusVectorDatabase, COLLECTION_LIMIT_MESSAGE } from "@zilliz/code-context-core";
+import { envManager } from "@zilliz/code-context-core";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -51,15 +52,15 @@ function getEmbeddingModelForProvider(provider: string): string {
     switch (provider) {
         case 'Ollama':
             // For Ollama, prioritize OLLAMA_MODEL over EMBEDDING_MODEL
-            const ollamaModel = process.env.OLLAMA_MODEL || process.env.EMBEDDING_MODEL || getDefaultModelForProvider(provider);
-            console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${process.env.OLLAMA_MODEL || 'NOT SET'}, EMBEDDING_MODEL=${process.env.EMBEDDING_MODEL || 'NOT SET'}, selected=${ollamaModel}`);
+            const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
+            console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`);
             return ollamaModel;
         case 'OpenAI':
         case 'VoyageAI':
         case 'Gemini':
         default:
             // For other providers, use EMBEDDING_MODEL or default
-            return process.env.EMBEDDING_MODEL || getDefaultModelForProvider(provider);
+            return envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
     }
 }
 
@@ -139,7 +140,7 @@ interface CodeContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     // Vector database configuration
-    milvusAddress: string;
+    milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
 }
 
@@ -989,9 +990,19 @@ class CodeContextMcpServer {
 
         // Execute initial sync immediately after a short delay to let server initialize
         console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
-        setTimeout(() => {
+        setTimeout(async () => {
             console.log('[SYNC-DEBUG] Executing initial sync after server startup');
-            this.handleSyncIndex();
+            try {
+                await this.handleSyncIndex();
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (errorMessage.includes('Failed to query collection')) {
+                    console.log('[SYNC-DEBUG] Collection not yet established, this is expected for new cluster users. Will retry on next sync cycle.');
+                } else {
+                    console.error('[SYNC-DEBUG] Initial sync failed with unexpected error:', error);
+                    throw error;
+                }
+            }
         }, 5000); // Initial sync after 5 seconds
 
         // Periodically check for file changes and update the index
@@ -1058,34 +1069,34 @@ async function main() {
     // Parse command line arguments
     const args = process.argv.slice(2);
 
-    const embeddingProvider = (process.env.EMBEDDING_PROVIDER?.toLowerCase() === 'ollama' ? 'ollama' : 'openai') as 'openai' | 'ollama';
+    const embeddingProvider = (envManager.get('EMBEDDING_PROVIDER')?.toLowerCase() === 'ollama' ? 'ollama' : 'openai') as 'openai' | 'ollama';
     // Debug: Print all environment variables related to CodeContext
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
-    console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${process.env.EMBEDDING_PROVIDER || 'NOT SET'}`);
-    console.log(`[DEBUG]   EMBEDDING_MODEL: ${process.env.EMBEDDING_MODEL || 'NOT SET'}`);
-    console.log(`[DEBUG]   OLLAMA_MODEL: ${process.env.OLLAMA_MODEL || 'NOT SET'}`);
-    console.log(`[DEBUG]   GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
-    console.log(`[DEBUG]   OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'SET (length: ' + process.env.OPENAI_API_KEY.length + ')' : 'NOT SET'}`);
-    console.log(`[DEBUG]   MILVUS_ADDRESS: ${process.env.MILVUS_ADDRESS || 'NOT SET'}`);
-    console.log(`[DEBUG]   NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
+    console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${envManager.get('EMBEDDING_PROVIDER') || 'NOT SET'}`);
+    console.log(`[DEBUG]   EMBEDDING_MODEL: ${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}`);
+    console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
+    console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
+    console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: CodeContextMcpConfig = {
-        name: process.env.MCP_SERVER_NAME || "CodeContext MCP Server",
-        version: process.env.MCP_SERVER_VERSION || "1.0.0",
+        name: envManager.get('MCP_SERVER_NAME') || "CodeContext MCP Server",
+        version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (process.env.EMBEDDING_PROVIDER as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
-        embeddingModel: getEmbeddingModelForProvider(process.env.EMBEDDING_PROVIDER || 'OpenAI'),
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
-        openaiApiKey: process.env.OPENAI_API_KEY,
-        openaiBaseUrl: process.env.OPENAI_BASE_URL,
-        voyageaiApiKey: process.env.VOYAGEAI_API_KEY,
-        geminiApiKey: process.env.GEMINI_API_KEY,
+        openaiApiKey: envManager.get('OPENAI_API_KEY'),
+        openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
+        voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
+        geminiApiKey: envManager.get('GEMINI_API_KEY'),
         // Ollama configuration
-        ollamaModel: process.env.OLLAMA_MODEL,
-        ollamaHost: process.env.OLLAMA_HOST,
-        // Vector database configuration
-        milvusAddress: process.env.MILVUS_ADDRESS || "localhost:19530",
-        milvusToken: process.env.MILVUS_TOKEN
+        ollamaModel: envManager.get('OLLAMA_MODEL'),
+        ollamaHost: envManager.get('OLLAMA_HOST'),
+        // Vector database configuration - address can be auto-resolved from token
+        milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
+        milvusToken: envManager.get('MILVUS_TOKEN')
     };
 
     // Show help if requested
@@ -1117,21 +1128,24 @@ Environment Variables:
   OLLAMA_MODEL            Ollama model name (default: nomic-embed-text)
   
   Vector Database Configuration:
-  MILVUS_ADDRESS          Milvus address (default: localhost:19530)
-  MILVUS_TOKEN            Milvus token (optional)
+  MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
+  MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
 
 Examples:
-  # Start MCP server with OpenAI (default)
-  OPENAI_API_KEY=sk-xxx npx @zilliz/code-context-mcp@latest
+  # Start MCP server with OpenAI (default) and explicit Milvus address
+  OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/code-context-mcp@latest
+  
+  # Start MCP server with OpenAI and auto-resolve Milvus address from token
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-zilliz-token npx @zilliz/code-context-mcp@latest
   
   # Start MCP server with VoyageAI
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx npx @zilliz/code-context-mcp@latest
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx MILVUS_TOKEN=your-token npx @zilliz/code-context-mcp@latest
   
   # Start MCP server with Gemini
-  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx npx @zilliz/code-context-mcp@latest
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx MILVUS_TOKEN=your-token npx @zilliz/code-context-mcp@latest
   
   # Start MCP server with Ollama
-  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text npx @zilliz/code-context-mcp@latest
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/code-context-mcp@latest
         `);
         process.exit(0);
     }
@@ -1142,7 +1156,7 @@ Examples:
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
-    console.log(`[MCP]   Milvus Address: ${config.milvusAddress}`);
+    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {

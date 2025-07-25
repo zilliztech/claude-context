@@ -1,10 +1,15 @@
-import { VectorDatabase, VectorDocument, SearchOptions, VectorSearchResult, COLLECTION_LIMIT_MESSAGE } from './index';
+import {
+    VectorDocument,
+    SearchOptions,
+    VectorSearchResult,
+    COLLECTION_LIMIT_MESSAGE
+} from './types';
+import {
+    AbstractMilvusVectorDatabase,
+    BaseMilvusConfig
+} from './abstract-milvus-vectordb';
 
-export interface MilvusRestfulConfig {
-    address: string;
-    token?: string;
-    username?: string;
-    password?: string;
+export interface MilvusRestfulConfig extends BaseMilvusConfig {
     database?: string;
 }
 
@@ -35,22 +40,30 @@ async function createCollectionWithLimitCheck(
  * This implementation is designed for environments where gRPC is not available,
  * such as VSCode extensions or browser environments.
  */
-export class MilvusRestfulVectorDatabase implements VectorDatabase {
-    private config: MilvusRestfulConfig;
-    private baseUrl: string;
+export class MilvusRestfulVectorDatabase extends AbstractMilvusVectorDatabase {
+    private baseUrl: string | null = null;
 
     constructor(config: MilvusRestfulConfig) {
-        this.config = config;
+        super(config);
+    }
 
+    protected async initializeClient(address: string): Promise<void> {
         // Ensure address has protocol prefix
-        let address = config.address;
-        if (!address.startsWith('http://') && !address.startsWith('https://')) {
-            address = `http://${address}`;
+        let processedAddress = address;
+        if (!processedAddress.startsWith('http://') && !processedAddress.startsWith('https://')) {
+            processedAddress = `http://${processedAddress}`;
         }
 
-        this.baseUrl = address.replace(/\/$/, '') + '/v2/vectordb';
+        this.baseUrl = processedAddress.replace(/\/$/, '') + '/v2/vectordb';
 
-        console.log(`🔌 Connecting to Milvus REST API at: ${address}`);
+        console.log(`🔌 Connecting to Milvus REST API at: ${processedAddress}`);
+    }
+
+    protected async ensureInitialized(): Promise<void> {
+        await super.ensureInitialized();
+        if (!this.baseUrl) {
+            throw new Error('Base URL not initialized');
+        }
     }
 
     /**
@@ -101,13 +114,16 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async createCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
+        await this.ensureInitialized();
+
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             // Build collection schema based on the original milvus-vectordb.ts implementation
             // Note: REST API doesn't support description parameter in collection creation
             // Unlike gRPC version, the description parameter is ignored in REST API
             const collectionSchema = {
                 collectionName,
-                dbName: this.config.database,
+                dbName: restfulConfig.database,
                 schema: {
                     enableDynamicField: false,
                     fields: [
@@ -186,9 +202,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
      */
     private async createIndex(collectionName: string): Promise<void> {
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             const indexParams = {
                 collectionName,
-                dbName: this.config.database,
+                dbName: restfulConfig.database,
                 indexParams: [
                     {
                         fieldName: "vector",
@@ -211,9 +228,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
      */
     private async loadCollection(collectionName: string): Promise<void> {
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             await this.makeRequest('/collections/load', 'POST', {
                 collectionName,
-                dbName: this.config.database
+                dbName: restfulConfig.database
             });
         } catch (error) {
             console.error(`❌ Failed to load collection '${collectionName}':`, error);
@@ -222,10 +240,13 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async dropCollection(collectionName: string): Promise<void> {
+        await this.ensureInitialized();
+
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             await this.makeRequest('/collections/drop', 'POST', {
                 collectionName,
-                dbName: this.config.database
+                dbName: restfulConfig.database
             });
         } catch (error) {
             console.error(`❌ Failed to drop collection '${collectionName}':`, error);
@@ -234,10 +255,13 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async hasCollection(collectionName: string): Promise<boolean> {
+        await this.ensureInitialized();
+
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             const response = await this.makeRequest('/collections/has', 'POST', {
                 collectionName,
-                dbName: this.config.database
+                dbName: restfulConfig.database
             });
 
             const exists = response.data?.has || false;
@@ -249,7 +273,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
+        await this.ensureInitialized();
+
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             // Transform VectorDocument array to Milvus entity format
             const data = documents.map(doc => ({
                 id: doc.id,
@@ -265,7 +292,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             const insertRequest = {
                 collectionName,
                 data,
-                dbName: this.config.database
+                dbName: restfulConfig.database
             };
 
             await this.makeRequest('/entities/insert', 'POST', insertRequest);
@@ -277,13 +304,16 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async search(collectionName: string, queryVector: number[], options?: SearchOptions): Promise<VectorSearchResult[]> {
+        await this.ensureInitialized();
+
         const topK = options?.topK || 10;
 
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             // Build search request according to Milvus REST API specification
             const searchRequest = {
                 collectionName,
-                dbName: this.config.database,
+                dbName: restfulConfig.database,
                 data: [queryVector], // Array of query vectors
                 annsField: "vector", // Vector field name
                 limit: topK,
@@ -338,7 +368,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async delete(collectionName: string, ids: string[]): Promise<void> {
+        await this.ensureInitialized();
+
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             // Build filter expression for deleting by IDs
             // Format: id in ["id1", "id2", "id3"]
             const filter = `id in [${ids.map(id => `"${id}"`).join(', ')}]`;
@@ -346,7 +379,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             const deleteRequest = {
                 collectionName,
                 filter,
-                dbName: this.config.database
+                dbName: restfulConfig.database
             };
 
             await this.makeRequest('/entities/delete', 'POST', deleteRequest);
@@ -358,10 +391,13 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     async query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]> {
+        await this.ensureInitialized();
+
         try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
             const queryRequest = {
                 collectionName,
-                dbName: this.config.database,
+                dbName: restfulConfig.database,
                 filter,
                 outputFields,
                 limit: 16384,

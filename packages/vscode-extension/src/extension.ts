@@ -6,6 +6,7 @@ import { IndexCommand } from './commands/indexCommand';
 import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
 import { CodeContext, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/code-context-core';
+import { envManager } from '@zilliz/code-context-core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;
@@ -144,8 +145,8 @@ function createCodeContextWithConfig(configManager: ConfigManager): CodeContext 
             codeContextConfig.vectorDatabase = vectorDatabase;
         } else {
             vectorDatabase = new MilvusRestfulVectorDatabase({
-                address: process.env.MILVUS_ADDRESS || 'http://localhost:19530',
-                token: process.env.MILVUS_TOKEN || ''
+                address: envManager.get('MILVUS_ADDRESS') || 'http://localhost:19530',
+                token: envManager.get('MILVUS_TOKEN') || ''
             });
             console.log('No Milvus configuration found, using default REST API configuration');
             codeContextConfig.vectorDatabase = vectorDatabase;
