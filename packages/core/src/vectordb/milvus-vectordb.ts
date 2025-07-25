@@ -1,17 +1,16 @@
 import { MilvusClient, DataType, MetricType } from '@zilliz/milvus2-sdk-node';
 import {
-    VectorDatabase,
     VectorDocument,
     SearchOptions,
     VectorSearchResult,
     COLLECTION_LIMIT_MESSAGE
-} from './index';
+} from './types';
+import {
+    AbstractMilvusVectorDatabase,
+    BaseMilvusConfig
+} from './abstract-milvus-vectordb';
 
-export interface MilvusConfig {
-    address: string;
-    username?: string;
-    password?: string;
-    token?: string;
+export interface MilvusConfig extends BaseMilvusConfig {
     ssl?: boolean;
 }
 
@@ -37,25 +36,35 @@ async function createCollectionWithLimitCheck(
     }
 }
 
-export class MilvusVectorDatabase implements VectorDatabase {
-    private client: MilvusClient;
-    private config: MilvusConfig;
+export class MilvusVectorDatabase extends AbstractMilvusVectorDatabase {
+    private client: MilvusClient | null = null;
 
     constructor(config: MilvusConfig) {
-        this.config = config;
-        console.log('🔌 Connecting to vector database at: ', config.address);
+        super(config);
+    }
+
+    protected async initializeClient(address: string): Promise<void> {
+        const milvusConfig = this.config as MilvusConfig;
+        console.log('🔌 Connecting to vector database at: ', address);
         this.client = new MilvusClient({
-            address: config.address,
-            username: config.username,
-            password: config.password,
-            token: config.token,
-            ssl: config.ssl || false,
+            address: address,
+            username: milvusConfig.username,
+            password: milvusConfig.password,
+            token: milvusConfig.token,
+            ssl: milvusConfig.ssl || false,
         });
     }
 
-
+    protected async ensureInitialized(): Promise<void> {
+        await super.ensureInitialized();
+        if (!this.client) {
+            throw new Error('Client not initialized');
+        }
+    }
 
     async createCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
+        await this.ensureInitialized();
+
         console.log('Beginning collection creation:', collectionName);
         console.log('Collection dimension:', dimension);
         const schema = [
@@ -114,7 +123,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             fields: schema,
         };
 
-        await createCollectionWithLimitCheck(this.client, createCollectionParams);
+        await createCollectionWithLimitCheck(this.client!, createCollectionParams);
 
         // Create index
         const indexParams = {
@@ -124,27 +133,31 @@ export class MilvusVectorDatabase implements VectorDatabase {
             metric_type: MetricType.COSINE,
         };
 
-        await this.client.createIndex(indexParams);
+        await this.client!.createIndex(indexParams);
 
         // Load collection to memory
-        await this.client.loadCollection({
+        await this.client!.loadCollection({
             collection_name: collectionName,
         });
 
         // Verify collection is created correctly
-        await this.client.describeCollection({
+        await this.client!.describeCollection({
             collection_name: collectionName,
         });
     }
 
     async dropCollection(collectionName: string): Promise<void> {
-        await this.client.dropCollection({
+        await this.ensureInitialized();
+
+        await this.client!.dropCollection({
             collection_name: collectionName,
         });
     }
 
     async hasCollection(collectionName: string): Promise<boolean> {
-        const result = await this.client.hasCollection({
+        await this.ensureInitialized();
+
+        const result = await this.client!.hasCollection({
             collection_name: collectionName,
         });
 
@@ -152,6 +165,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
     }
 
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
+        await this.ensureInitialized();
+
         console.log('Inserting documents into collection:', collectionName);
         const data = documents.map(doc => ({
             id: doc.id,
@@ -164,13 +179,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
             metadata: JSON.stringify(doc.metadata),
         }));
 
-        await this.client.insert({
+        await this.client!.insert({
             collection_name: collectionName,
             data: data,
         });
     }
 
     async search(collectionName: string, queryVector: number[], options?: SearchOptions): Promise<VectorSearchResult[]> {
+        await this.ensureInitialized();
 
         const searchParams = {
             collection_name: collectionName,
@@ -179,7 +195,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
         };
 
-        const searchResult = await this.client.search(searchParams);
+        const searchResult = await this.client!.search(searchParams);
 
         if (!searchResult.results || searchResult.results.length === 0) {
             return [];
@@ -201,15 +217,19 @@ export class MilvusVectorDatabase implements VectorDatabase {
     }
 
     async delete(collectionName: string, ids: string[]): Promise<void> {
-        await this.client.delete({
+        await this.ensureInitialized();
+
+        await this.client!.delete({
             collection_name: collectionName,
             filter: `id in [${ids.map(id => `"${id}"`).join(', ')}]`,
         });
     }
 
     async query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]> {
+        await this.ensureInitialized();
+
         try {
-            const result = await this.client.query({
+            const result = await this.client!.query({
                 collection_name: collectionName,
                 filter: filter,
                 output_fields: outputFields,

@@ -1,4 +1,5 @@
 import { CodeContext, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/code-context-core';
+import { envManager } from '@zilliz/code-context-core';
 import * as path from 'path';
 
 // Try to load .env file
@@ -17,9 +18,9 @@ async function main() {
         // Set to true to use RESTful API (for environments without gRPC support)
         // Set to false to use gRPC (default, more efficient)
         const useRestfulApi = false;
-        const milvusAddress = process.env.MILVUS_ADDRESS || 'localhost:19530';
-        const milvusToken = process.env.MILVUS_TOKEN;
-        const splitterType = process.env.SPLITTER_TYPE?.toLowerCase() || 'ast';
+        const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
+        const milvusToken = envManager.get('MILVUS_TOKEN');
+        const splitterType = envManager.get('SPLITTER_TYPE')?.toLowerCase() || 'ast';
 
         console.log(`🔧 Using ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
         console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);

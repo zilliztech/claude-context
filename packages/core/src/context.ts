@@ -14,6 +14,7 @@ import {
     VectorSearchResult
 } from './vectordb';
 import { SemanticSearchResult } from './types';
+import { envManager } from './utils/env-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -101,9 +102,9 @@ export class CodeContext {
     constructor(config: CodeContextConfig = {}) {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
-            apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
+            apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
             model: 'text-embedding-3-small',
-            ...(process.env.OPENAI_BASE_URL && { baseURL: process.env.OPENAI_BASE_URL })
+            ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
         });
 
         if (!config.vectorDatabase) {
@@ -461,7 +462,7 @@ export class CodeContext {
         codebasePath: string,
         onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void
     ): Promise<{ processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
-        const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(process.env.EMBEDDING_BATCH_SIZE || '100', 10));
+        const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(envManager.get('EMBEDDING_BATCH_SIZE') || '100', 10));
         const CHUNK_LIMIT = 450000;
         console.log(`🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
 
