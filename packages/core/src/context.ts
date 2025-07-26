@@ -414,7 +414,8 @@ export class CodeContext {
         }
 
         const dimension = this.embedding.getDimension();
-        await this.vectorDatabase.createCollection(collectionName, dimension, `Code chunk vector storage collection for codebase: ${codebasePath}`);
+        const dirName = path.basename(codebasePath);
+        await this.vectorDatabase.createCollection(collectionName, dimension, `Index for ${dirName}`);
         console.log(`✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
     }
 
