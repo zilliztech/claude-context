@@ -1,4 +1,11 @@
-# 🔍 Code Context
+<p align="center">
+  <a href="https://github.com/zilliztech/code-context">
+    <img src="assets/code_context_logo_dark.png" width=600 alt="Code Context Logo">
+  </a>
+  <h3 align="center"> Add Semantic Search to Claude Code</h2>
+</p>
+
+<div align="center">
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
@@ -8,19 +15,29 @@
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/code-context)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord" /></a>
+</div>
 
-**Code Context** is an MCP plugin that brings semantic code search to Claude Code, Gemini CLI, or any AI coding agent. By indexing your entire codebase, it gives your assistant deep context awareness for better code generation.
-
-AI coding assistants like Claude Code are limited by their context window and can only see part of your codebase. Code Context uses semantic search with a scalable vector database Zilliz Cloud so your assistant can find and understand relevant code from your whole project using natural language, not just keywords. This gives your AI assistant real context awareness.
+**Code Context** is an MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
 
 ---
 
-## 🚀 Use Code Context as MCP in Claude Code and others
+## ✨ Features
+
+- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
+- 🧠 **Context-Aware**: Discover large codebase, understand how different parts of your codebase relate, even across millions of lines of code.
+- ⚡ **Incremental Indexing**: Efficiently re-index only changed files using Merkle trees.
+- 🧩 **Intelligent Code Chunking**: Analyze code in Abstract Syntax Trees (AST) for chunking.
+- 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
+- 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
+---
+
+## 🚀 Demo
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeUgHZrQT1xNXvPLa5DuPQLpnK5yhHk6yJvLwcq5ZBAaUWo69tcyqalcChWFF4sjQ1mjUSBZgKqLKtD1edKnCPq2af6D_jGRNvwyTEc2UcGnJbsFw1mu_uSmdZHxTLdLO6dFAa8kg?key=_L-CtW461S9w7NRqzdFOIg)
 
 Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants, e.g. Claude Code.
 
+## Quick Start
 ### Prerequisites
 
 <details>
@@ -358,18 +375,6 @@ npx @zilliz/code-context-mcp@latest
 
 </details>
 
----
-
-## ✨ Features
-
-- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
-- 🧠 **Context-Aware Discovery**: Understand how different parts of your codebase relate, even across millions of lines.
-- 🤖 **AI-Assisted Programming**: Generate, refactor, or extend code using natural language prompts.
-- ⚡ **Incremental File Synchronization**: Efficiently re-index only changed files using Merkle trees.
-- 🧩 **Smart Chunking**: AST-based code splitting for context-preserving search and generation.
-- 🔌 **Pluggable Embedding Providers**: Support for OpenAI, VoyageAI, Ollama, and more.
-- 🗄️ **Vector Storage**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
-- 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
 
 ---
 
