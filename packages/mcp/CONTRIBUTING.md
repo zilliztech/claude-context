@@ -64,7 +64,7 @@ See [README.md](./README.md#prepare-environment-variables) for required environm
 
 ## Working with MCP Clients
 
-### Cursor/Claude Desktop Configuration
+### Cursor/Claude Desktop Development Mode Configuration
 You can use the following configuration to configure the MCP server with a development mode.
 ```json
 {
@@ -73,13 +73,19 @@ You can use the following configuration to configure the MCP server with a devel
       "command": "node",
       "args": ["PATH_TO_CODECONTEXT/packages/mcp/dist/index.js"],
       "env": {
-        "OPENAI_API_KEY": "your-key",  
-        "MILVUS_ADDRESS": "localhost:19530"
+        "OPENAI_API_KEY": "sk-your-openai-api-key",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
 }
 ```
+
+### Claude Code Development Mode Configuration
+```bash
+claude mcp add code-context -e OPENAI_API_KEY=sk-your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- node PATH_TO_CODECONTEXT/packages/mcp/dist/index.js
+```
+And then you can start Claude Code with `claude --debug` to see the MCP server logs.
 
 ### Manual Usage
 Use all three MCP tools:

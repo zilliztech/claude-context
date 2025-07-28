@@ -3,14 +3,16 @@ import {
     VectorDocument,
     SearchOptions,
     VectorSearchResult,
+    VectorDatabase,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
-import {
-    AbstractMilvusVectorDatabase,
-    BaseMilvusConfig
-} from './abstract-milvus-vectordb';
+import { ClusterManager } from './zilliz-utils';
 
-export interface MilvusConfig extends BaseMilvusConfig {
+export interface MilvusConfig {
+    address?: string;
+    token?: string;
+    username?: string;
+    password?: string;
     ssl?: boolean;
 }
 
@@ -36,14 +38,24 @@ async function createCollectionWithLimitCheck(
     }
 }
 
-export class MilvusVectorDatabase extends AbstractMilvusVectorDatabase {
+export class MilvusVectorDatabase implements VectorDatabase {
+    protected config: MilvusConfig;
     private client: MilvusClient | null = null;
+    protected initializationPromise: Promise<void>;
 
     constructor(config: MilvusConfig) {
-        super(config);
+        this.config = config;
+
+        // Start initialization asynchronously without waiting
+        this.initializationPromise = this.initialize();
     }
 
-    protected async initializeClient(address: string): Promise<void> {
+    private async initialize(): Promise<void> {
+        const resolvedAddress = await this.resolveAddress();
+        await this.initializeClient(resolvedAddress);
+    }
+
+    private async initializeClient(address: string): Promise<void> {
         const milvusConfig = this.config as MilvusConfig;
         console.log('🔌 Connecting to vector database at: ', address);
         this.client = new MilvusClient({
@@ -55,8 +67,30 @@ export class MilvusVectorDatabase extends AbstractMilvusVectorDatabase {
         });
     }
 
+    /**
+     * Resolve address from config or token
+     * Common logic for both gRPC and REST implementations
+     */
+    protected async resolveAddress(): Promise<string> {
+        let finalConfig = { ...this.config };
+
+        // If address is not provided, get it using token
+        if (!finalConfig.address && finalConfig.token) {
+            finalConfig.address = await ClusterManager.getAddressFromToken(finalConfig.token);
+        }
+
+        if (!finalConfig.address) {
+            throw new Error('Address is required and could not be resolved from token');
+        }
+
+        return finalConfig.address;
+    }
+
+    /**
+     * Ensure initialization is complete before method execution
+     */
     protected async ensureInitialized(): Promise<void> {
-        await super.ensureInitialized();
+        await this.initializationPromise;
         if (!this.client) {
             throw new Error('Client not initialized');
         }
