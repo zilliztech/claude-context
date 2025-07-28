@@ -41,9 +41,13 @@ Model Context Protocol (MCP) allows you to integrate Code Context with your favo
 ### Prerequisites
 
 <details>
-<summary><strong>Get a free vector database on Zilliz Cloud</strong></summary>
+<summary><strong>Setup Vector Database (Zilliz Cloud or Local Milvus)</strong></summary>
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You have two options: use Zilliz Cloud (managed service) or run Milvus locally (self-hosted).
+
+**Option 1: Zilliz Cloud (Recommended for quick start)**
+
+You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
 ![](assets/signup_and_create_cluster.jpeg)
 
@@ -55,6 +59,26 @@ These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud
 Keep both values handy for the configuration steps below.
 
 If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
+
+**Option 2: Local Milvus (Self-hosted)**
+
+For local development, data privacy, or enterprise use, you can run Milvus locally using Docker:
+
+```bash
+# Download and start Milvus standalone
+curl -sfL https://raw.githubusercontent.com/milvus-io/milvus/master/scripts/standalone_embed.sh -o standalone_embed.sh
+bash standalone_embed.sh start
+```
+
+This creates a local Milvus instance at `localhost:19530` with a web UI at `http://127.0.0.1:9091/webui/`.
+
+For the configuration steps below, use:
+- `your-milvus-address`: `localhost:19530` 
+- Skip the `MILVUS_TOKEN` (not needed for local setup)
+
+**Alternative: Docker Compose**
+
+You can also use the [official Docker Compose setup](https://github.com/milvus-io/milvus/blob/master/deployments/docker/standalone/docker-compose.yml) for more control over the configuration.
 
 </details>
 
@@ -70,13 +94,24 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 ### Configure MCP for your AI Assistant
 
+**Important:** In the configuration examples below, replace the placeholder values based on your setup:
+- **Zilliz Cloud:** Use `your-zilliz-cloud-public-endpoint` for `MILVUS_ADDRESS` and include `MILVUS_TOKEN`
+- **Local Milvus:** Use `localhost:19530` for `MILVUS_ADDRESS` and omit `MILVUS_TOKEN`
+
 #### Claude Code
 
 Use the command line interface to add the Code Context MCP server:
 
+**Option 1: With Zilliz Cloud**
 ```bash
-# Add the Code Context MCP server
+# Add the Code Context MCP server (Zilliz Cloud)
 claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/code-context-mcp@latest
+```
+
+**Option 2: With Local Milvus**
+```bash
+# Add the Code Context MCP server (Local Milvus)
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
 ```
 
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
@@ -86,8 +121,9 @@ See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claud
 Gemini CLI requires manual configuration through a JSON file:
 
 1. Create or edit the `~/.gemini/settings.json` file.
-2. Add the following configuration:
+2. Add one of the following configurations:
 
+**Option 1: With Zilliz Cloud**
 ```json
 {
   "mcpServers": {
@@ -98,6 +134,22 @@ Gemini CLI requires manual configuration through a JSON file:
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**Option 2: With Local Milvus**
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["@zilliz/code-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "localhost:19530"
       }
     }
   }
@@ -507,6 +559,34 @@ Common directories and files are automatically ignored:
 - `node_modules/**`, `dist/**`, `build/**`
 - `.git/**`, `.vscode/**`, `.idea/**`
 - `*.log`, `*.min.js`, `*.map`
+
+### Environment Variables
+
+Code Context supports configuration via environment variables. Key variables include:
+
+**Vector Database:**
+- `MILVUS_ADDRESS` - Milvus server address (e.g., `localhost:19530` or Zilliz Cloud endpoint)
+- `MILVUS_TOKEN` - Authentication token (required for Zilliz Cloud, optional for local)
+
+**Embedding Providers:**
+- `EMBEDDING_PROVIDER` - Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` (default: `OpenAI`)
+- `OPENAI_API_KEY` - OpenAI API key (required for OpenAI provider)
+- `VOYAGEAI_API_KEY` - VoyageAI API key (required for VoyageAI provider)  
+- `GEMINI_API_KEY` - Google AI API key (required for Gemini provider)
+- `OLLAMA_HOST` - Ollama server URL (default: `http://127.0.0.1:11434`)
+
+**Examples:**
+```bash
+# Local Milvus with OpenAI
+export MILVUS_ADDRESS="localhost:19530"
+export OPENAI_API_KEY="sk-your-key"
+
+# Zilliz Cloud with VoyageAI
+export MILVUS_ADDRESS="your-zilliz-endpoint"
+export MILVUS_TOKEN="your-zilliz-token"
+export EMBEDDING_PROVIDER="VoyageAI" 
+export VOYAGEAI_API_KEY="pa-your-key"
+```
 
 ---
 
