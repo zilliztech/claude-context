@@ -2,14 +2,16 @@ import {
     VectorDocument,
     SearchOptions,
     VectorSearchResult,
+    VectorDatabase,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
-import {
-    AbstractMilvusVectorDatabase,
-    BaseMilvusConfig
-} from './abstract-milvus-vectordb';
+import { ClusterManager } from './zilliz-utils';
 
-export interface MilvusRestfulConfig extends BaseMilvusConfig {
+export interface MilvusRestfulConfig {
+    address?: string;
+    token?: string;
+    username?: string;
+    password?: string;
     database?: string;
 }
 
@@ -40,14 +42,24 @@ async function createCollectionWithLimitCheck(
  * This implementation is designed for environments where gRPC is not available,
  * such as VSCode extensions or browser environments.
  */
-export class MilvusRestfulVectorDatabase extends AbstractMilvusVectorDatabase {
+export class MilvusRestfulVectorDatabase implements VectorDatabase {
+    protected config: MilvusRestfulConfig;
     private baseUrl: string | null = null;
+    protected initializationPromise: Promise<void>;
 
     constructor(config: MilvusRestfulConfig) {
-        super(config);
+        this.config = config;
+
+        // Start initialization asynchronously without waiting
+        this.initializationPromise = this.initialize();
     }
 
-    protected async initializeClient(address: string): Promise<void> {
+    private async initialize(): Promise<void> {
+        const resolvedAddress = await this.resolveAddress();
+        await this.initializeClient(resolvedAddress);
+    }
+
+    private async initializeClient(address: string): Promise<void> {
         // Ensure address has protocol prefix
         let processedAddress = address;
         if (!processedAddress.startsWith('http://') && !processedAddress.startsWith('https://')) {
@@ -59,8 +71,30 @@ export class MilvusRestfulVectorDatabase extends AbstractMilvusVectorDatabase {
         console.log(`🔌 Connecting to Milvus REST API at: ${processedAddress}`);
     }
 
+    /**
+     * Resolve address from config or token
+     * Common logic for both gRPC and REST implementations
+     */
+    protected async resolveAddress(): Promise<string> {
+        let finalConfig = { ...this.config };
+
+        // If address is not provided, get it using token
+        if (!finalConfig.address && finalConfig.token) {
+            finalConfig.address = await ClusterManager.getAddressFromToken(finalConfig.token);
+        }
+
+        if (!finalConfig.address) {
+            throw new Error('Address is required and could not be resolved from token');
+        }
+
+        return finalConfig.address;
+    }
+
+    /**
+     * Ensure initialization is complete before method execution
+     */
     protected async ensureInitialized(): Promise<void> {
-        await super.ensureInitialized();
+        await this.initializationPromise;
         if (!this.baseUrl) {
             throw new Error('Base URL not initialized');
         }

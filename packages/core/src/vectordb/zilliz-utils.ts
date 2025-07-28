@@ -152,6 +152,8 @@ export class ClusterManager {
             const result = await response.json();
             return result as T;
         } catch (error: any) {
+            // Log the original error for more details, especially for fetch errors
+            console.error('Original error in makeRequest:', error);
             throw new Error(`Zilliz API request failed: ${error.message}`);
         }
     }
@@ -313,4 +315,4 @@ export class ClusterManager {
             throw new Error(`Failed to get address from token: ${error.message}`);
         }
     }
-} 
+}
