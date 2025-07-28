@@ -166,7 +166,7 @@ class CodeContextMcpServer {
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
 
         // Initialize snapshot file path
-        this.snapshotFilePath = path.join(os.homedir(), '.code-context-mcp', 'codebase-snapshot.json');
+        this.snapshotFilePath = path.join(os.homedir(), '.codecontext', 'mcp-codebase-snapshot.json');
 
         // Initialize MCP server
         this.server = new Server(
@@ -370,7 +370,6 @@ class CodeContextMcpServer {
                             required: ["path"]
                         }
                     },
-
                 ]
             };
         });
@@ -744,7 +743,6 @@ class CodeContextMcpServer {
                 };
             }
 
-            // Track the codebase path for syncing (even if not indexed yet)
             this.trackCodebasePath(absolutePath);
 
             // Check if this codebase is indexed or being indexed
@@ -842,7 +840,7 @@ class CodeContextMcpServer {
             return {
                 content: [{
                     type: "text",
-                    text: `Error searching code: ${errorMessage}`
+                    text: `Error searching code: ${errorMessage} Please check if the codebase has been indexed first.`
                 }],
                 isError: true
             };
@@ -1051,11 +1049,7 @@ class CodeContextMcpServer {
 
     private trackCodebasePath(codebasePath: string) {
         const absolutePath = this.ensureAbsolutePath(codebasePath);
-        if (!this.indexedCodebases.includes(absolutePath)) {
-            this.indexedCodebases.push(absolutePath);
-            this.saveCodebaseSnapshot();
-            console.log(`[TRACKING] Added codebase path to indexedCodebases: ${absolutePath}`);
-        }
+        console.log(`[TRACKING] Tracked codebase path: ${absolutePath} (not marked as indexed)`);
     }
 }
 
