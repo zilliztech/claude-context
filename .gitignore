@@ -53,3 +53,5 @@ Thumbs.db
 *.vsix
 *.crx
 *.pem 
+.claude/*
+CLAUDE.md
