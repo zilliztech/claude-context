@@ -1,4 +1,5 @@
 # @zilliz/code-context-core
+![](../../assets/code_context_logo_dark.png)
 
 The core indexing engine for Code Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
 
@@ -185,7 +186,7 @@ import { CodeContext, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/co
 // Initialize with VoyageAI embedding provider
 const embedding = new VoyageAIEmbedding({
   apiKey: process.env.VOYAGEAI_API_KEY || 'your-voyageai-api-key',
-  model: 'voyage-code-2'  // Optimized for code
+  model: 'voyage-code-3'
 });
 
 const vectorDatabase = new MilvusVectorDatabase({
