@@ -63,7 +63,7 @@ export class LangChainCodeSplitter implements Splitter {
 
     private mapLanguage(language: string): SupportedLanguage | null {
         // Map common language names to LangChain supported formats
-        const languageMap: Record<string, SupportedLanguage> = {
+        const languageMap: Record<string, SupportedLanguage | null> = {
             'javascript': 'js',
             'typescript': 'js',
             'python': 'python',
@@ -84,9 +84,11 @@ export class LangChainCodeSplitter implements Splitter {
             'tex': 'latex',
             'solidity': 'sol',
             'sol': 'sol',
+            'zig': null, // LangChain doesn't have native Zig support, will use fallback
         };
 
-        return languageMap[language.toLowerCase()] || null;
+        const mapped = languageMap[language.toLowerCase()];
+        return mapped !== undefined ? mapped : null;
     }
 
     private async fallbackSplit(code: string, language: string, filePath?: string): Promise<CodeChunk[]> {
