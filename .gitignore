@@ -52,4 +52,9 @@ Thumbs.db
 # Extension specific
 *.vsix
 *.crx
-*.pem 
+*.pem
+
+.claude/*
+CLAUDE.md
+
+.cursor/*

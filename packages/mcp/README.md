@@ -31,6 +31,8 @@ Before using the MCP server, make sure you have:
 
 Code Context MCP supports multiple embedding providers. Choose the one that best fits your needs:
 
+> 💡 **Tip**: You can also use [global environment variables](../../docs/getting-started/environment-variables.md) for easier configuration management across different MCP clients.
+
 ```bash
 # Supported providers: OpenAI, VoyageAI, Gemini, Ollama
 EMBEDDING_PROVIDER=OpenAI
@@ -148,7 +150,7 @@ OLLAMA_HOST=http://127.0.0.1:11434
 
 #### Get a free vector database on Zilliz Cloud
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a API key.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
 
 ![](../../assets/signup_and_get_apikey.png)
 

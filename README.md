@@ -9,6 +9,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
+[![Documentation](https://img.shields.io/badge/Documentation-📚-orange.svg)](docs/)
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Extension&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 [![npm - core](https://img.shields.io/npm/v/@zilliz/code-context-core?label=%40zilliz%2Fcode-context-core&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-core)
 [![npm - mcp](https://img.shields.io/npm/v/@zilliz/code-context-mcp?label=%40zilliz%2Fcode-context-mcp&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
@@ -43,7 +44,7 @@ Model Context Protocol (MCP) allows you to integrate Code Context with your favo
 <details>
 <summary>Get a free vector database on Zilliz Cloud</summary>
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a API key.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
 
 ![](assets/signup_and_get_apikey.png)
 
@@ -364,8 +365,9 @@ npx @zilliz/code-context-mcp@latest
 
 </details>
 
-</details>
+For more detailed MCP environment variable configuration, see our [Environment Variables Guide](docs/getting-started/environment-variables.md).
 
+📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
 
 ---
 
@@ -506,6 +508,12 @@ Common directories and files are automatically ignored:
 Check the `/examples` directory for complete usage examples:
 
 - **Basic Usage**: Simple indexing and search example
+
+---
+
+## ❓ FAQ
+
+For frequently asked questions and troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
 
 ---
 
