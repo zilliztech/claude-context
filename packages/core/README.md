@@ -42,6 +42,8 @@ MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint
 MILVUS_TOKEN=your-zilliz-cloud-api-key
 ``` 
 
+> 💡 **Tip**: For easier configuration management across different usage scenarios, consider using [global environment variables](../../docs/getting-started/environment-variables.md).
+
 ## Quick Start
 
 ```typescript
