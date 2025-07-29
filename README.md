@@ -41,25 +41,17 @@ Model Context Protocol (MCP) allows you to integrate Code Context with your favo
 ### Prerequisites
 
 <details>
-<summary><strong>Get a free vector database on Zilliz Cloud</strong></summary>
+<summary>Get a free vector database on Zilliz Cloud</summary>
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a API key.
 
-![](assets/signup_and_create_cluster.jpeg)
+![](assets/signup_and_get_apikey.png)
 
-After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
-These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
-
-![Zilliz Cloud Dashboard](assets/zilliz_cloud_dashboard.jpeg)
-
-Keep both values handy for the configuration steps below.
-
-If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
-
+Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configuration examples.
 </details>
 
 <details>
-<summary><strong>Get OpenAI API Key for embedding model</strong></summary>
+<summary>Get OpenAI API Key for embedding model</summary>
 
 You need an OpenAI API key for the embedding model. You can get one by signing up at [OpenAI](https://platform.openai.com/api-keys).  
 
@@ -70,13 +62,13 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 ### Configure MCP for your AI Assistant
 
-#### Claude Code
+#### Claude Code Configuration
 
 Use the command line interface to add the Code Context MCP server:
 
 ```bash
 # Add the Code Context MCP server
-claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/code-context-mcp@latest
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/code-context-mcp@latest
 ```
 
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
@@ -96,7 +88,6 @@ Gemini CLI requires manual configuration through a JSON file:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
@@ -390,7 +381,7 @@ Code Context is a monorepo containing three main packages:
 - **`@zilliz/code-context-mcp`**: Model Context Protocol server for AI agent integration
 
 ### Supported Technologies
-- **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai)
+- **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
 - **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
 - **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
@@ -534,7 +525,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - [x] AST-based code analysis for improved understanding
 - [x] Support for additional embedding providers
 - [ ] Agent-based interactive search mode
-- [ ] Enhanced code chunking strategies
+- [x] Enhanced code chunking strategies
 - [ ] Search result ranking optimization
 - [ ] Robust Chrome Extension
 

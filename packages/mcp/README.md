@@ -1,5 +1,5 @@
 # @zilliz/code-context-mcp
-
+![](../../assets/code_context_logo_dark.png)
 Model Context Protocol (MCP) integration for Code Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
 [![npm version](https://img.shields.io/npm/v/@zilliz/code-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
@@ -146,24 +146,15 @@ OLLAMA_HOST=http://127.0.0.1:11434
 
 </details>
 
-#### Zilliz Cloud configuration
-Get a free Milvus vector database on Zilliz Cloud. 
+#### Get a free vector database on Zilliz Cloud
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
+Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a API key.
 
-![](../../assets/signup_and_create_cluster.jpeg)
+![](../../assets/signup_and_get_apikey.png)
 
-After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
-These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
-
-![Zilliz Cloud Dashboard](../../assets/zilliz_cloud_dashboard.jpeg)
-
-Keep both values handy for the configuration steps below.
-
-If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
+Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configuration examples.
 
 ```bash
-MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint
 MILVUS_TOKEN=your-zilliz-cloud-api-key
 ``` 
 
@@ -190,7 +181,6 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
@@ -217,8 +207,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
       "env": {
         "EMBEDDING_PROVIDER": "OpenAI",
         "OPENAI_API_KEY": "your-openai-api-key",
-        "OPENAI_BASE_URL": "https://your-custom-endpoint.com/v1",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -236,7 +225,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
         "EMBEDDING_PROVIDER": "VoyageAI",
         "VOYAGEAI_API_KEY": "your-voyageai-api-key",
         "EMBEDDING_MODEL": "voyage-code-3",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -253,7 +242,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
       "env": {
         "EMBEDDING_PROVIDER": "Gemini",
         "GEMINI_API_KEY": "your-gemini-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -271,7 +260,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
         "EMBEDDING_PROVIDER": "Ollama",
         "EMBEDDING_MODEL": "nomic-embed-text",
         "OLLAMA_HOST": "http://127.0.0.1:11434",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -293,7 +282,7 @@ Add to your Claude Desktop configuration:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -309,7 +298,7 @@ Use the command line interface to add the CodeContext MCP server:
 
 ```bash
 # Add the CodeContext MCP server
-claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_ADDRESS=localhost:19530 -- npx @zilliz/code-context-mcp@latest
+claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/code-context-mcp@latest
 
 ```
 
@@ -330,7 +319,7 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -352,7 +341,7 @@ The CodeContext MCP server can be used with VS Code through MCP-compatible exten
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -374,7 +363,7 @@ Cherry Studio allows for visual MCP server configuration through its settings in
    - **Arguments**: `["@zilliz/code-context-mcp@latest"]`
    - **Environment Variables**:
      - `OPENAI_API_KEY`: `your-openai-api-key`
-     - `MILVUS_ADDRESS`: `localhost:19530`
+     - `MILVUS_TOKEN`: `your-zilliz-cloud-api-key`
 3. Save the configuration to activate the server.
 
 </details>
@@ -398,7 +387,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -474,7 +463,7 @@ Gemini CLI requires manual configuration through a JSON file:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
@@ -502,7 +491,7 @@ Roo Code utilizes a JSON configuration file for MCP servers:
       "args": ["@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_ADDRESS": "localhost:19530"
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
   }
