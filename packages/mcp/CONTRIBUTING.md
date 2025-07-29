@@ -37,7 +37,7 @@ See [README.md](./README.md#prepare-environment-variables) for required environm
    pnpm start
    ```
 3. Use the tools:
-   - `index_codebase` - Index a sample codebase
+   - `index_codebase` - Index a sample codebase with optional custom ignore patterns
    - `search_code` - Search for code snippets
    - `clear_index` - Clear the index
 
@@ -54,6 +54,24 @@ See [README.md](./README.md#prepare-environment-variables) for required environm
 - Use stdio transport for compatibility
 - Handle errors gracefully with proper MCP responses
 - Redirect logs to stderr (not stdout)
+
+## Tool Parameters
+
+### `index_codebase`
+- `path` (required): Path to the codebase directory
+- `force` (optional): Force re-indexing even if already indexed (default: false)
+- `splitter` (optional): Code splitter type - 'ast' or 'langchain' (default: 'ast')  
+- `ignorePatterns` (optional): Additional ignore patterns to add to defaults (default: [])
+  - Examples: `["static/**", "*.tmp", "private/**", "docs/generated/**"]`
+  - Merged with default patterns (node_modules, .git, etc.)
+
+### `search_code`
+- `path` (required): Path to the indexed codebase
+- `query` (required): Natural language search query
+- `limit` (optional): Maximum number of results (default: 10, max: 50)
+
+### `clear_index`
+- `path` (required): Path to the codebase to clear
 
 ## Guidelines
 
@@ -89,7 +107,8 @@ And then you can start Claude Code with `claude --debug` to see the MCP server l
 
 ### Manual Usage
 Use all three MCP tools:
-- `index_codebase` - Index sample repositories
+- `index_codebase` - Index sample repositories with optional custom ignore patterns  
+  Example with ignore patterns: `{"path": "/repo/path", "ignorePatterns": ["static/**", "*.tmp"]}`
 - `search_code` - Search with various queries  
 - `clear_index` - Clear and re-index
 
