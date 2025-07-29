@@ -328,6 +328,14 @@ class CodeContextMcpServer {
                                     description: "Code splitter to use: 'ast' for syntax-aware splitting with automatic fallback, 'langchain' for character-based splitting",
                                     enum: ["ast", "langchain"],
                                     default: "ast"
+                                },
+                                ignorePatterns: {
+                                    type: "array",
+                                    items: {
+                                        type: "string"
+                                    },
+                                    description: "Additional ignore patterns to add to defaults (e.g., ['static/**', '*.tmp', 'private/**'])",
+                                    default: []
                                 }
                             },
                             required: ["path"]
@@ -395,9 +403,10 @@ class CodeContextMcpServer {
 
 
     private async handleIndexCodebase(args: any) {
-        const { path: codebasePath, force, splitter } = args;
+        const { path: codebasePath, force, splitter, ignorePatterns } = args;
         const forceReindex = force || false;
         const splitterType = splitter || 'ast'; // Default to AST
+        const customIgnorePatterns = ignorePatterns || [];
 
         try {
             // Validate splitter parameter
@@ -509,6 +518,12 @@ class CodeContextMcpServer {
                 }
             }
 
+            // Update ignore patterns if provided
+            if (customIgnorePatterns.length > 0) {
+                console.log(`[IGNORE-PATTERNS] Adding ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`);
+                this.codeContext.updateIgnorePatterns(customIgnorePatterns);
+            }
+
             // Add to indexing list and save snapshot immediately
             this.indexingCodebases.push(absolutePath);
             this.saveCodebaseSnapshot();
@@ -523,10 +538,14 @@ class CodeContextMcpServer {
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
                 : '';
 
+            const ignoreInfo = customIgnorePatterns.length > 0
+                ? `\nUsing ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`
+                : '';
+
             return {
                 content: [{
                     type: "text",
-                    text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
+                    text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}${ignoreInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
                 }]
             };
 
