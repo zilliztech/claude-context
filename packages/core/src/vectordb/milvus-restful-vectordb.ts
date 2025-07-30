@@ -306,6 +306,22 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
+    async listCollections(): Promise<string[]> {
+        await this.ensureInitialized();
+
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+            const response = await this.makeRequest('/collections/list', 'POST', {
+                dbName: restfulConfig.database
+            });
+
+            return response.data || [];
+        } catch (error) {
+            console.error(`❌ Failed to list collections:`, error);
+            throw error;
+        }
+    }
+
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
 
@@ -424,7 +440,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    async query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]> {
+    async query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]> {
         await this.ensureInitialized();
 
         try {
@@ -434,7 +450,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 dbName: restfulConfig.database,
                 filter,
                 outputFields,
-                limit: 16384,
+                limit: limit || 16384, // Use provided limit or default
                 offset: 0
             };
 

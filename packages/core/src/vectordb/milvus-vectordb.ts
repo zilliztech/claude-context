@@ -198,6 +198,15 @@ export class MilvusVectorDatabase implements VectorDatabase {
         return Boolean(result.value);
     }
 
+    async listCollections(): Promise<string[]> {
+        await this.ensureInitialized();
+
+        const result = await this.client!.showCollections();
+        // Handle the response format - cast to any to avoid type errors
+        const collections = (result as any).collection_names || (result as any).collections || [];
+        return Array.isArray(collections) ? collections : [];
+    }
+
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
 
@@ -259,15 +268,25 @@ export class MilvusVectorDatabase implements VectorDatabase {
         });
     }
 
-    async query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]> {
+    async query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]> {
         await this.ensureInitialized();
 
         try {
-            const result = await this.client!.query({
+            const queryParams: any = {
                 collection_name: collectionName,
                 filter: filter,
                 output_fields: outputFields,
-            });
+            };
+
+            // Add limit if provided, or default for empty filter expressions
+            if (limit !== undefined) {
+                queryParams.limit = limit;
+            } else if (filter === '' || filter.trim() === '') {
+                // Milvus requires limit when using empty expressions
+                queryParams.limit = 16384; // Default limit for empty filters
+            }
+
+            const result = await this.client!.query(queryParams);
 
             if (result.status.error_code !== 'Success') {
                 throw new Error(`Failed to query Milvus: ${result.status.reason}`);
