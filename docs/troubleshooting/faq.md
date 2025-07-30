@@ -10,8 +10,19 @@
 **Files that are excluded:**
 - Files matching DEFAULT_IGNORE_PATTERNS 
 - Files matching patterns in .gitignore
+- Files matching patterns in any .xxxignore files (e.g., .cursorignore, .codeiumignore)
+- Files matching patterns in global ~/.codecontext/.codecontextignore
 
-The final rule is: `DEFAULT_SUPPORTED_EXTENSIONS - DEFAULT_IGNORE_PATTERNS - .gitignore patterns`
+The final rule is: `DEFAULT_SUPPORTED_EXTENSIONS - (DEFAULT_IGNORE_PATTERNS + MCP_CUSTOM_PATTERNS + .gitignore + .xxxignore files + global .codecontextignore)`
+
+**Ignore pattern merging (all patterns are combined):**
+1. **Default patterns**: Built-in ignore patterns for common build outputs, dependencies, etc.
+2. **MCP custom patterns**: Additional patterns passed via MCP `ignorePatterns` parameter 
+3. **.gitignore**: Standard Git ignore patterns in codebase root
+4. **.xxxignore files**: Any file in codebase root matching pattern `.xxxignore` (e.g., `.cursorignore`, `.codeiumignore`)
+5. **Global ignore**: `~/.codecontext/.codecontextignore` for user-wide patterns
+
+All patterns are merged together - MCP custom patterns will NOT be overwritten by file-based patterns.
 
 Supported extensions include common programming languages (.ts, .js, .py, .java, .cpp, etc.) and documentation files (.md, .markdown). Default ignore patterns cover build outputs, dependencies (node_modules), IDE files, and temporary files.
 

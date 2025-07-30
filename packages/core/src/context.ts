@@ -139,7 +139,7 @@ export class CodeContext {
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         console.log(`🚀 Starting to index codebase: ${codebasePath}`);
 
-        // 1. Load .gitignore patterns if not already loaded
+        // 1. Load ignore patterns from various ignore files
         await this.loadGitignorePatterns(codebasePath);
 
         // 2. Check and prepare vector collection
@@ -352,17 +352,33 @@ export class CodeContext {
     }
 
     /**
-     * Update ignore patterns (merges with default patterns)
+     * Update ignore patterns (merges with default patterns and existing patterns)
      * @param ignorePatterns Array of ignore patterns to add to defaults
      */
     updateIgnorePatterns(ignorePatterns: string[]): void {
-        // Merge with default patterns, avoiding duplicates
+        // Merge with default patterns and any existing custom patterns, avoiding duplicates
         const mergedPatterns = [...DEFAULT_IGNORE_PATTERNS, ...ignorePatterns];
         const uniquePatterns: string[] = [];
         const patternSet = new Set(mergedPatterns);
         patternSet.forEach(pattern => uniquePatterns.push(pattern));
         this.ignorePatterns = uniquePatterns;
-        console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} from .gitignore + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total patterns`);
+        console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} new + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total patterns`);
+    }
+
+    /**
+     * Add custom ignore patterns (from MCP or other sources) without replacing existing ones
+     * @param customPatterns Array of custom ignore patterns to add
+     */
+    addCustomIgnorePatterns(customPatterns: string[]): void {
+        if (customPatterns.length === 0) return;
+
+        // Merge current patterns with new custom patterns, avoiding duplicates
+        const mergedPatterns = [...this.ignorePatterns, ...customPatterns];
+        const uniquePatterns: string[] = [];
+        const patternSet = new Set(mergedPatterns);
+        patternSet.forEach(pattern => uniquePatterns.push(pattern));
+        this.ignorePatterns = uniquePatterns;
+        console.log(`🚫 Added ${customPatterns.length} custom ignore patterns. Total: ${this.ignorePatterns.length} patterns`);
     }
 
     /**
@@ -664,36 +680,113 @@ export class CodeContext {
     }
 
     /**
-     * Load .gitignore patterns from the codebase root directory
+     * Load ignore patterns from various ignore files in the codebase
+     * This method preserves any existing custom patterns that were added before
      * @param codebasePath Path to the codebase
      */
     private async loadGitignorePatterns(codebasePath: string): Promise<void> {
         try {
+            let fileBasedPatterns: string[] = [];
+
+            // 1. Load .gitignore
             const gitignorePath = path.join(codebasePath, '.gitignore');
+            const gitignorePatterns = await this.loadIgnoreFile(gitignorePath, '.gitignore');
+            fileBasedPatterns.push(...gitignorePatterns);
 
-            // Check if .gitignore exists
-            try {
-                await fs.promises.access(gitignorePath);
-                console.log(`📄 Found .gitignore file at: ${gitignorePath}`);
+            // 2. Load all .xxxignore files in codebase directory
+            const ignoreFiles = await this.findIgnoreFiles(codebasePath);
+            for (const ignoreFile of ignoreFiles) {
+                const patterns = await this.loadIgnoreFile(ignoreFile, path.basename(ignoreFile));
+                fileBasedPatterns.push(...patterns);
+            }
 
-                // Use the static method from CodeContext to read ignore patterns
-                const ignorePatterns = await CodeContext.getIgnorePatternsFromFile(gitignorePath);
+            // 3. Load global ~/.codecontext/.codecontextignore
+            const globalIgnorePatterns = await this.loadGlobalIgnoreFile();
+            fileBasedPatterns.push(...globalIgnorePatterns);
 
-                if (ignorePatterns.length > 0) {
-                    // Update the CodeContext instance with new patterns
-                    this.updateIgnorePatterns(ignorePatterns);
-                    console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from .gitignore`);
-                } else {
-                    console.log('📄 .gitignore file found but no valid patterns detected');
-                }
-            } catch (error) {
-                console.log('📄 No .gitignore file found, using default ignore patterns only');
-                // No need to update patterns - CodeContext will use defaults
+            // 4. Merge file-based patterns with existing patterns (which may include custom MCP patterns)
+            if (fileBasedPatterns.length > 0) {
+                this.addCustomIgnorePatterns(fileBasedPatterns);
+                console.log(`🚫 Loaded total ${fileBasedPatterns.length} ignore patterns from all ignore files`);
+            } else {
+                console.log('📄 No ignore files found, keeping existing patterns');
             }
         } catch (error) {
-            console.warn(`⚠️ Failed to load .gitignore patterns: ${error}`);
-            // Continue with default patterns on error
-            this.updateIgnorePatterns([]);
+            console.warn(`⚠️ Failed to load ignore patterns: ${error}`);
+            // Continue with existing patterns on error - don't reset them
+        }
+    }
+
+    /**
+     * Find all .xxxignore files in the codebase directory (excluding .gitignore as it's handled separately)
+     * @param codebasePath Path to the codebase
+     * @returns Array of ignore file paths
+     */
+    private async findIgnoreFiles(codebasePath: string): Promise<string[]> {
+        try {
+            const entries = await fs.promises.readdir(codebasePath, { withFileTypes: true });
+            const ignoreFiles: string[] = [];
+
+            for (const entry of entries) {
+                if (entry.isFile() &&
+                    entry.name.startsWith('.') &&
+                    entry.name.endsWith('ignore') &&
+                    entry.name !== '.gitignore') { // Exclude .gitignore as it's handled separately
+                    ignoreFiles.push(path.join(codebasePath, entry.name));
+                }
+            }
+
+            if (ignoreFiles.length > 0) {
+                console.log(`📄 Found additional ignore files: ${ignoreFiles.map(f => path.basename(f)).join(', ')}`);
+            }
+
+            return ignoreFiles;
+        } catch (error) {
+            console.warn(`⚠️ Failed to scan for ignore files: ${error}`);
+            return [];
+        }
+    }
+
+    /**
+     * Load global ignore file from ~/.codecontext/.codecontextignore
+     * @returns Array of ignore patterns
+     */
+    private async loadGlobalIgnoreFile(): Promise<string[]> {
+        try {
+            const homeDir = require('os').homedir();
+            const globalIgnorePath = path.join(homeDir, '.codecontext', '.codecontextignore');
+            return await this.loadIgnoreFile(globalIgnorePath, 'global .codecontextignore');
+        } catch (error) {
+            // Global ignore file is optional, don't log warnings
+            return [];
+        }
+    }
+
+    /**
+     * Load ignore patterns from a specific ignore file
+     * @param filePath Path to the ignore file
+     * @param fileName Display name for logging
+     * @returns Array of ignore patterns
+     */
+    private async loadIgnoreFile(filePath: string, fileName: string): Promise<string[]> {
+        try {
+            await fs.promises.access(filePath);
+            console.log(`📄 Found ${fileName} file at: ${filePath}`);
+
+            const ignorePatterns = await CodeContext.getIgnorePatternsFromFile(filePath);
+
+            if (ignorePatterns.length > 0) {
+                console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from ${fileName}`);
+                return ignorePatterns;
+            } else {
+                console.log(`📄 ${fileName} file found but no valid patterns detected`);
+                return [];
+            }
+        } catch (error) {
+            if (fileName === '.gitignore' || fileName.includes('global')) {
+                console.log(`📄 No ${fileName} file found`);
+            }
+            return [];
         }
     }
 
