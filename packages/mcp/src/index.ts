@@ -334,7 +334,7 @@ class CodeContextMcpServer {
                                     items: {
                                         type: "string"
                                     },
-                                    description: "Additional ignore patterns to add to defaults (e.g., ['static/**', '*.tmp', 'private/**'])",
+                                    description: "Optional: Additional ignore patterns to exclude specific files/directories beyond defaults. Only include this parameter if the user explicitly requests custom ignore patterns (e.g., ['static/**', '*.tmp', 'private/**'])",
                                     default: []
                                 }
                             },
@@ -518,10 +518,10 @@ class CodeContextMcpServer {
                 }
             }
 
-            // Update ignore patterns if provided
+            // Add custom ignore patterns if provided (before loading file-based patterns)
             if (customIgnorePatterns.length > 0) {
                 console.log(`[IGNORE-PATTERNS] Adding ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`);
-                this.codeContext.updateIgnorePatterns(customIgnorePatterns);
+                this.codeContext.addCustomIgnorePatterns(customIgnorePatterns);
             }
 
             // Add to indexing list and save snapshot immediately
