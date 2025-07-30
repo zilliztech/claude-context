@@ -93,7 +93,7 @@ Index a codebase directory to enable semantic search using a configurable code s
 - You MUST provide an absolute path to the target codebase.
 - Relative paths will be automatically resolved to absolute paths.
 - Current working directory: ${currentWorkingDirectory}.
-    You may use this directly or append subfolders (e.g., ${currentWorkingDirectory}/subfolder).
+    You MUST use this directly and DO NOT append any subfolder.
 
 ✨ **Usage Guidance**:
 - This tool is typically used when search fails due to an unindexed codebase.
@@ -107,7 +107,7 @@ Search the indexed codebase using natural language queries within a specified ab
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path.
 - The current working directory is: ${currentWorkingDirectory}.
-- You can use this as the default path or customize it (e.g., ${currentWorkingDirectory}/subfolder).
+- You MUST use this as the default path and DO NOT append any subfolder.
 
 ✨ **Usage Guidance**:
 - If the codebase is not indexed, this tool will return a clear error message indicating that indexing is required first.
