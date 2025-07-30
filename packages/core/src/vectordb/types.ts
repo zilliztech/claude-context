@@ -43,6 +43,11 @@ export interface VectorDatabase {
     hasCollection(collectionName: string): Promise<boolean>;
 
     /**
+     * List all collections
+     */
+    listCollections(): Promise<string[]>;
+
+    /**
      * Insert vector documents
      * @param collectionName Collection name
      * @param documents Document array
@@ -69,8 +74,9 @@ export interface VectorDatabase {
      * @param collectionName Collection name
      * @param filter Filter expression string
      * @param outputFields Fields to return
+     * @param limit Maximum number of results to return (optional)
      */
-    query(collectionName: string, filter: string, outputFields: string[]): Promise<Record<string, any>[]>;
+    query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
 }
 
 /**
