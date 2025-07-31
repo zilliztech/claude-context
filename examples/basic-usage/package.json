@@ -1,6 +1,6 @@
 {
     "name": "code-context-basic-example",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "description": "Basic usage example for Code Context",
     "main": "index.ts",
     "scripts": {
