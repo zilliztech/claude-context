@@ -1,6 +1,6 @@
 {
     "name": "@zilliz/code-context-chrome-extension",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "description": "Code Context Chrome extension for web-based code indexing",
     "private": true,
     "scripts": {
