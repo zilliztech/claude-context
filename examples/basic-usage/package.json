@@ -1,6 +1,6 @@
 {
-    "name": "code-context-basic-example",
-    "version": "0.0.12",
+    "name": "claude-context-basic-example",
+    "version": "0.0.1",
     "description": "Basic usage example for Code Context",
     "main": "index.ts",
     "scripts": {
@@ -9,7 +9,7 @@
         "dev": "tsx --watch index.ts"
     },
     "dependencies": {
-        "@zilliz/code-context-core": "workspace:*"
+        "@zilliz/claude-context-core": "workspace:*"
     },
     "devDependencies": {
         "tsx": "^4.0.0",

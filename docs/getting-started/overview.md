@@ -43,14 +43,14 @@ Natural language queries are converted to vectors and matched against stored cod
 
 ## Architecture Components
 
-### Core Engine (`@zilliz/code-context-core`)
+### Core Engine (`@zilliz/claude-context-core`)
 The foundational indexing engine that handles:
 - Code parsing and analysis
 - Embedding generation
 - Vector database operations
 - Search algorithms
 
-### MCP Server (`@zilliz/code-context-mcp`)
+### MCP Server (`@zilliz/claude-context-mcp`)
 Model Context Protocol server that enables integration with AI assistants:
 - Standardized tool interface
 - Compatible with Claude Code, Cursor, Windsurf, and more

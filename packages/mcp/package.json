@@ -1,6 +1,6 @@
 {
-    "name": "@zilliz/code-context-mcp",
-    "version": "0.0.12",
+    "name": "@zilliz/claude-context-mcp",
+    "version": "0.0.1",
     "description": "Model Context Protocol integration for Code Context",
     "type": "module",
     "main": "dist/index.js",
@@ -18,7 +18,7 @@
         "prepublishOnly": "pnpm build"
     },
     "dependencies": {
-        "@zilliz/code-context-core": "workspace:*",
+        "@zilliz/claude-context-core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.12.1",
         "zod": "^3.25.55"
     },
@@ -33,7 +33,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/zilliztech/code-context.git",
+        "url": "https://github.com/zilliztech/claude-context.git",
         "directory": "packages/mcp"
     },
     "license": "MIT",

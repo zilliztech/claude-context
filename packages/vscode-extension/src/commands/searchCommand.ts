@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CodeContext, SearchQuery, SemanticSearchResult } from '@zilliz/code-context-core';
+import { CodeContext, SearchQuery, SemanticSearchResult } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
 export class SearchCommand {

@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Code Context! This guide will hel
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/your-username/code-context.git
-   cd code-context
+   git clone https://github.com/your-username/claude-context.git
+   cd claude-context
    ```
 
 2. **Install Dependencies**
@@ -36,7 +36,7 @@ Thank you for your interest in contributing to Code Context! This guide will hel
 ## 📁 Project Structure
 
 ```
-code-context/
+claude-context/
 ├── packages/
 │   ├── core/              # Core indexing engine
 │   ├── vscode-extension/  # VSCode extension

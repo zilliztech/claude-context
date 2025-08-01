@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { CodeContext, COLLECTION_LIMIT_MESSAGE } from "@zilliz/code-context-core";
+import { CodeContext, COLLECTION_LIMIT_MESSAGE } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
@@ -361,7 +361,7 @@ export class ToolHandlers {
             await this.codeContext['loadGitignorePatterns'](absolutePath);
             
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
-            const { FileSynchronizer } = await import("@zilliz/code-context-core");
+            const { FileSynchronizer } = await import("@zilliz/claude-context-core");
             const ignorePatterns = this.codeContext['ignorePatterns'] || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);

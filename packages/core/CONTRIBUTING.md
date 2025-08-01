@@ -1,4 +1,4 @@
-# Contributing to @zilliz/code-context-core
+# Contributing to @zilliz/claude-context-core
 
 Thanks for your interest in contributing to the Code Context core package!
 
