@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { CodeContext } from "@zilliz/code-context-core";
+import { CodeContext } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 
 export class SyncManager {

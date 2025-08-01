@@ -28,7 +28,7 @@ Code Context supports a global configuration file at `~/.codecontext/.env` to si
 ### Vector Database
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MILVUS_TOKEN` | Milvus authentication token. Get [Zilliz Personal API Key](https://github.com/zilliztech/code-context/blob/master/assets/signup_and_get_apikey.png) | Recommended |
+| `MILVUS_TOKEN` | Milvus authentication token. Get [Zilliz Personal API Key](https://github.com/zilliztech/claude-context/blob/master/assets/signup_and_get_apikey.png) | Recommended |
 | `MILVUS_ADDRESS` | Milvus server address. Optional when using Zilliz Personal API Key | Auto-resolved from token |
 
 ### Ollama (Local)
@@ -61,16 +61,16 @@ EOF
 
 **Claude Code:**
 ```bash
-claude mcp add code-context -- npx @zilliz/code-context-mcp@latest
+claude mcp add claude-context -- npx @zilliz/claude-context-mcp@latest
 ```
 
 **Cursor/Windsurf/Others:**
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["-y", "@zilliz/code-context-mcp@latest"]
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"]
     }
   }
 }
@@ -79,5 +79,5 @@ claude mcp add code-context -- npx @zilliz/code-context-mcp@latest
 ## 📚 Additional Information
 
 For detailed information about file processing rules and how custom patterns work, see:
-- [What files does Code Context decide to embed?](../troubleshooting/faq.md#q-what-files-does-code-context-decide-to-embed)
+- [What files does Code Context decide to embed?](../troubleshooting/faq.md#q-what-files-does-claude-context-decide-to-embed)
  

@@ -1,17 +1,17 @@
-# @zilliz/code-context-core
+# @zilliz/claude-context-core
 ![](../../assets/code_context_logo_dark.png)
 
 The core indexing engine for Code Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
 
-[![npm version](https://img.shields.io/npm/v/@zilliz/code-context-core.svg)](https://www.npmjs.com/package/@zilliz/code-context-core)
-[![npm downloads](https://img.shields.io/npm/dm/@zilliz/code-context-core.svg)](https://www.npmjs.com/package/@zilliz/code-context-core)
+[![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
+[![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
 
 > 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and quick start guide.
 
 ## Installation
 
 ```bash
-npm install @zilliz/code-context-core
+npm install @zilliz/claude-context-core
 ```
 
 ### Prepare Environment Variables
@@ -51,7 +51,7 @@ import {
   CodeContext, 
   OpenAIEmbedding, 
   MilvusVectorDatabase 
-} from '@zilliz/code-context-core';
+} from '@zilliz/claude-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -183,7 +183,7 @@ interface SemanticSearchResult {
 ### Using VoyageAI Embeddings
 
 ```typescript
-import { CodeContext, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/code-context-core';
+import { CodeContext, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/claude-context-core';
 
 // Initialize with VoyageAI embedding provider
 const embedding = new VoyageAIEmbedding({
@@ -239,7 +239,7 @@ The file synchronization system uses a **Merkle tree-based approach** combined w
 - Any change to any file will cause the root hash to change
 
 #### 3. Snapshot Management
-- File synchronization state is persisted to `~/.code-context/merkle/` directory
+- File synchronization state is persisted to `~/.codecontext/merkle/` directory
 - Each codebase gets a unique snapshot file based on its absolute path hash
 - Snapshots contain both file hashes and serialized Merkle tree data
 
@@ -266,7 +266,7 @@ This package is part of the CodeContext monorepo. Please see:
 
 ## Related Packages
 
-- **[@code-context/mcp](../mcp)** - MCP server that uses this core engine
+- **[@claude-context/mcp](../mcp)** - MCP server that uses this core engine
 - **[VSCode Extension](../vscode-extension)** - VSCode extension built on this core
 
 

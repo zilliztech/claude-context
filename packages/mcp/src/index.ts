@@ -21,8 +21,8 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeContext } from "@zilliz/code-context-core";
-import { MilvusVectorDatabase } from "@zilliz/code-context-core";
+import { CodeContext } from "@zilliz/claude-context-core";
+import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, CodeContextMcpConfig } from "./config.js";
