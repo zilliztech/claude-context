@@ -348,6 +348,14 @@ class SemanticSearchController {
                     fieldElement.input.addEventListener('input', () => this.validateForm());
                     fieldElement.input.addEventListener('change', () => this.validateForm());
                 }
+
+                // Add event listeners for select-with-custom model inputs
+                if (fieldElement.selectElement) {
+                    fieldElement.selectElement.addEventListener('change', () => this.validateForm());
+                }
+                if (fieldElement.customInput) {
+                    fieldElement.customInput.addEventListener('input', () => this.validateForm());
+                }
             } catch (error) {
                 console.error(`Failed to create field ${field.name}:`, error);
             }
@@ -397,6 +405,88 @@ class SemanticSearchController {
 
                 input.appendChild(option);
             });
+        } else if (field.name === 'model' && field.inputType === 'select-with-custom') {
+            // Create a container for both select and custom input
+            const inputContainer = document.createElement('div');
+            inputContainer.className = 'model-input-container';
+
+            // Create select dropdown
+            const selectElement = document.createElement('select');
+            selectElement.id = field.name + '_select';
+            selectElement.className = 'model-select';
+
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Please select...';
+            selectElement.appendChild(defaultOption);
+
+            // Add custom option
+            const customOption = document.createElement('option');
+            customOption.value = 'custom';
+            customOption.textContent = 'Custom model...';
+            selectElement.appendChild(customOption);
+
+            // Populate with predefined models
+            const models = providerInfo.models || {};
+            Object.entries(models).forEach(([modelId, modelInfo]) => {
+                const option = document.createElement('option');
+                option.value = modelId;
+                option.textContent = modelId;
+
+                if (modelInfo && modelInfo.description) {
+                    option.title = modelInfo.description;
+                }
+
+                selectElement.appendChild(option);
+            });
+
+            // Create custom input field (initially hidden)
+            const customInput = document.createElement('input');
+            customInput.type = 'text';
+            customInput.id = field.name + '_custom';
+            customInput.className = 'model-custom-input';
+            customInput.placeholder = 'Enter custom model name...';
+            customInput.style.display = 'none';
+            customInput.style.marginTop = '8px';
+
+            // Create the main input that will hold the final value
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.id = field.name;
+            input.required = field.required || false;
+
+            // Add event listeners
+            selectElement.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    customInput.style.display = 'block';
+                    customInput.required = field.required || false;
+                    customInput.focus();
+                    input.value = customInput.value;
+                } else {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                    input.value = e.target.value;
+                }
+            });
+
+            customInput.addEventListener('input', (e) => {
+                input.value = e.target.value;
+            });
+
+            inputContainer.appendChild(selectElement);
+            inputContainer.appendChild(customInput);
+            inputContainer.appendChild(input);
+
+            container.appendChild(inputContainer);
+
+            return {
+                container,
+                input,
+                field,
+                selectElement,
+                customInput
+            };
         } else {
             // Create input based on inputType
             input = document.createElement('input');
@@ -438,7 +528,33 @@ class SemanticSearchController {
             this.dynamicFieldElements.forEach((fieldElement, fieldName) => {
                 const value = this.currentConfig.config[fieldName];
                 if (value !== undefined && fieldElement.input) {
-                    fieldElement.input.value = value;
+                    // Handle select-with-custom model fields
+                    if (fieldElement.selectElement && fieldElement.customInput) {
+                        // Check if the value matches any predefined option
+                        const selectElement = fieldElement.selectElement;
+                        let foundMatch = false;
+
+                        for (let option of selectElement.options) {
+                            if (option.value === value) {
+                                selectElement.value = value;
+                                fieldElement.input.value = value;
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+
+                        // If no match found, use custom input
+                        if (!foundMatch && value) {
+                            selectElement.value = 'custom';
+                            fieldElement.customInput.value = value;
+                            fieldElement.customInput.style.display = 'block';
+                            fieldElement.customInput.required = fieldElement.field.required || false;
+                            fieldElement.input.value = value;
+                        }
+                    } else {
+                        // Regular input field
+                        fieldElement.input.value = value;
+                    }
                 }
             });
         }

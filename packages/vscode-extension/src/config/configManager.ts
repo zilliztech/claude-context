@@ -40,7 +40,7 @@ type FieldDefinition = {
     name: string;
     type: string;
     description: string;
-    inputType?: 'text' | 'password' | 'url' | 'select';
+    inputType?: 'text' | 'password' | 'url' | 'select' | 'select-with-custom';
     placeholder?: string;
     required?: boolean;
 };
@@ -51,7 +51,7 @@ const EMBEDDING_PROVIDERS = {
         name: 'OpenAI',
         class: OpenAIEmbedding,
         requiredFields: [
-            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select', required: true },
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select-with-custom', required: true },
             { name: 'apiKey', type: 'string', description: 'OpenAI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [
@@ -65,7 +65,7 @@ const EMBEDDING_PROVIDERS = {
         name: 'VoyageAI',
         class: VoyageAIEmbedding,
         requiredFields: [
-            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select', required: true },
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select-with-custom', required: true },
             { name: 'apiKey', type: 'string', description: 'VoyageAI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [] as FieldDefinition[],
@@ -93,7 +93,7 @@ const EMBEDDING_PROVIDERS = {
         name: 'Gemini',
         class: GeminiEmbedding,
         requiredFields: [
-            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select', required: true },
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select-with-custom', required: true },
             { name: 'apiKey', type: 'string', description: 'Google AI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [
