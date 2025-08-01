@@ -385,3 +385,50 @@ input[type="url"]:focus {
     margin: 8px 0 4px 0;
     font-weight: 600;
 }
+
+/* Model input container styles */
+.model-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.model-select {
+    padding: 6px 10px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-size: 0.85rem;
+    transition: border-color 0.2s ease;
+}
+
+.model-select:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.model-select:hover {
+    border-color: var(--vscode-input-border);
+}
+
+.model-custom-input {
+    padding: 6px 10px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-size: 0.85rem;
+    transition: border-color 0.2s ease;
+}
+
+.model-custom-input:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.model-custom-input:hover {
+    border-color: var(--vscode-input-border);
+}
