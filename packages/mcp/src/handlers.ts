@@ -142,9 +142,10 @@ export class ToolHandlers {
     }
 
     public async handleIndexCodebase(args: any) {
-        const { path: codebasePath, force, splitter, ignorePatterns } = args;
+        const { path: codebasePath, force, splitter, customExtensions, ignorePatterns } = args;
         const forceReindex = force || false;
         const splitterType = splitter || 'ast'; // Default to AST
+        const customFileExtensions = customExtensions || [];
         const customIgnorePatterns = ignorePatterns || [];
 
         try {
@@ -278,6 +279,12 @@ export class ToolHandlers {
                 }
             }
 
+            // Add custom extensions if provided
+            if (customFileExtensions.length > 0) {
+                console.log(`[CUSTOM-EXTENSIONS] Adding ${customFileExtensions.length} custom extensions: ${customFileExtensions.join(', ')}`);
+                this.codeContext.addCustomExtensions(customFileExtensions);
+            }
+
             // Add custom ignore patterns if provided (before loading file-based patterns)
             if (customIgnorePatterns.length > 0) {
                 console.log(`[IGNORE-PATTERNS] Adding ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`);
@@ -298,6 +305,10 @@ export class ToolHandlers {
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
                 : '';
 
+            const extensionInfo = customFileExtensions.length > 0
+                ? `\nUsing ${customFileExtensions.length} custom extensions: ${customFileExtensions.join(', ')}`
+                : '';
+
             const ignoreInfo = customIgnorePatterns.length > 0
                 ? `\nUsing ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`
                 : '';
@@ -305,7 +316,7 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}${ignoreInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
+                    text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}${extensionInfo}${ignoreInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
                 }]
             };
 

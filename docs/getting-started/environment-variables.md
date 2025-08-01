@@ -42,6 +42,8 @@ Code Context supports a global configuration file at `~/.codecontext/.env` to si
 |----------|-------------|---------|
 | `EMBEDDING_BATCH_SIZE` | Batch size for processing. Larger batch size means less indexing time | `100` |
 | `SPLITTER_TYPE` | Code splitter type: `ast`, `langchain` | `ast` |
+| `CUSTOM_EXTENSIONS` | Additional file extensions to include (comma-separated, e.g., `.vue,.svelte,.astro`) | None |
+| `CUSTOM_IGNORE_PATTERNS` | Additional ignore patterns (comma-separated, e.g., `temp/**,*.backup,private/**`) | None |
 
 ## 🚀 Quick Setup
 
@@ -73,4 +75,9 @@ claude mcp add code-context -- npx @zilliz/code-context-mcp@latest
   }
 }
 ```
+
+## 📚 Additional Information
+
+For detailed information about file processing rules and how custom patterns work, see:
+- [What files does Code Context decide to embed?](../troubleshooting/faq.md#q-what-files-does-code-context-decide-to-embed)
  

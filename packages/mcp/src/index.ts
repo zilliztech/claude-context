@@ -139,6 +139,14 @@ Search the indexed codebase using natural language queries within a specified ab
                                     enum: ["ast", "langchain"],
                                     default: "ast"
                                 },
+                                customExtensions: {
+                                    type: "array",
+                                    items: {
+                                        type: "string"
+                                    },
+                                    description: "Optional: Additional file extensions to include beyond defaults (e.g., ['.vue', '.svelte', '.astro']). Extensions should include the dot prefix or will be automatically added",
+                                    default: []
+                                },
                                 ignorePatterns: {
                                     type: "array",
                                     items: {
