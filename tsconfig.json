@@ -19,10 +19,10 @@
         "baseUrl": ".",
         "downlevelIteration": true,
         "paths": {
-            "@zilliz/code-context-core": [
+            "@zilliz/claude-context-core": [
                 "./packages/core/src"
             ],
-            "@zilliz/code-context-core/*": [
+            "@zilliz/claude-context-core/*": [
                 "./packages/core/src/*"
             ]
         }

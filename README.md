@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/zilliztech/code-context">
+  <a href="https://github.com/zilliztech/claude-context">
     <img src="assets/code_context_logo_dark.png" width=600 alt="Code Context Logo">
   </a>
   <h3 align="center"> Add Semantic Search to Claude Code</h2>
@@ -11,10 +11,10 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
 [![Documentation](https://img.shields.io/badge/Documentation-📚-orange.svg)](docs/)
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Extension&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
-[![npm - core](https://img.shields.io/npm/v/@zilliz/code-context-core?label=%40zilliz%2Fcode-context-core&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-core)
-[![npm - mcp](https://img.shields.io/npm/v/@zilliz/code-context-mcp?label=%40zilliz%2Fcode-context-mcp&logo=npm)](https://www.npmjs.com/package/@zilliz/code-context-mcp)
+[![npm - core](https://img.shields.io/npm/v/@zilliz/claude-context-core?label=%40zilliz%2Fclaude-context-core&logo=npm)](https://www.npmjs.com/package/@zilliz/claude-context-core)
+[![npm - mcp](https://img.shields.io/npm/v/@zilliz/claude-context-mcp?label=%40zilliz%2Fclaude-context-mcp&logo=npm)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/code-context)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/claude-context)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord" /></a>
 </div>
 
@@ -69,7 +69,7 @@ Use the command line interface to add the Code Context MCP server:
 
 ```bash
 # Add the Code Context MCP server
-claude mcp add code-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/code-context-mcp@latest
+claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
 ```
 
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
@@ -84,9 +84,9 @@ Gemini CLI requires manual configuration through a JSON file:
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["@zilliz/code-context-mcp@latest"],
+      "args": ["@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
@@ -109,9 +109,9 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["@zilliz/code-context-mcp@latest"],
+      "args": ["@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -128,7 +128,7 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
 <details>
 <summary><strong>Cursor</strong></summary>
 
-<a href="https://cursor.com/install-mcp?name=code-context&config=JTdCJTIyY29tbWFuZCUyMiUzQSUyMm5weCUyMC15JTIwJTQwemlsbGl6JTJGY29kZS1jb250ZXh0LW1jcCU0MGxhdGVzdCUyMiUyQyUyMmVudiUyMiUzQSU3QiUyMk9QRU5BSV9BUElfS0VZJTIyJTNBJTIyeW91ci1vcGVuYWktYXBpLWtleSUyMiUyQyUyMk1JTFZVU19BRERSRVNTJTIyJTNBJTIybG9jYWxob3N0JTNBMTk1MzAlMjIlN0QlN0Q%3D"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add code-context MCP server to Cursor" height="32" /></a>
+<a href="https://cursor.com/install-mcp?name=claude-context&config=JTdCJTIyY29tbWFuZCUyMiUzQSUyMm5weCUyMC15JTIwJTQwemlsbGl6JTJGY29kZS1jb250ZXh0LW1jcCU0MGxhdGVzdCUyMiUyQyUyMmVudiUyMiUzQSU3QiUyMk9QRU5BSV9BUElfS0VZJTIyJTNBJTIyeW91ci1vcGVuYWktYXBpLWtleSUyMiUyQyUyMk1JTFZVU19BRERSRVNTJTIyJTNBJTIybG9jYWxob3N0JTNBMTk1MzAlMjIlN0QlN0Q%3D"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add claude-context MCP server to Cursor" height="32" /></a>
 
 Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`
 
@@ -137,9 +137,9 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -185,9 +185,9 @@ Add to your Claude Desktop configuration:
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["@zilliz/code-context-mcp@latest"],
+      "args": ["@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -208,9 +208,9 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -231,9 +231,9 @@ The Code Context MCP server can be used with VS Code through MCP-compatible exte
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -253,10 +253,10 @@ Cherry Studio allows for visual MCP server configuration through its settings in
 
 1. Navigate to **Settings → MCP Servers → Add Server**.
 2. Fill in the server details:
-   - **Name**: `code-context`
+   - **Name**: `claude-context`
    - **Type**: `STDIO`
    - **Command**: `npx`
-   - **Arguments**: `["@zilliz/code-context-mcp@latest"]`
+   - **Arguments**: `["@zilliz/claude-context-mcp@latest"]`
    - **Environment Variables**:
      - `OPENAI_API_KEY`: `your-openai-api-key`
      - `MILVUS_ADDRESS`: `your-zilliz-cloud-public-endpoint`
@@ -279,9 +279,9 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["@zilliz/code-context-mcp@latest"],
+      "args": ["@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -314,7 +314,7 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
 5. Enter the following command:
 
    ```
-   npx @zilliz/code-context-mcp@latest
+   npx @zilliz/claude-context-mcp@latest
    ```
 
 6. Name the MCP: **Code Context**.
@@ -334,9 +334,9 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
 "augment.advanced": { 
   "mcpServers": [ 
     { 
-      "name": "code-context", 
+      "name": "claude-context", 
       "command": "npx", 
-      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -361,9 +361,9 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 ```json
 {
   "mcpServers": {
-    "code-context": {
+    "claude-context": {
       "command": "npx",
-      "args": ["@zilliz/code-context-mcp@latest"],
+      "args": ["@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
@@ -385,7 +385,7 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 The server uses stdio transport and follows the standard MCP protocol. It can be integrated with any MCP-compatible client by running:
 
 ```bash
-npx @zilliz/code-context-mcp@latest
+npx @zilliz/claude-context-mcp@latest
 ```
 
 </details>
@@ -403,9 +403,9 @@ Code Context is a monorepo containing three main packages:
 
 ### Core Components
 
-- **`@zilliz/code-context-core`**: Core indexing engine with embedding and vector database integration
+- **`@zilliz/claude-context-core`**: Core indexing engine with embedding and vector database integration
 - **VSCode Extension**: Semantic Code Search extension for Visual Studio Code
-- **`@zilliz/code-context-mcp`**: Model Context Protocol server for AI agent integration
+- **`@zilliz/claude-context-mcp`**: Model Context Protocol server for AI agent integration
 
 ### Supported Technologies
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
@@ -422,10 +422,10 @@ While MCP is the recommended way to use Code Context with AI assistants, you can
 
 ### Core Package Usage
 
-The `@zilliz/code-context-core` package provides the fundamental functionality for code indexing and semantic search.
+The `@zilliz/claude-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
 ```typescript
-import { CodeContext, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
+import { CodeContext, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -480,8 +480,8 @@ Integrates Code Context directly into your IDE. Provides an intuitive interface 
 
 ```bash
 # Clone repository
-git clone https://github.com/zilliztech/code-context.git
-cd code-context
+git clone https://github.com/zilliztech/claude-context.git
+cd claude-context
 
 # Install dependencies
 pnpm install
@@ -572,7 +572,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/zilliztech/code-context)
+- [GitHub Repository](https://github.com/zilliztech/claude-context)
 - [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 - [Milvus Documentation](https://milvus.io/docs)
 - [Zilliz Cloud](https://zilliz.com/cloud)

@@ -21,13 +21,13 @@ Welcome to the Code Context documentation! Code Context is a powerful tool that 
 
 ## 🔗 External Resources
 
-- [GitHub Repository](https://github.com/zilliztech/code-context)
+- [GitHub Repository](https://github.com/zilliztech/claude-context)
 - [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
-- [npm - Core Package](https://www.npmjs.com/package/@zilliz/code-context-core)
-- [npm - MCP Server](https://www.npmjs.com/package/@zilliz/code-context-mcp)
+- [npm - Core Package](https://www.npmjs.com/package/@zilliz/claude-context-core)
+- [npm - MCP Server](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
 - [Zilliz Cloud](https://cloud.zilliz.com)
 
 ## 💬 Support
 
-- **Issues**: [GitHub Issues](https://github.com/zilliztech/code-context/issues)
+- **Issues**: [GitHub Issues](https://github.com/zilliztech/claude-context/issues)
 - **Discord**: [Join our Discord](https://discord.gg/mKc3R95yE5)

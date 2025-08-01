@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CodeContext } from '@zilliz/code-context-core';
+import { CodeContext } from '@zilliz/claude-context-core';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
@@ -75,7 +75,7 @@ export class IndexCommand {
 
                 // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
-                const { FileSynchronizer } = await import("@zilliz/code-context-core");
+                const { FileSynchronizer } = await import("@zilliz/claude-context-core");
                 const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.codeContext['ignorePatterns'] || []);
                 await synchronizer.initialize();
                 // Store synchronizer in the context's internal map using the same collection name generation logic
