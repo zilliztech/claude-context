@@ -5,8 +5,8 @@ import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
 import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
-import { CodeContext, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/code-context-core';
-import { envManager } from '@zilliz/code-context-core';
+import { CodeContext, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/claude-context-core';
+import { envManager } from '@zilliz/claude-context-core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
 let searchCommand: SearchCommand;

@@ -115,9 +115,9 @@ This Chrome extension is part of the Code Context monorepo. Please see:
 
 ## Related Packages
 
-- **[@zilliz/code-context-core](../core)** - Core indexing engine used by this extension
-- **[@zilliz/code-context-vscode-extension](../vscode-extension)** - VSCode integration
-- **[@zilliz/code-context-mcp](../mcp)** - MCP server integration
+- **[@zilliz/claude-context-core](../core)** - Core indexing engine used by this extension
+- **[@zilliz/claude-context-vscode-extension](../vscode-extension)** - VSCode integration
+- **[@zilliz/claude-context-mcp](../mcp)** - MCP server integration
 
 ## Tech Stack
 
