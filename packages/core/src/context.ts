@@ -237,6 +237,9 @@ export class CodeContext {
         const synchronizer = this.synchronizers.get(collectionName);
 
         if (!synchronizer) {
+            // Load project-specific ignore patterns before creating FileSynchronizer
+            await this.loadGitignorePatterns(codebasePath);
+            
             // To be safe, let's initialize if it's not there.
             const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns);
             await newSynchronizer.initialize();
