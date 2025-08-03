@@ -357,7 +357,10 @@ export class ToolHandlers {
             const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
             const collectionName = `code_chunks_${hash.substring(0, 8)}`;
 
-            // Initialize file synchronizer with proper ignore patterns
+            // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
+            await this.codeContext['loadGitignorePatterns'](absolutePath);
+            
+            // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/code-context-core");
             const ignorePatterns = this.codeContext['ignorePatterns'] || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
