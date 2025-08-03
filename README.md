@@ -16,6 +16,7 @@
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-AI%20Docs-purple.svg?logo=gitbook&logoColor=white)](https://deepwiki.com/zilliztech/code-context)
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord" /></a>
+
 </div>
 
 **Code Context** is an MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
@@ -24,12 +25,13 @@
 
 ## ✨ Features
 
-- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
+- 🔍 **Semantic Code Search**: Ask questions like _"find functions that handle user authentication"_ and get relevant, context-rich code instantly.
 - 🧠 **Context-Aware**: Discover large codebase, understand how different parts of your codebase relate, even across millions of lines of code.
 - ⚡ **Incremental Indexing**: Efficiently re-index only changed files using Merkle trees.
 - 🧩 **Intelligent Code Chunking**: Analyze code in Abstract Syntax Trees (AST) for chunking.
 - 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
 - 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
+
 ---
 
 ## 🚀 Demo
@@ -39,6 +41,7 @@
 Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants, e.g. Claude Code.
 
 ## Quick Start
+
 ### Prerequisites
 
 <details>
@@ -49,12 +52,13 @@ Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com
 ![](assets/signup_and_get_apikey.png)
 
 Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configuration examples.
+
 </details>
 
 <details>
 <summary>Get OpenAI API Key for embedding model</summary>
 
-You need an OpenAI API key for the embedding model. You can get one by signing up at [OpenAI](https://platform.openai.com/api-keys).  
+You need an OpenAI API key for the embedding model. You can get one by signing up at [OpenAI](https://platform.openai.com/api-keys).
 
 Your API key will look like this: it always starts with `sk-`.  
 Copy your key and use it in the configuration examples below as `your-openai-api-key`.
@@ -95,11 +99,10 @@ Gemini CLI requires manual configuration through a JSON file:
   }
 }
 ```
+
 3. Save the file and restart Gemini CLI to apply the changes.
 
 ### Other MCP Client Configurations (Cursor, Windsurf, etc.)
-
-
 
 <details>
 <summary><strong>Qwen Code</strong></summary>
@@ -124,7 +127,6 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
 
 </details>
 
-
 <details>
 <summary><strong>Cursor</strong></summary>
 
@@ -133,6 +135,31 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
 Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`
 
 Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file is the recommended approach. You may also install in a specific project by creating `.cursor/mcp.json` in your project folder. See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more info.
+
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Void</strong></summary>
+
+Go to: `Settings` -> `MCP` -> `Add MCP server`
+
+Add the following configuration to your Void MCP settings:
 
 ```json
 {
@@ -296,7 +323,7 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
 
 7. Click the **Add** button.
 
-------
+---
 
 #### **B. Manual Configuration**
 
@@ -306,11 +333,11 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
 4. Add the server configuration to the `mcpServers` array in the `augment.advanced` object
 
 ```json
-"augment.advanced": { 
-  "mcpServers": [ 
-    { 
-      "name": "code-context", 
-      "command": "npx", 
+"augment.advanced": {
+  "mcpServers": [
+    {
+      "name": "code-context",
+      "command": "npx",
       "args": ["-y", "@zilliz/code-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
@@ -353,7 +380,6 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 
 </details>
 
-
 <details>
 <summary><strong>Other MCP Clients</strong></summary>
 
@@ -372,6 +398,7 @@ For more detailed MCP environment variable configuration, see our [Environment V
 ---
 
 ## 🏗️ Architecture
+
 ![](assets/Architecture.png)
 
 Code Context is a monorepo containing three main packages:
@@ -383,6 +410,7 @@ Code Context is a monorepo containing three main packages:
 - **`@zilliz/code-context-mcp`**: Model Context Protocol server for AI agent integration
 
 ### Supported Technologies
+
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
 - **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
@@ -400,38 +428,48 @@ While MCP is the recommended way to use Code Context with AI assistants, you can
 The `@zilliz/code-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
 ```typescript
-import { CodeContext, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/code-context-core';
+import {
+  CodeContext,
+  MilvusVectorDatabase,
+  OpenAIEmbedding,
+} from "@zilliz/code-context-core";
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
-    apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
-    model: 'text-embedding-3-small'
+  apiKey: process.env.OPENAI_API_KEY || "your-openai-api-key",
+  model: "text-embedding-3-small",
 });
 
 // Initialize vector database
 const vectorDatabase = new MilvusVectorDatabase({
-    address: process.env.MILVUS_ADDRESS || 'your-zilliz-cloud-public-endpoint',
-    token: process.env.MILVUS_TOKEN || 'your-zilliz-cloud-api-key'
+  address: process.env.MILVUS_ADDRESS || "your-zilliz-cloud-public-endpoint",
+  token: process.env.MILVUS_TOKEN || "your-zilliz-cloud-api-key",
 });
 
 // Create context instance
 const context = new CodeContext({
-    embedding,
-    vectorDatabase
+  embedding,
+  vectorDatabase,
 });
 
 // Index your codebase with progress tracking
-const stats = await context.indexCodebase('./your-project', (progress) => {
-    console.log(`${progress.phase} - ${progress.percentage}%`);
+const stats = await context.indexCodebase("./your-project", (progress) => {
+  console.log(`${progress.phase} - ${progress.percentage}%`);
 });
 console.log(`Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks`);
 
 // Perform semantic search
-const results = await context.semanticSearch('./your-project', 'vector database operations', 5);
-results.forEach(result => {
-    console.log(`File: ${result.relativePath}:${result.startLine}-${result.endLine}`);
-    console.log(`Score: ${(result.score * 100).toFixed(2)}%`);
-    console.log(`Content: ${result.content.substring(0, 100)}...`);
+const results = await context.semanticSearch(
+  "./your-project",
+  "vector database operations",
+  5
+);
+results.forEach((result) => {
+  console.log(
+    `File: ${result.relativePath}:${result.startLine}-${result.endLine}`
+  );
+  console.log(`Score: ${(result.score * 100).toFixed(2)}%`);
+  console.log(`Content: ${result.content.substring(0, 100)}...`);
 });
 ```
 
@@ -441,9 +479,9 @@ Integrates Code Context directly into your IDE. Provides an intuitive interface 
 
 1. **Direct Link**: [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 2. **Manual Search**:
-    - Open Extensions view in VSCode (Ctrl+Shift+X or Cmd+Shift+X on Mac)
-    - Search for "Semantic Code Search"
-    - Click Install
+   - Open Extensions view in VSCode (Ctrl+Shift+X or Cmd+Shift+X on Mac)
+   - Search for "Semantic Code Search"
+   - Click Install
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdphYH31AdG2Z5FdtLYbedPTGXHvwtDbNwUduYRl7j7sR_WhtiUTdnUALNw-dsABnJkZxxnsRcDA1G37qsaXm9KAW4MiCXY_bStpaaeG-KCfEfmMG4kPFQmoO33yQ_6OlLyjIsPvQ?key=_L-CtW461S9w7NRqzdFOIg)
 
@@ -491,12 +529,14 @@ pnpm dev
 ### Supported File Extensions
 
 By default, Code Context supports:
+
 - Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`
 - Documentation: `.md`, `.markdown`
 
 ### Ignore Patterns
 
 Common directories and files are automatically ignored:
+
 - `node_modules/**`, `dist/**`, `build/**`
 - `.git/**`, `.vscode/**`, `.idea/**`
 - `*.log`, `*.min.js`, `*.map`
@@ -522,8 +562,9 @@ For frequently asked questions and troubleshooting tips, see our [FAQ Guide](doc
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
 
 **Package-specific contributing guides:**
+
 - [Core Package Contributing](packages/core/CONTRIBUTING.md)
-- [MCP Server Contributing](packages/mcp/CONTRIBUTING.md)  
+- [MCP Server Contributing](packages/mcp/CONTRIBUTING.md)
 - [VSCode Extension Contributing](packages/vscode-extension/CONTRIBUTING.md)
 
 ---
