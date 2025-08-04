@@ -1,8 +1,8 @@
 # Project Overview
 
-## What is Code Context?
+## What is Claude Context?
 
-Code Context is a powerful semantic code search tool that gives AI coding assistants deep understanding of your entire codebase. Instead of traditional keyword-based search, Code Context uses vector embeddings and AI to understand the meaning and context of your code.
+Claude Context is a powerful semantic code search tool that gives AI coding assistants deep understanding of your entire codebase. Instead of traditional keyword-based search, Claude Context uses vector embeddings and AI to understand the meaning and context of your code.
 
 ## Key Features
 
@@ -27,7 +27,7 @@ Configure file extensions, ignore patterns, embedding models, and search paramet
 ## How It Works
 
 ### 1. Code Analysis
-Code Context analyzes your codebase using AST parsers to understand code structure and semantics.
+Claude Context analyzes your codebase using AST parsers to understand code structure and semantics.
 
 ### 2. Intelligent Chunking
 Code is split into meaningful chunks that preserve context, function boundaries, and logical groupings.
@@ -43,14 +43,14 @@ Natural language queries are converted to vectors and matched against stored cod
 
 ## Architecture Components
 
-### Core Engine (`@zilliz/code-context-core`)
+### Core Engine (`@zilliz/claude-context-core`)
 The foundational indexing engine that handles:
 - Code parsing and analysis
 - Embedding generation
 - Vector database operations
 - Search algorithms
 
-### MCP Server (`@zilliz/code-context-mcp`)
+### MCP Server (`@zilliz/claude-context-mcp`)
 Model Context Protocol server that enables integration with AI assistants:
 - Standardized tool interface
 - Compatible with Claude Code, Cursor, Windsurf, and more

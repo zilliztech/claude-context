@@ -1,6 +1,6 @@
 # Contributing to VSCode Extension
 
-Thanks for your interest in contributing to the Code Context VSCode extension!
+Thanks for your interest in contributing to the Claude Context VSCode extension!
 
 > 📖 **First time contributing?** Please read the [main contributing guide](../../CONTRIBUTING.md) first for general setup and workflow.
 
@@ -60,7 +60,7 @@ Press `F5` to launch Extension Development Host
 ## Extension Features
 
 - Semantic code search within VSCode
-- Integration with Code Context core
+- Integration with Claude Context core
 - Progress indicators for indexing
 - Search results in sidebar
 

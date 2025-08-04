@@ -1,12 +1,12 @@
-# Contributing to Code Context
+# Contributing to Claude Context
 
-Thank you for your interest in contributing to Code Context! This guide will help you get started.
+Thank you for your interest in contributing to Claude Context! This guide will help you get started.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js >= 20.0.0
+- Node.js >= 20.0.0 and < 24.0.0
 - pnpm >= 10.0.0
 - Git
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Code Context! This guide will hel
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/your-username/code-context.git
-   cd code-context
+   git clone https://github.com/your-username/claude-context.git
+   cd claude-context
    ```
 
 2. **Install Dependencies**
@@ -36,7 +36,7 @@ Thank you for your interest in contributing to Code Context! This guide will hel
 ## 📁 Project Structure
 
 ```
-code-context/
+claude-context/
 ├── packages/
 │   ├── core/              # Core indexing engine
 │   ├── vscode-extension/  # VSCode extension
@@ -155,8 +155,8 @@ When reporting bugs or requesting features:
 
 ## 📄 License
 
-By contributing to Code Context, you agree that your contributions will be licensed under the MIT License.
+By contributing to Claude Context, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-Thank you for contributing to Code Context! 🎉
+Thank you for contributing to Claude Context! 🎉

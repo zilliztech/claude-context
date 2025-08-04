@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-CodeContext End-to-End Test
-Use TypeScriptExecutor to call complete CodeContext workflow
+Claude Context End-to-End Test
+Use TypeScriptExecutor to call complete Claude Context workflow
 """
 
 import os
@@ -14,8 +14,8 @@ sys.path.append(str(Path(__file__).parent))
 from ts_executor import TypeScriptExecutor
 
 
-def run_codecontext_endtoend_test():
-    """Run CodeContext end-to-end test"""
+def run_context_endtoend_test():
+    """Run Claude Context end-to-end test"""
 
     # Configuration parameters
     config = {
@@ -27,7 +27,7 @@ def run_codecontext_endtoend_test():
         "searchQuery": "embedding creation and vector database configuration",
     }
 
-    print("🚀 Starting CodeContext end-to-end test")
+    print("🚀 Starting Claude Context end-to-end test")
     print(f"📊 Configuration:")
     print(f"   - Codebase path: {config['codebasePath']}")
     print(f"   - Vector database: {config['milvusAddress']}")
@@ -42,7 +42,7 @@ def run_codecontext_endtoend_test():
 
         # Call end-to-end test
         result = executor.call_method(
-            "./test_codecontext.ts", "testCodeContextEndToEnd", config
+            "./test_context.ts", "testContextEndToEnd", config
         )
 
         # Output results
@@ -104,19 +104,19 @@ def run_codecontext_endtoend_test():
 def main():
     """Main function"""
     print("=" * 60)
-    print("🧪 CodeContext End-to-End Test")
+    print("🧪 Claude Context End-to-End Test")
     print("=" * 60)
     print()
 
-    success = run_codecontext_endtoend_test()
+    success = run_context_endtoend_test()
 
     print()
     print("=" * 60)
     if success:
-        print("🎉 Test completed! CodeContext end-to-end workflow runs successfully!")
+        print("🎉 Test completed! Claude Context end-to-end workflow runs successfully!")
         print()
         print("💡 This proves:")
-        print("   ✅ Can call TypeScript CodeContext from Python")
+        print("   ✅ Can call TypeScript Claude Context from Python")
         print("   ✅ Supports complete indexing and search workflow")
         print("   ✅ Supports complex configuration and parameter passing")
         print("   ✅ Can get detailed execution results and statistics")

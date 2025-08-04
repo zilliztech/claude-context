@@ -2,9 +2,9 @@
 
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/zilliz.semanticcodesearch?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 
-A code indexing and semantic search VSCode extension powered by [Code Context](https://github.com/zilliztech/code-context).
+A code indexing and semantic search VSCode extension powered by [Claude Context](https://github.com/zilliztech/claude-context).
 
-> 📖 **New to Code Context?** Check out the [main project README](https://github.com/zilliztech/code-context/blob/master/README.md) for an overview and setup instructions.
+> 📖 **New to Claude Context?** Check out the [main project README](https://github.com/zilliztech/claude-context/blob/master/README.md) for an overview and setup instructions.
 
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdphYH31AdG2Z5FdtLYbedPTGXHvwtDbNwUduYRl7j7sR_WhtiUTdnUALNw-dsABnJkZxxnsRcDA1G37qsaXm9KAW4MiCXY_bStpaaeG-KCfEfmMG4kPFQmoO33yQ_6OlLyjIsPvQ?key=_L-CtW461S9w7NRqzdFOIg)
@@ -35,7 +35,7 @@ A code indexing and semantic search VSCode extension powered by [Code Context](h
 ## Quick Start
 
 ### Configuration
-The first time you open Code Context, you need to click on Settings icon to configure the relevant options.
+The first time you open Claude Context, you need to click on Settings icon to configure the relevant options.
 
 #### Embedding Configuration
 Configure your embedding provider to convert code into semantic vectors.
@@ -65,14 +65,14 @@ Configure how your code is split into chunks for indexing.
 #### Zilliz Cloud configuration
 Get a free Milvus vector database on Zilliz Cloud. 
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
+Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
-![](https://raw.githubusercontent.com/zilliztech/code-context/master/assets/signup_and_create_cluster.jpeg)
+![](https://raw.githubusercontent.com/zilliztech/claude-context/master/assets/signup_and_create_cluster.jpeg)
 
 After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
 These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
 
-![Zilliz Cloud Dashboard](https://raw.githubusercontent.com/zilliztech/code-context/master/assets/zilliz_cloud_dashboard.jpeg)
+![Zilliz Cloud Dashboard](https://raw.githubusercontent.com/zilliztech/claude-context/master/assets/zilliz_cloud_dashboard.jpeg)
 
 Keep both values handy for the configuration steps below.
 
@@ -114,14 +114,14 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 
 ## Contributing
 
-This VSCode extension is part of the Code Context monorepo. Please see:
-- [Main Contributing Guide](https://github.com/zilliztech/code-context/blob/master/CONTRIBUTING.md) - General contribution guidelines
-- [VSCode Extension Contributing](https://github.com/zilliztech/code-context/blob/master/packages/vscode-extension/CONTRIBUTING.md) - Specific development guide for this extension
+This VSCode extension is part of the Claude Context monorepo. Please see:
+- [Main Contributing Guide](https://github.com/zilliztech/claude-context/blob/master/CONTRIBUTING.md) - General contribution guidelines
+- [VSCode Extension Contributing](https://github.com/zilliztech/claude-context/blob/master/packages/vscode-extension/CONTRIBUTING.md) - Specific development guide for this extension
 
 ## Related Packages
 
-- **[@zilliz/code-context-core](https://github.com/zilliztech/code-context/tree/master/packages/core)** - Core indexing engine used by this extension
-- **[@zilliz/code-context-mcp](https://github.com/zilliztech/code-context/tree/master/packages/mcp)** - Alternative MCP server integration
+- **[@zilliz/claude-context-core](https://github.com/zilliztech/claude-context/tree/master/packages/core)** - Core indexing engine used by this extension
+- **[@zilliz/claude-context-mcp](https://github.com/zilliztech/claude-context/tree/master/packages/mcp)** - Alternative MCP server integration
 
 ## Tech Stack
 
@@ -132,4 +132,4 @@ This VSCode extension is part of the Code Context monorepo. Please see:
 
 ## License
 
-MIT - See [LICENSE](https://github.com/zilliztech/code-context/blob/master/LICENSE) for details 
+MIT - See [LICENSE](https://github.com/zilliztech/claude-context/blob/master/LICENSE) for details 

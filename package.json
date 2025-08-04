@@ -1,25 +1,25 @@
 {
-    "name": "code-context",
-    "version": "0.0.11",
+    "name": "claude-context",
+    "version": "0.0.13",
     "description": "A powerful code indexing tool with multi-platform support",
     "private": true,
     "scripts": {
         "build": "pnpm -r --filter='!./examples/*' build && pnpm -r --filter='./examples/*' build",
-        "build:core": "pnpm --filter @zilliz/code-context-core build",
+        "build:core": "pnpm --filter @zilliz/claude-context-core build",
         "build:vscode": "pnpm --filter semanticcodesearch compile",
-        "build:mcp": "pnpm --filter @zilliz/code-context-mcp build",
+        "build:mcp": "pnpm --filter @zilliz/claude-context-mcp build",
         "dev": "pnpm -r dev",
-        "dev:core": "pnpm --filter @zilliz/code-context-core dev",
+        "dev:core": "pnpm --filter @zilliz/claude-context-core dev",
         "dev:vscode": "pnpm --filter semanticcodesearch watch",
-        "dev:mcp": "pnpm --filter @zilliz/code-context-mcp dev",
+        "dev:mcp": "pnpm --filter @zilliz/claude-context-mcp dev",
         "clean": "pnpm -r clean",
         "lint": "pnpm -r lint",
         "lint:fix": "pnpm -r run lint:fix",
         "typecheck": "pnpm -r run typecheck",
-        "release:core": "pnpm --filter @zilliz/code-context-core... run build && pnpm --filter @zilliz/code-context-core publish --access public --no-git-checks",
-        "release:mcp": "pnpm --filter @zilliz/code-context-mcp... run build && pnpm --filter @zilliz/code-context-mcp publish --access public --no-git-checks",
-        "release:vscode": "pnpm --filter @zilliz/code-context-core build && pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
-        "example:basic": "pnpm --filter code-context-basic-example start"
+        "release:core": "pnpm --filter @zilliz/claude-context-core... run build && pnpm --filter @zilliz/claude-context-core publish --access public --no-git-checks",
+        "release:mcp": "pnpm --filter @zilliz/claude-context-mcp... run build && pnpm --filter @zilliz/claude-context-mcp publish --access public --no-git-checks",
+        "release:vscode": "pnpm --filter @zilliz/claude-context-core build && pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
+        "example:basic": "pnpm --filter claude-context-basic-example start"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
@@ -49,9 +49,8 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/zilliztech/code-context.git"
+        "url": "https://github.com/zilliztech/claude-context.git"
     },
     "license": "MIT",
-    "author": "Cheney Zhang <277584121@qq.com>",
-    "packageManager": "pnpm@10.12.1+sha512.f0dda8580f0ee9481c5c79a1d927b9164f2c478e90992ad268bbb2465a736984391d6333d2c327913578b2804af33474ca554ba29c04a8b13060a717675ae3ac"
+    "author": "Cheney Zhang <277584121@qq.com>"
 }

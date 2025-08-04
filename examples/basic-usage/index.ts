@@ -1,5 +1,5 @@
-import { CodeContext, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/code-context-core';
-import { envManager } from '@zilliz/code-context-core';
+import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
+import { envManager } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
 // Try to load .env file
@@ -10,7 +10,7 @@ try {
 }
 
 async function main() {
-    console.log('🚀 CodeContext Real Usage Example');
+    console.log('🚀 Context Real Usage Example');
     console.log('===============================');
 
     try {
@@ -40,14 +40,14 @@ async function main() {
             });
         }
 
-        // 2. Create CodeContext instance
+        // 2. Create Context instance
         let codeSplitter;
         if (splitterType === 'langchain') {
             codeSplitter = new LangChainCodeSplitter(1000, 200);
         } else {
             codeSplitter = new AstCodeSplitter(2500, 300);
         }
-        const context = new CodeContext({
+        const context = new Context({
             vectorDatabase,
             codeSplitter,
             supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp', '.go', '.rs']

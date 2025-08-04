@@ -1,8 +1,8 @@
 # GitHub Code Vector Search Chrome Extension
 
-A Chrome extension for indexing and semantically searching GitHub repository code, powered by Code Context.
+A Chrome extension for indexing and semantically searching GitHub repository code, powered by Claude Context.
 
-> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
+> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 ## Features
 
@@ -109,22 +109,22 @@ The extension requires the following permissions:
 
 ## Contributing
 
-This Chrome extension is part of the Code Context monorepo. Please see:
+This Chrome extension is part of the Claude Context monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines
 - [Chrome Extension Contributing](CONTRIBUTING.md) - Specific development guide for this extension
 
 ## Related Packages
 
-- **[@zilliz/code-context-core](../core)** - Core indexing engine used by this extension
-- **[@zilliz/code-context-vscode-extension](../vscode-extension)** - VSCode integration
-- **[@zilliz/code-context-mcp](../mcp)** - MCP server integration
+- **[@zilliz/claude-context-core](../core)** - Core indexing engine used by this extension
+- **[@zilliz/claude-context-vscode-extension](../vscode-extension)** - VSCode integration
+- **[@zilliz/claude-context-mcp](../mcp)** - MCP server integration
 
 ## Tech Stack
 
 - **TypeScript** - Type-safe development
 - **Chrome Extension Manifest V3** - Modern extension architecture
 - **Webpack** - Module bundling and optimization
-- **Code Context Core** - Semantic search engine
+- **Claude Context Core** - Semantic search engine
 - **Milvus Vector Database** - Vector storage and retrieval
 - **OpenAI/VoyageAI Embeddings** - Text embedding generation
 

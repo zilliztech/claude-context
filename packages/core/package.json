@@ -1,7 +1,7 @@
 {
-    "name": "@zilliz/code-context-core",
-    "version": "0.0.11",
-    "description": "Core indexing engine for Code Context",
+    "name": "@zilliz/claude-context-core",
+    "version": "0.0.13",
+    "description": "Core indexing engine for Claude Context",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -46,7 +46,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/zilliztech/code-context.git",
+        "url": "https://github.com/zilliztech/claude-context.git",
         "directory": "packages/core"
     },
     "license": "MIT",

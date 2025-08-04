@@ -1,6 +1,6 @@
-import { envManager } from "@zilliz/code-context-core";
+import { envManager } from "@zilliz/claude-context-core";
 
-export interface CodeContextMcpConfig {
+export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
@@ -58,8 +58,8 @@ export function getEmbeddingModelForProvider(provider: string): string {
     }
 }
 
-export function createMcpConfig(): CodeContextMcpConfig {
-    // Debug: Print all environment variables related to CodeContext
+export function createMcpConfig(): ContextMcpConfig {
+    // Debug: Print all environment variables related to Context
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
     console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${envManager.get('EMBEDDING_PROVIDER') || 'NOT SET'}`);
     console.log(`[DEBUG]   EMBEDDING_MODEL: ${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}`);
@@ -69,8 +69,8 @@ export function createMcpConfig(): CodeContextMcpConfig {
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
-    const config: CodeContextMcpConfig = {
-        name: envManager.get('MCP_SERVER_NAME') || "CodeContext MCP Server",
+    const config: ContextMcpConfig = {
+        name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
         embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
@@ -91,9 +91,9 @@ export function createMcpConfig(): CodeContextMcpConfig {
     return config;
 }
 
-export function logConfigurationSummary(config: CodeContextMcpConfig): void {
+export function logConfigurationSummary(config: ContextMcpConfig): void {
     // Log configuration summary before starting server
-    console.log(`[MCP] 🚀 Starting CodeContext MCP Server`);
+    console.log(`[MCP] 🚀 Starting Context MCP Server`);
     console.log(`[MCP] Configuration Summary:`);
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
@@ -125,9 +125,9 @@ export function logConfigurationSummary(config: CodeContextMcpConfig): void {
 
 export function showHelpMessage(): void {
     console.log(`
-CodeContext MCP Server
+Context MCP Server
 
-Usage: npx @zilliz/code-context-mcp@latest [options]
+Usage: npx @zilliz/claude-context-mcp@latest [options]
 
 Options:
   --help, -h                          Show this help message
@@ -156,18 +156,18 @@ Environment Variables:
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
-  OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/code-context-mcp@latest
+  OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with OpenAI and auto-resolve Milvus address from token
-  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-zilliz-token npx @zilliz/code-context-mcp@latest
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-zilliz-token npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with VoyageAI
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx MILVUS_TOKEN=your-token npx @zilliz/code-context-mcp@latest
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with Gemini
-  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx MILVUS_TOKEN=your-token npx @zilliz/code-context-mcp@latest
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with Ollama
-  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/code-context-mcp@latest
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
         `);
 } 

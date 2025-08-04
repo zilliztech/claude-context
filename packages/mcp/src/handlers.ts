@@ -1,18 +1,18 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { CodeContext, COLLECTION_LIMIT_MESSAGE } from "@zilliz/code-context-core";
+import { Context, COLLECTION_LIMIT_MESSAGE } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
 export class ToolHandlers {
-    private codeContext: CodeContext;
+    private context: Context;
     private snapshotManager: SnapshotManager;
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
     private currentWorkspace: string;
 
-    constructor(codeContext: CodeContext, snapshotManager: SnapshotManager) {
-        this.codeContext = codeContext;
+    constructor(context: Context, snapshotManager: SnapshotManager) {
+        this.context = context;
         this.snapshotManager = snapshotManager;
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
@@ -33,7 +33,7 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
 
             // Get all collections using the interface method
-            const vectorDb = this.codeContext['vectorDatabase'];
+            const vectorDb = this.context['vectorDatabase'];
 
             // Use the new listCollections method from the interface
             const collections = await vectorDb.listCollections();
@@ -225,15 +225,15 @@ export class ToolHandlers {
                 console.log(`[INDEX-VALIDATION] 🔍 Validating hybrid collection creation for: ${collectionName}`);
 
                 // Get embedding dimension for collection creation
-                const embeddingProvider = this.codeContext['embedding'];
+                const embeddingProvider = this.context['embedding'];
                 const dimension = embeddingProvider.getDimension();
 
                 // Check if collection already exists and clear it to avoid schema conflicts
-                const collectionExists = await this.codeContext['vectorDatabase'].hasCollection(collectionName);
+                const collectionExists = await this.context['vectorDatabase'].hasCollection(collectionName);
                 if (collectionExists) {
                     console.log(`[INDEX-VALIDATION] 📋 Hybrid collection ${collectionName} already exists, clearing for validation`);
                     try {
-                        await this.codeContext['vectorDatabase'].dropCollection(collectionName);
+                        await this.context['vectorDatabase'].dropCollection(collectionName);
                         console.log(`[INDEX-VALIDATION] ✅ Existing hybrid collection cleared for validation: ${collectionName}`);
                     } catch (dropError: any) {
                         console.log(`[INDEX-VALIDATION] ⚠️  Error clearing existing collection: ${dropError.message || dropError}`);
@@ -244,14 +244,14 @@ export class ToolHandlers {
                 }
 
                 // Attempt to create hybrid collection with BM25 support - this will throw COLLECTION_LIMIT_MESSAGE if limit reached
-                await this.codeContext['vectorDatabase'].createHybridCollection(
+                await this.context['vectorDatabase'].createHybridCollection(
                     collectionName,
                     dimension,
                     `Hybrid code context collection: ${collectionName}`
                 );
 
                 // If creation succeeds, immediately drop the test collection
-                await this.codeContext['vectorDatabase'].dropCollection(collectionName);
+                await this.context['vectorDatabase'].dropCollection(collectionName);
                 console.log(`[INDEX-VALIDATION] ✅ Hybrid collection creation validated successfully`);
 
             } catch (validationError: any) {
@@ -285,13 +285,13 @@ export class ToolHandlers {
             // Add custom extensions if provided
             if (customFileExtensions.length > 0) {
                 console.log(`[CUSTOM-EXTENSIONS] Adding ${customFileExtensions.length} custom extensions: ${customFileExtensions.join(', ')}`);
-                this.codeContext.addCustomExtensions(customFileExtensions);
+                this.context.addCustomExtensions(customFileExtensions);
             }
 
             // Add custom ignore patterns if provided (before loading file-based patterns)
             if (customIgnorePatterns.length > 0) {
                 console.log(`[IGNORE-PATTERNS] Adding ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`);
-                this.codeContext.addCustomIgnorePatterns(customIgnorePatterns);
+                this.context.addCustomIgnorePatterns(customIgnorePatterns);
             }
 
             // Add to indexing list and save snapshot immediately
@@ -349,8 +349,8 @@ export class ToolHandlers {
                 console.log(`[BACKGROUND-INDEX] ℹ️  Force reindex mode - collection was already cleared during validation`);
             }
 
-            // Use the existing CodeContext instance for indexing.
-            let contextForThisTask = this.codeContext;
+            // Use the existing Context instance for indexing.
+            let contextForThisTask = this.context;
             if (splitterType !== 'ast') {
                 console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
@@ -360,23 +360,26 @@ export class ToolHandlers {
             const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
             const collectionName = `hybrid_code_chunks_${hash.substring(0, 8)}`;
 
-            // Initialize file synchronizer with proper ignore patterns
-            const { FileSynchronizer } = await import("@zilliz/code-context-core");
-            const ignorePatterns = this.codeContext['ignorePatterns'] || [];
+            // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
+            await this.context['loadGitignorePatterns'](absolutePath);
+
+            // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
+            const { FileSynchronizer } = await import("@zilliz/claude-context-core");
+            const ignorePatterns = this.context['ignorePatterns'] || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
 
             // Store synchronizer in the context's internal map
-            this.codeContext['synchronizers'].set(collectionName, synchronizer);
-            if (contextForThisTask !== this.codeContext) {
+            this.context['synchronizers'].set(collectionName, synchronizer);
+            if (contextForThisTask !== this.context) {
                 contextForThisTask['synchronizers'].set(collectionName, synchronizer);
             }
 
             console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
             // Log embedding provider information before indexing
-            const embeddingProvider = this.codeContext['embedding'];
+            const embeddingProvider = this.context['embedding'];
             console.log(`[BACKGROUND-INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
             // Start indexing with the appropriate context
@@ -470,12 +473,12 @@ export class ToolHandlers {
             console.log(`[SEARCH] Indexing status: ${isIndexing ? 'In Progress' : 'Completed'}`);
 
             // Log embedding provider information before search
-            const embeddingProvider = this.codeContext['embedding'];
+            const embeddingProvider = this.context['embedding'];
             console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for hybrid search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
             // Search in the specified codebase using hybrid search
-            const searchResults = await this.codeContext.hybridSemanticSearch(
+            const searchResults = await this.context.hybridSemanticSearch(
                 absolutePath,
                 query,
                 Math.min(resultLimit, 50),
@@ -603,7 +606,7 @@ export class ToolHandlers {
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
             try {
-                await this.codeContext.clearHybridIndex(absolutePath);
+                await this.context.clearHybridIndex(absolutePath);
                 console.log(`[CLEAR] Successfully cleared hybrid index for: ${absolutePath}`);
             } catch (error: any) {
                 const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;

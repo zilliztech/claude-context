@@ -1,19 +1,19 @@
 import * as vscode from 'vscode';
-import { CodeContext, SearchQuery, SemanticSearchResult } from '@zilliz/code-context-core';
+import { Context, SearchQuery, SemanticSearchResult } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
 export class SearchCommand {
-    private codeContext: CodeContext;
+    private context: Context;
 
-    constructor(codeContext: CodeContext) {
-        this.codeContext = codeContext;
+    constructor(context: Context) {
+        this.context = context;
     }
 
     /**
-     * Update the CodeContext instance (used when configuration changes)
+     * Update the Context instance (used when configuration changes)
      */
-    updateCodeContext(codeContext: CodeContext): void {
-        this.codeContext = codeContext;
+    updateContext(context: Context): void {
+        this.context = context;
     }
 
     async execute(preSelectedText?: string): Promise<void> {
@@ -54,7 +54,7 @@ export class SearchCommand {
 
                 // Check if hybrid index exists
                 progress.report({ increment: 20, message: 'Checking hybrid index...' });
-                const hasHybridIndex = await this.codeContext.hasHybridIndex(codebasePath);
+                const hasHybridIndex = await this.context.hasHybridIndex(codebasePath);
 
                 if (!hasHybridIndex) {
                     vscode.window.showErrorMessage('Hybrid index not found. Please index the codebase first using hybrid indexing.');
@@ -71,7 +71,7 @@ export class SearchCommand {
                 console.log('🔍 Using hybrid search (semantic + keyword)...');
                 progress.report({ increment: 50, message: 'Executing hybrid search...' });
 
-                const results = await this.codeContext.hybridSemanticSearch(
+                const results = await this.context.hybridSemanticSearch(
                     codebasePath,
                     query.term,
                     query.limit || 20,
@@ -148,13 +148,13 @@ export class SearchCommand {
         const codebasePath = workspaceFolders[0].uri.fsPath;
 
         // Check if hybrid index exists
-        const hasHybridIndex = await this.codeContext.hasHybridIndex(codebasePath);
+        const hasHybridIndex = await this.context.hasHybridIndex(codebasePath);
         if (!hasHybridIndex) {
             throw new Error('Hybrid index not found. Please index the codebase first using hybrid indexing.');
         }
 
         console.log('🔍 Using hybrid search for webview...');
-        return await this.codeContext.hybridSemanticSearch(
+        return await this.context.hybridSemanticSearch(
             codebasePath,
             searchTerm,
             limit,
@@ -167,7 +167,7 @@ export class SearchCommand {
      */
     async hasIndex(codebasePath: string): Promise<boolean> {
         try {
-            return await this.codeContext.hasHybridIndex(codebasePath);
+            return await this.context.hasHybridIndex(codebasePath);
         } catch (error) {
             console.error('Error checking hybrid index existence:', error);
             return false;
