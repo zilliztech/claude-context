@@ -158,7 +158,7 @@ Add the following configuration to your Void MCP settings:
   "mcpServers": {
     "code-context": {
       "command": "npx",
-      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",

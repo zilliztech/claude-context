@@ -142,6 +142,34 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 
 </details>
 
+
+
+<details>
+<summary><strong>Void</strong></summary>
+
+Go to: `Settings` -> `MCP` -> `Add MCP Server`
+
+Add the following configuration to your Void MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+
 <details>
 <summary><strong>Claude Desktop</strong></summary>
 
@@ -178,6 +206,8 @@ claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TO
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
 </details>
+
+
 
 <details>
 <summary><strong>Windsurf</strong></summary>
