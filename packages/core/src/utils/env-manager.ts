@@ -7,7 +7,7 @@ export class EnvManager {
 
     constructor() {
         const homeDir = os.homedir();
-        this.envFilePath = path.join(homeDir, '.codecontext', '.env');
+        this.envFilePath = path.join(homeDir, '.context', '.env');
     }
 
     /**

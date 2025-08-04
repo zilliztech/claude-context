@@ -1,6 +1,6 @@
 # Contributing to Chrome Extension
 
-Thanks for your interest in contributing to the Code Context Chrome extension!
+Thanks for your interest in contributing to the Claude Context Chrome extension!
 
 > 📖 **First time contributing?** Please read the [main contributing guide](../../CONTRIBUTING.md) first for general setup and workflow.
 

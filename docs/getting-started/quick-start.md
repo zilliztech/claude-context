@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get Code Context running with AI assistants in under 5 minutes! This guide covers the most common setup using MCP (Model Context Protocol) with Claude Code.
+Get Claude Context running with AI assistants in under 5 minutes! This guide covers the most common setup using MCP (Model Context Protocol) with Claude Code.
 
 ## 🚀 1-Minute Setup for Claude Code
 
@@ -14,7 +14,7 @@ You'll need two API keys:
 
 ### Step 2: Configure Claude Code
 
-Run this single command to add Code Context to Claude Code:
+Run this single command to add Claude Context to Claude Code:
 
 ```bash
 claude mcp add claude-context \
@@ -25,7 +25,7 @@ claude mcp add claude-context \
 
 Replace the API keys with your actual keys.
 
-### Step 3: Start Using Code Context
+### Step 3: Start Using Claude Context
 
 1. **Open Claude Code** in your project directory
 2. **Index your codebase**:
@@ -167,10 +167,10 @@ Add to your Claude Desktop configuration:
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Use the command line interface to add the CodeContext MCP server:
+Use the command line interface to add the Claude Context MCP server:
 
 ```bash
-# Add the CodeContext MCP server
+# Add the Claude Context MCP server
 claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
 
 ```
@@ -204,7 +204,7 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 <details>
 <summary><strong>VS Code</strong></summary>
 
-The CodeContext MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
+The Claude Context MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
 
 ```json
 {
@@ -275,7 +275,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 <details>
 <summary><strong>Augment</strong></summary>
 
-To configure Code Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
+To configure Claude Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
 
 #### **A. Using the Augment Code UI**
 
@@ -293,7 +293,7 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
    npx @zilliz/claude-context-mcp@latest
    ```
 
-6. Name the MCP: **Code Context**.
+6. Name the MCP: **Claude Context**.
 
 7. Click the **Add** button.
 

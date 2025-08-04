@@ -1,20 +1,20 @@
 import * as vscode from 'vscode';
-import { CodeContext } from '@zilliz/claude-context-core';
+import { Context } from '@zilliz/claude-context-core';
 import * as fs from 'fs';
 
 export class SyncCommand {
-    private codeContext: CodeContext;
+    private context: Context;
     private isSyncing: boolean = false;
 
-    constructor(codeContext: CodeContext) {
-        this.codeContext = codeContext;
+    constructor(context: Context) {
+        this.context = context;
     }
 
     /**
-     * Update the CodeContext instance (used when configuration changes)
+     * Update the Context instance (used when configuration changes)
      */
-    updateCodeContext(codeContext: CodeContext): void {
-        this.codeContext = codeContext;
+    updateContext(context: Context): void {
+        this.context = context;
     }
 
     /**
@@ -57,7 +57,7 @@ export class SyncCommand {
                 progress.report({ increment: 0, message: 'Checking for file changes...' });
 
                 try {
-                    syncStats = await this.codeContext.reindexByChange(
+                    syncStats = await this.context.reindexByChange(
                         codebasePath,
                         (progressInfo) => {
                             const increment = progressInfo.percentage;
@@ -148,7 +148,7 @@ export class SyncCommand {
         this.isSyncing = true;
 
         try {
-            const syncStats = await this.codeContext.reindexByChange(codebasePath);
+            const syncStats = await this.context.reindexByChange(codebasePath);
 
             const totalChanges = syncStats.added + syncStats.removed + syncStats.modified;
 
