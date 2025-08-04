@@ -197,7 +197,7 @@ class SemanticSearchController {
             this.resultsList.innerHTML = '<div class="no-results">No matches found</div>';
         } else {
             this.resultsHeader.textContent = `${results.length} result${results.length === 1 ? '' : 's'} for "${query}"`;
-            this.resultsList.innerHTML = results.map(result => this.createResultHTML(result)).join('');
+            this.resultsList.innerHTML = results.map((result, index) => this.createResultHTML(result, index + 1)).join('');
         }
         this.resultsContainer.style.display = 'block';
     }
@@ -205,9 +205,10 @@ class SemanticSearchController {
     /**
      * Create HTML for a single result item
      * @param {Object} result - Result object
+     * @param {number} rank - Result rank (1-indexed)
      * @returns {string} HTML string
      */
-    createResultHTML(result) {
+    createResultHTML(result, rank) {
         return `
             <div class="result-item" onclick="searchController.openFile('${result.relativePath}', ${result.line}, ${result.startLine}, ${result.endLine})">
                 <div class="result-file">
@@ -216,7 +217,7 @@ class SemanticSearchController {
                 </div>
                 <div class="result-preview">${result.preview}</div>
                 <div class="result-context">${result.context}</div>
-                ${result.score ? `<div class="result-score" style="margin-top: 8px; text-align: right;">Similarity: ${(result.score * 100).toFixed(1)}%</div>` : ''}
+                <div class="result-rank" style="margin-top: 8px; text-align: right;">Rank: ${rank}</div>
             </div>
         `;
     }

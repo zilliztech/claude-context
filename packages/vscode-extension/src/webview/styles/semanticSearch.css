@@ -184,7 +184,7 @@ body {
     white-space: nowrap;
 }
 
-.result-score {
+.result-rank {
     font-size: 10px;
     color: var(--vscode-descriptionForeground);
     background-color: var(--vscode-badge-background);

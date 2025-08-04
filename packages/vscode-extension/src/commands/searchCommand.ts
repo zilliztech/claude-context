@@ -28,7 +28,7 @@ export class SearchCommand {
             // Show input box if no meaningful pre-selected text
             searchTerm = await vscode.window.showInputBox({
                 placeHolder: 'Enter search term...',
-                prompt: 'Search for functions, classes, variables, or any code using semantic search'
+                prompt: 'Search for functions, classes, variables, or any code using hybrid search (semantic + keyword)'
             });
         }
 
@@ -42,7 +42,7 @@ export class SearchCommand {
                 title: 'Searching...',
                 cancellable: false
             }, async (progress) => {
-                progress.report({ increment: 0, message: 'Performing semantic search...' });
+                progress.report({ increment: 0, message: 'Performing hybrid search...' });
 
                 // Get workspace root for codebase path
                 const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -52,21 +52,33 @@ export class SearchCommand {
                 }
                 const codebasePath = workspaceFolders[0].uri.fsPath;
 
-                // Use the new semantic search service
+                // Check if hybrid index exists
+                progress.report({ increment: 20, message: 'Checking hybrid index...' });
+                const hasHybridIndex = await this.codeContext.hasHybridIndex(codebasePath);
+
+                if (!hasHybridIndex) {
+                    vscode.window.showErrorMessage('Hybrid index not found. Please index the codebase first using hybrid indexing.');
+                    return;
+                }
+
+                // Use hybrid search
                 const query: SearchQuery = {
                     term: searchTerm,
                     includeContent: true,
                     limit: 20
                 };
 
-                const results = await this.codeContext.semanticSearch(
+                console.log('🔍 Using hybrid search (semantic + keyword)...');
+                progress.report({ increment: 50, message: 'Executing hybrid search...' });
+
+                const results = await this.codeContext.hybridSemanticSearch(
                     codebasePath,
                     query.term,
                     query.limit || 20,
                     0.3 // similarity threshold
                 );
 
-                progress.report({ increment: 100, message: 'Semantic search complete!' });
+                progress.report({ increment: 100, message: 'Hybrid search complete!' });
 
                 if (results.length === 0) {
                     vscode.window.showInformationMessage(`No results found for "${searchTerm}"`);
@@ -77,7 +89,7 @@ export class SearchCommand {
                 const quickPickItems = this.generateQuickPickItems(results, searchTerm, codebasePath);
 
                 const selected = await vscode.window.showQuickPick(quickPickItems, {
-                    placeHolder: `Found ${results.length} results for "${searchTerm}"`,
+                    placeHolder: `Found ${results.length} results for "${searchTerm}" using hybrid search`,
                     matchOnDescription: true,
                     matchOnDetail: true
                 });
@@ -88,8 +100,8 @@ export class SearchCommand {
             });
 
         } catch (error) {
-            console.error('Semantic search failed:', error);
-            vscode.window.showErrorMessage(`Semantic search failed: ${error}`);
+            console.error('Hybrid search failed:', error);
+            vscode.window.showErrorMessage(`Hybrid search failed: ${error}. Please ensure the codebase is indexed with hybrid indexing.`);
         }
     }
 
@@ -135,8 +147,14 @@ export class SearchCommand {
         }
         const codebasePath = workspaceFolders[0].uri.fsPath;
 
-        // Use the semantic search service
-        return await this.codeContext.semanticSearch(
+        // Check if hybrid index exists
+        const hasHybridIndex = await this.codeContext.hasHybridIndex(codebasePath);
+        if (!hasHybridIndex) {
+            throw new Error('Hybrid index not found. Please index the codebase first using hybrid indexing.');
+        }
+
+        console.log('🔍 Using hybrid search for webview...');
+        return await this.codeContext.hybridSemanticSearch(
             codebasePath,
             searchTerm,
             limit,
@@ -145,26 +163,34 @@ export class SearchCommand {
     }
 
     /**
-     * Check if index exists for the given codebase path
+     * Check if hybrid index exists for the given codebase path
      */
     async hasIndex(codebasePath: string): Promise<boolean> {
-        return await this.codeContext.hasIndex(codebasePath);
+        try {
+            return await this.codeContext.hasHybridIndex(codebasePath);
+        } catch (error) {
+            console.error('Error checking hybrid index existence:', error);
+            return false;
+        }
     }
 
     /**
      * Generate quick pick items for VS Code
      */
     private generateQuickPickItems(results: SemanticSearchResult[], searchTerm: string, workspaceRoot?: string) {
-        return results.slice(0, 20).map(result => {
+        return results.slice(0, 20).map((result, index) => {
             let displayPath = result.relativePath;
             // Truncate content for display
             const truncatedContent = result.content.length <= 150
                 ? result.content
                 : result.content.substring(0, 150) + '...';
 
+            // Add rank info to description
+            const rankText = ` (rank: ${index + 1})`;
+
             return {
                 label: `$(file-code) ${displayPath}`,
-                description: `1 match in ${displayPath}`,
+                description: `$(combine) hybrid search${rankText}`,
                 detail: truncatedContent,
                 result: result
             };

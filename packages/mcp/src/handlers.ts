@@ -61,8 +61,8 @@ export class ToolHandlers {
             // Check each collection for codebase path
             for (const collectionName of collections) {
                 try {
-                    // Skip collections that don't match the code_chunks pattern
-                    if (!collectionName.startsWith('code_chunks_')) {
+                    // Skip collections that don't match the code_chunks pattern (support both legacy and hybrid collections)
+                    if (!collectionName.startsWith('code_chunks_') && !collectionName.startsWith('hybrid_code_chunks_')) {
                         console.log(`[SYNC-CLOUD] ⏭️  Skipping non-code collection: ${collectionName}`);
                         continue;
                     }
@@ -220,36 +220,39 @@ export class ToolHandlers {
             try {
                 const normalizedPath = path.resolve(absolutePath);
                 const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-                const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+                const collectionName = `hybrid_code_chunks_${hash.substring(0, 8)}`;
 
-                console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation for: ${collectionName}`);
+                console.log(`[INDEX-VALIDATION] 🔍 Validating hybrid collection creation for: ${collectionName}`);
 
                 // Get embedding dimension for collection creation
                 const embeddingProvider = this.codeContext['embedding'];
                 const dimension = embeddingProvider.getDimension();
 
-                // If force reindex, clear existing collection first
-                if (forceReindex) {
-                    console.log(`[INDEX-VALIDATION] 🧹 Force reindex enabled, clearing existing collection: ${collectionName}`);
+                // Check if collection already exists and clear it to avoid schema conflicts
+                const collectionExists = await this.codeContext['vectorDatabase'].hasCollection(collectionName);
+                if (collectionExists) {
+                    console.log(`[INDEX-VALIDATION] 📋 Hybrid collection ${collectionName} already exists, clearing for validation`);
                     try {
                         await this.codeContext['vectorDatabase'].dropCollection(collectionName);
-                        console.log(`[INDEX-VALIDATION] ✅ Existing collection cleared: ${collectionName}`);
+                        console.log(`[INDEX-VALIDATION] ✅ Existing hybrid collection cleared for validation: ${collectionName}`);
                     } catch (dropError: any) {
-                        // Collection might not exist, which is fine
-                        console.log(`[INDEX-VALIDATION] ℹ️  Collection ${collectionName} does not exist or already cleared`);
+                        console.log(`[INDEX-VALIDATION] ⚠️  Error clearing existing collection: ${dropError.message || dropError}`);
+                        // Continue anyway, as the creation might still work
                     }
+                } else if (forceReindex) {
+                    console.log(`[INDEX-VALIDATION] ℹ️  Force reindex enabled, but hybrid collection ${collectionName} does not exist`);
                 }
 
-                // Attempt to create collection - this will throw COLLECTION_LIMIT_MESSAGE if limit reached
-                await this.codeContext['vectorDatabase'].createCollection(
+                // Attempt to create hybrid collection with BM25 support - this will throw COLLECTION_LIMIT_MESSAGE if limit reached
+                await this.codeContext['vectorDatabase'].createHybridCollection(
                     collectionName,
                     dimension,
-                    `Code context collection: ${collectionName}`
+                    `Hybrid code context collection: ${collectionName}`
                 );
 
                 // If creation succeeds, immediately drop the test collection
                 await this.codeContext['vectorDatabase'].dropCollection(collectionName);
-                console.log(`[INDEX-VALIDATION] ✅ Collection creation validated successfully`);
+                console.log(`[INDEX-VALIDATION] ✅ Hybrid collection creation validated successfully`);
 
             } catch (validationError: any) {
                 const errorMessage = typeof validationError === 'string' ? validationError :
@@ -352,10 +355,10 @@ export class ToolHandlers {
                 console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
-            // Generate collection name
+            // Generate hybrid collection name
             const normalizedPath = path.resolve(absolutePath);
             const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-            const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+            const collectionName = `hybrid_code_chunks_${hash.substring(0, 8)}`;
 
             // Initialize file synchronizer with proper ignore patterns
             const { FileSynchronizer } = await import("@zilliz/code-context-core");
@@ -378,7 +381,7 @@ export class ToolHandlers {
 
             // Start indexing with the appropriate context
             console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
-            const stats = await contextForThisTask.indexCodebase(absolutePath);
+            const stats = await contextForThisTask.indexCodebaseHybrid(absolutePath);
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Move from indexing to indexed list
@@ -468,18 +471,18 @@ export class ToolHandlers {
 
             // Log embedding provider information before search
             const embeddingProvider = this.codeContext['embedding'];
-            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for semantic search`);
+            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for hybrid search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
-            // Search in the specified codebase
-            const searchResults = await this.codeContext.semanticSearch(
+            // Search in the specified codebase using hybrid search
+            const searchResults = await this.codeContext.hybridSemanticSearch(
                 absolutePath,
                 query,
                 Math.min(resultLimit, 50),
                 0.3
             );
 
-            console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
+            console.log(`[SEARCH] ✅ Hybrid search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
 
             if (searchResults.length === 0) {
                 let noResultsMessage = `No results found for query: "${query}" in codebase '${absolutePath}'`;
@@ -502,7 +505,7 @@ export class ToolHandlers {
 
                 return `${index + 1}. Code snippet (${result.language}) [${codebaseInfo}]\n` +
                     `   Location: ${location}\n` +
-                    `   Score: ${result.score.toFixed(3)}\n` +
+                    `   Rank: ${index + 1}\n` +
                     `   Context: \n\`\`\`${result.language}\n${context}\n\`\`\`\n`;
             }).join('\n');
 
@@ -600,8 +603,8 @@ export class ToolHandlers {
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
             try {
-                await this.codeContext.clearIndex(absolutePath);
-                console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
+                await this.codeContext.clearHybridIndex(absolutePath);
+                console.log(`[CLEAR] Successfully cleared hybrid index for: ${absolutePath}`);
             } catch (error: any) {
                 const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;
                 console.error(`[CLEAR] ${errorMsg}`);

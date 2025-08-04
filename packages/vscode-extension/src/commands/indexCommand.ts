@@ -64,8 +64,8 @@ export class IndexCommand {
             }, async (progress) => {
                 let lastPercentage = 0;
 
-                // Clear existing index first
-                await this.codeContext.clearIndex(
+                // Clear existing hybrid index first
+                await this.codeContext.clearHybridIndex(
                     selectedFolder.uri.fsPath,
                     (progressInfo) => {
                         // Clear index progress is usually fast, just show the message
@@ -81,11 +81,11 @@ export class IndexCommand {
                 // Store synchronizer in the context's internal map using the same collection name generation logic
                 const normalizedPath = path.resolve(selectedFolder.uri.fsPath);
                 const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-                const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+                const collectionName = this.codeContext['getHybridCollectionName'](selectedFolder.uri.fsPath);
                 this.codeContext['synchronizers'].set(collectionName, synchronizer);
 
-                // Start indexing with progress callback
-                indexStats = await this.codeContext.indexCodebase(
+                // Start hybrid indexing with progress callback
+                indexStats = await this.codeContext.indexCodebaseHybrid(
                     selectedFolder.uri.fsPath,
                     (progressInfo) => {
                         // Calculate increment from last reported percentage
@@ -156,7 +156,7 @@ export class IndexCommand {
                 title: 'Clearing Index',
                 cancellable: false
             }, async (progress) => {
-                await this.codeContext.clearIndex(
+                await this.codeContext.clearHybridIndex(
                     workspaceFolders[0].uri.fsPath,
                     (progressInfo) => {
                         progress.report({

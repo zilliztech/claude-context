@@ -4,6 +4,11 @@ export {
     SearchOptions,
     VectorSearchResult,
     VectorDatabase,
+    HybridVectorDocument,
+    HybridSearchRequest,
+    HybridSearchOptions,
+    HybridSearchResult,
+    RerankStrategy,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
 
