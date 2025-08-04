@@ -1,11 +1,5 @@
-<p align="center">
-  <a href="https://github.com/zilliztech/claude-context">
-    <img src="assets/code_context_logo_dark.png" width=600 alt="Claude Context Logo">
-  </a>
-  <h3 align="center"> Add Semantic Search to Claude Code</h2>
-</p>
-
-<div align="center">
+![](assets/claude-context.png)
+### Add Semantic Search to Claude Code
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
