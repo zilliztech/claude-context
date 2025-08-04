@@ -155,7 +155,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 <details>
 <summary><strong>Void</strong></summary>
 
-Go to: `Settings` -> `MCP` -> `Add new global MCP server`
+Go to: `Settings` -> `MCP` -> `Add MCP Server`
 
 Add the following configuration to your Void MCP settings:
 
