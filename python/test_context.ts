@@ -1,20 +1,20 @@
-import { CodeContext } from '../packages/core/src/context';
+import { Context } from '../packages/core/src/context';
 import { OpenAIEmbedding } from '../packages/core/src/embedding/openai-embedding';
 import { MilvusVectorDatabase } from '../packages/core/src/vectordb/milvus-vectordb';
 import { AstCodeSplitter } from '../packages/core/src/splitter/ast-splitter';
 
 /**
- * CodeContext End-to-End Test - Complete Workflow
+ * Context End-to-End Test - Complete Workflow
  * Includes: Configure Embedding → Configure Vector Database → Create Context → Index Codebase → Semantic Search
  */
-export async function testCodeContextEndToEnd(config: {
+export async function testContextEndToEnd(config: {
     openaiApiKey: string;
     milvusAddress: string;
     codebasePath: string;
     searchQuery: string;
 }) {
     try {
-        console.log('🚀 Starting CodeContext end-to-end test...');
+        console.log('🚀 Starting Context end-to-end test...');
 
         // 1. Create embedding instance
         console.log('📝 Creating OpenAI embedding instance...');
@@ -29,10 +29,10 @@ export async function testCodeContextEndToEnd(config: {
             address: config.milvusAddress
         });
 
-        // 3. Create CodeContext instance
-        console.log('🔧 Creating CodeContext instance...');
+        // 3. Create Context instance
+        console.log('🔧 Creating Context instance...');
         const codeSplitter = new AstCodeSplitter(1000, 200);
-        const context = new CodeContext({
+        const context = new Context({
             embedding: embedding,
             vectorDatabase: vectorDB,
             codeSplitter: codeSplitter

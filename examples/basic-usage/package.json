@@ -1,7 +1,7 @@
 {
     "name": "claude-context-basic-example",
     "version": "0.0.1",
-    "description": "Basic usage example for Code Context",
+    "description": "Basic usage example for Claude Context",
     "main": "index.ts",
     "scripts": {
         "start": "tsx index.ts",

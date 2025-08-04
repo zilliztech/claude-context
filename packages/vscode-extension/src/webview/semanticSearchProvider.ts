@@ -259,7 +259,7 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             // Add a small delay to ensure configuration is fully saved
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Notify extension to recreate CodeContext with new config
+            // Notify extension to recreate Context with new config
             vscode.commands.executeCommand('semanticCodeSearch.reloadConfiguration');
 
             webview.postMessage({
@@ -268,7 +268,7 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                 message: 'Configuration saved successfully!'
             });
 
-            vscode.window.showInformationMessage('CodeContext configuration saved successfully!');
+            vscode.window.showInformationMessage('Context configuration saved successfully!');
         } catch (error) {
             webview.postMessage({
                 command: 'saveResult',

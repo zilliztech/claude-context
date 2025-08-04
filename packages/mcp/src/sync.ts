@@ -1,14 +1,14 @@
 import * as fs from "fs";
-import { CodeContext } from "@zilliz/claude-context-core";
+import { Context } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 
 export class SyncManager {
-    private codeContext: CodeContext;
+    private context: Context;
     private snapshotManager: SnapshotManager;
     private isSyncing: boolean = false;
 
-    constructor(codeContext: CodeContext, snapshotManager: SnapshotManager) {
-        this.codeContext = codeContext;
+    constructor(context: Context, snapshotManager: SnapshotManager) {
+        this.context = context;
         this.snapshotManager = snapshotManager;
     }
 
@@ -57,8 +57,8 @@ export class SyncManager {
                 }
 
                 try {
-                    console.log(`[SYNC-DEBUG] Calling codeContext.reindexByChange() for '${codebasePath}'`);
-                    const stats = await this.codeContext.reindexByChange(codebasePath);
+                    console.log(`[SYNC-DEBUG] Calling context.reindexByChange() for '${codebasePath}'`);
+                    const stats = await this.context.reindexByChange(codebasePath);
                     const codebaseElapsed = Date.now() - codebaseStartTime;
 
                     console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);

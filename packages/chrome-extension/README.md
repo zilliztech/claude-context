@@ -1,8 +1,8 @@
 # GitHub Code Vector Search Chrome Extension
 
-A Chrome extension for indexing and semantically searching GitHub repository code, powered by Code Context.
+A Chrome extension for indexing and semantically searching GitHub repository code, powered by Claude Context.
 
-> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
+> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 ## Features
 
@@ -109,7 +109,7 @@ The extension requires the following permissions:
 
 ## Contributing
 
-This Chrome extension is part of the Code Context monorepo. Please see:
+This Chrome extension is part of the Claude Context monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines
 - [Chrome Extension Contributing](CONTRIBUTING.md) - Specific development guide for this extension
 
@@ -124,7 +124,7 @@ This Chrome extension is part of the Code Context monorepo. Please see:
 - **TypeScript** - Type-safe development
 - **Chrome Extension Manifest V3** - Modern extension architecture
 - **Webpack** - Module bundling and optimization
-- **Code Context Core** - Semantic search engine
+- **Claude Context Core** - Semantic search engine
 - **Milvus Vector Database** - Vector storage and retrieval
 - **OpenAI/VoyageAI Embeddings** - Text embedding generation
 

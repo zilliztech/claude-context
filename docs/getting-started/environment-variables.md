@@ -2,7 +2,7 @@
 
 ## 🎯 Global Configuration
 
-Code Context supports a global configuration file at `~/.codecontext/.env` to simplify MCP setup across different MCP clients.
+Claude Context supports a global configuration file at `~/.context/.env` to simplify MCP setup across different MCP clients.
 
 **Benefits:**
 - Configure once, use everywhere
@@ -12,7 +12,7 @@ Code Context supports a global configuration file at `~/.codecontext/.env` to si
 ## 📋 Environment Variable Priority
 
 1. **Process Environment Variables** (highest)
-2. **Global Configuration File** (`~/.codecontext/.env`)
+2. **Global Configuration File** (`~/.context/.env`)
 3. **Default Values** (lowest)
 
 ## 🔧 Required Environment Variables
@@ -49,8 +49,8 @@ Code Context supports a global configuration file at `~/.codecontext/.env` to si
 
 ### 1. Create Global Config
 ```bash
-mkdir -p ~/.codecontext
-cat > ~/.codecontext/.env << 'EOF'
+mkdir -p ~/.context
+cat > ~/.context/.env << 'EOF'
 EMBEDDING_PROVIDER=OpenAI
 OPENAI_API_KEY=sk-your-openai-api-key
 MILVUS_TOKEN=your-zilliz-cloud-api-key
@@ -79,5 +79,5 @@ claude mcp add claude-context -- npx @zilliz/claude-context-mcp@latest
 ## 📚 Additional Information
 
 For detailed information about file processing rules and how custom patterns work, see:
-- [What files does Code Context decide to embed?](../troubleshooting/faq.md#q-what-files-does-claude-context-decide-to-embed)
+- [What files does Claude Context decide to embed?](../troubleshooting/faq.md#q-what-files-does-claude-context-decide-to-embed)
  
