@@ -1,5 +1,5 @@
 # Claude Context Documentation
-![](../assets/code_context_logo_dark.png)
+![](../assets/claude-context.png)
 
 Welcome to the Claude Context documentation! Claude Context is a powerful tool that adds semantic code search capabilities to AI coding assistants through MCP.
 
