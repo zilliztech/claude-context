@@ -83,7 +83,7 @@ const DEFAULT_IGNORE_PATTERNS = [
     'coverage', '.nyc_output', 'logs', 'tmp', 'temp'
 ];
 
-export interface CodeContextConfig {
+export interface ContextConfig {
     embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
     codeSplitter?: Splitter;
@@ -93,7 +93,7 @@ export interface CodeContextConfig {
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
 }
 
-export class CodeContext {
+export class Context {
     private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: Splitter;
@@ -101,7 +101,7 @@ export class CodeContext {
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
 
-    constructor(config: CodeContextConfig = {}) {
+    constructor(config: ContextConfig = {}) {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
@@ -738,7 +738,7 @@ export class CodeContext {
                 fileBasedPatterns.push(...patterns);
             }
 
-            // 3. Load global ~/.codecontext/.codecontextignore
+            // 3. Load global ~/.context/.contextignore
             const globalIgnorePatterns = await this.loadGlobalIgnoreFile();
             fileBasedPatterns.push(...globalIgnorePatterns);
 
@@ -786,14 +786,14 @@ export class CodeContext {
     }
 
     /**
-     * Load global ignore file from ~/.codecontext/.codecontextignore
+     * Load global ignore file from ~/.context/.contextignore
      * @returns Array of ignore patterns
      */
     private async loadGlobalIgnoreFile(): Promise<string[]> {
         try {
             const homeDir = require('os').homedir();
-            const globalIgnorePath = path.join(homeDir, '.codecontext', '.codecontextignore');
-            return await this.loadIgnoreFile(globalIgnorePath, 'global .codecontextignore');
+            const globalIgnorePath = path.join(homeDir, '.context', '.contextignore');
+            return await this.loadIgnoreFile(globalIgnorePath, 'global .contextignore');
         } catch (error) {
             // Global ignore file is optional, don't log warnings
             return [];
@@ -811,7 +811,7 @@ export class CodeContext {
             await fs.promises.access(filePath);
             console.log(`📄 Found ${fileName} file at: ${filePath}`);
 
-            const ignorePatterns = await CodeContext.getIgnorePatternsFromFile(filePath);
+            const ignorePatterns = await Context.getIgnorePatternsFromFile(filePath);
 
             if (ignorePatterns.length > 0) {
                 console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from ${fileName}`);

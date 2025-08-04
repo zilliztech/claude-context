@@ -1,7 +1,7 @@
 {
     "name": "@zilliz/claude-context-chrome-extension",
     "version": "0.0.1",
-    "description": "Code Context Chrome extension for web-based code indexing",
+    "description": "Claude Context Chrome extension for web-based code indexing",
     "private": true,
     "scripts": {
         "build": "webpack --mode=production",

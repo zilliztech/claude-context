@@ -1,18 +1,18 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { CodeContext, COLLECTION_LIMIT_MESSAGE } from "@zilliz/claude-context-core";
+import { Context, COLLECTION_LIMIT_MESSAGE } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
 export class ToolHandlers {
-    private codeContext: CodeContext;
+    private context: Context;
     private snapshotManager: SnapshotManager;
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
     private currentWorkspace: string;
 
-    constructor(codeContext: CodeContext, snapshotManager: SnapshotManager) {
-        this.codeContext = codeContext;
+    constructor(context: Context, snapshotManager: SnapshotManager) {
+        this.context = context;
         this.snapshotManager = snapshotManager;
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
@@ -33,7 +33,7 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
 
             // Get all collections using the interface method
-            const vectorDb = this.codeContext['vectorDatabase'];
+            const vectorDb = this.context['vectorDatabase'];
 
             // Use the new listCollections method from the interface
             const collections = await vectorDb.listCollections();
@@ -225,14 +225,14 @@ export class ToolHandlers {
                 console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation for: ${collectionName}`);
 
                 // Get embedding dimension for collection creation
-                const embeddingProvider = this.codeContext['embedding'];
+                const embeddingProvider = this.context['embedding'];
                 const dimension = embeddingProvider.getDimension();
 
                 // If force reindex, clear existing collection first
                 if (forceReindex) {
                     console.log(`[INDEX-VALIDATION] 🧹 Force reindex enabled, clearing existing collection: ${collectionName}`);
                     try {
-                        await this.codeContext['vectorDatabase'].dropCollection(collectionName);
+                        await this.context['vectorDatabase'].dropCollection(collectionName);
                         console.log(`[INDEX-VALIDATION] ✅ Existing collection cleared: ${collectionName}`);
                     } catch (dropError: any) {
                         // Collection might not exist, which is fine
@@ -241,14 +241,14 @@ export class ToolHandlers {
                 }
 
                 // Attempt to create collection - this will throw COLLECTION_LIMIT_MESSAGE if limit reached
-                await this.codeContext['vectorDatabase'].createCollection(
+                await this.context['vectorDatabase'].createCollection(
                     collectionName,
                     dimension,
-                    `Code context collection: ${collectionName}`
+                    `Claude Context collection: ${collectionName}`
                 );
 
                 // If creation succeeds, immediately drop the test collection
-                await this.codeContext['vectorDatabase'].dropCollection(collectionName);
+                await this.context['vectorDatabase'].dropCollection(collectionName);
                 console.log(`[INDEX-VALIDATION] ✅ Collection creation validated successfully`);
 
             } catch (validationError: any) {
@@ -282,13 +282,13 @@ export class ToolHandlers {
             // Add custom extensions if provided
             if (customFileExtensions.length > 0) {
                 console.log(`[CUSTOM-EXTENSIONS] Adding ${customFileExtensions.length} custom extensions: ${customFileExtensions.join(', ')}`);
-                this.codeContext.addCustomExtensions(customFileExtensions);
+                this.context.addCustomExtensions(customFileExtensions);
             }
 
             // Add custom ignore patterns if provided (before loading file-based patterns)
             if (customIgnorePatterns.length > 0) {
                 console.log(`[IGNORE-PATTERNS] Adding ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`);
-                this.codeContext.addCustomIgnorePatterns(customIgnorePatterns);
+                this.context.addCustomIgnorePatterns(customIgnorePatterns);
             }
 
             // Add to indexing list and save snapshot immediately
@@ -346,8 +346,8 @@ export class ToolHandlers {
                 console.log(`[BACKGROUND-INDEX] ℹ️  Force reindex mode - collection was already cleared during validation`);
             }
 
-            // Use the existing CodeContext instance for indexing.
-            let contextForThisTask = this.codeContext;
+            // Use the existing Context instance for indexing.
+            let contextForThisTask = this.context;
             if (splitterType !== 'ast') {
                 console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
@@ -362,21 +362,21 @@ export class ToolHandlers {
             
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
-            const ignorePatterns = this.codeContext['ignorePatterns'] || [];
+            const ignorePatterns = this.context['ignorePatterns'] || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
 
             // Store synchronizer in the context's internal map
-            this.codeContext['synchronizers'].set(collectionName, synchronizer);
-            if (contextForThisTask !== this.codeContext) {
+            this.context['synchronizers'].set(collectionName, synchronizer);
+            if (contextForThisTask !== this.context) {
                 contextForThisTask['synchronizers'].set(collectionName, synchronizer);
             }
 
             console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
             // Log embedding provider information before indexing
-            const embeddingProvider = this.codeContext['embedding'];
+            const embeddingProvider = this.context['embedding'];
             console.log(`[BACKGROUND-INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
             // Start indexing with the appropriate context
@@ -470,12 +470,12 @@ export class ToolHandlers {
             console.log(`[SEARCH] Indexing status: ${isIndexing ? 'In Progress' : 'Completed'}`);
 
             // Log embedding provider information before search
-            const embeddingProvider = this.codeContext['embedding'];
+            const embeddingProvider = this.context['embedding'];
             console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for semantic search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
             // Search in the specified codebase
-            const searchResults = await this.codeContext.semanticSearch(
+            const searchResults = await this.context.semanticSearch(
                 absolutePath,
                 query,
                 Math.min(resultLimit, 50),
@@ -603,7 +603,7 @@ export class ToolHandlers {
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
             try {
-                await this.codeContext.clearIndex(absolutePath);
+                await this.context.clearIndex(absolutePath);
                 console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
             } catch (error: any) {
                 const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;

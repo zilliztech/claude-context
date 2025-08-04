@@ -1,12 +1,12 @@
 # @zilliz/claude-context-core
 ![](../../assets/code_context_logo_dark.png)
 
-The core indexing engine for Code Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
+The core indexing engine for Claude Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
 
 [![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
 [![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
 
-> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and quick start guide.
+> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and quick start guide.
 
 ## Installation
 
@@ -24,7 +24,7 @@ OPENAI_API_KEY=your-openai-api-key
 #### Zilliz Cloud configuration
 Get a free Milvus vector database on Zilliz Cloud. 
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
+Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
 
 ![](../../assets/signup_and_create_cluster.jpeg)
 
@@ -48,7 +48,7 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 
 ```typescript
 import { 
-  CodeContext, 
+  Context, 
   OpenAIEmbedding, 
   MilvusVectorDatabase 
 } from '@zilliz/claude-context-core';
@@ -66,7 +66,7 @@ const vectorDatabase = new MilvusVectorDatabase({
 });
 
 // Create context instance
-const context = new CodeContext({
+const context = new Context({
   embedding,
   vectorDatabase
 });
@@ -118,10 +118,10 @@ results.forEach(result => {
 
 ## Configuration
 
-### CodeContextConfig
+### ContextConfig
 
 ```typescript
-interface CodeContextConfig {
+interface ContextConfig {
   embedding?: Embedding;           // Embedding provider
   vectorDatabase?: VectorDatabase; // Vector database instance (required)
   codeSplitter?: Splitter;        // Code splitting strategy
@@ -151,7 +151,7 @@ interface CodeContextConfig {
 
 ## API Reference
 
-### CodeContext
+### Context
 
 #### Methods
 
@@ -183,7 +183,7 @@ interface SemanticSearchResult {
 ### Using VoyageAI Embeddings
 
 ```typescript
-import { CodeContext, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/claude-context-core';
+import { Context, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/claude-context-core';
 
 // Initialize with VoyageAI embedding provider
 const embedding = new VoyageAIEmbedding({
@@ -196,7 +196,7 @@ const vectorDatabase = new MilvusVectorDatabase({
   token: process.env.MILVUS_TOKEN || ''
 });
 
-const context = new CodeContext({
+const context = new Context({
   embedding,
   vectorDatabase
 });
@@ -205,7 +205,7 @@ const context = new CodeContext({
 ### Custom File Filtering
 
 ```typescript
-const context = new CodeContext({
+const context = new Context({
   embedding,
   vectorDatabase,
   supportedExtensions: ['.ts', '.js', '.py', '.java'],
@@ -220,7 +220,7 @@ const context = new CodeContext({
 
 ## File Synchronization Architecture
 
-Code Context implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
+Claude Context implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
 
 ![File Synchronization Architecture](../../assets/file_synchronizer.png)
 
@@ -239,7 +239,7 @@ The file synchronization system uses a **Merkle tree-based approach** combined w
 - Any change to any file will cause the root hash to change
 
 #### 3. Snapshot Management
-- File synchronization state is persisted to `~/.codecontext/merkle/` directory
+- File synchronization state is persisted to `~/.context/merkle/` directory
 - Each codebase gets a unique snapshot file based on its absolute path hash
 - Snapshots contain both file hashes and serialized Merkle tree data
 
@@ -260,7 +260,7 @@ The file synchronization system uses a **Merkle tree-based approach** combined w
 
 ## Contributing
 
-This package is part of the CodeContext monorepo. Please see:
+This package is part of the Claude Context monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines
 - [Core Package Contributing](CONTRIBUTING.md) - Specific development guide for this package
 

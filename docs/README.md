@@ -1,20 +1,20 @@
-# Code Context Documentation
+# Claude Context Documentation
 ![](../assets/code_context_logo_dark.png)
 
-Welcome to the Code Context documentation! Code Context is a powerful tool that adds semantic code search capabilities to AI coding assistants through MCP.
+Welcome to the Claude Context documentation! Claude Context is a powerful tool that adds semantic code search capabilities to AI coding assistants through MCP.
 
 ## 🚀 Quick Navigation
 
 ### Getting Started
-- [📋 Project Overview](getting-started/overview.md) - What is Code Context and how it works
+- [📋 Project Overview](getting-started/overview.md) - What is Claude Context and how it works
 - [🛠️ Prerequisites](getting-started/prerequisites.md) - What you need before starting
 - [⚡ Quick Start Guide](getting-started/quick-start.md) - Get up and running in 1 minutes
 
 
 ### Components
-- [MCP Server](../packages/mcp/README.md) - The MCP server of Code Context
-- [VSCode Extension](../packages/vscode-extension/README.md) - The VSCode extension of Code Context
-- [Core Package](../packages/core/README.md) - The core package of Code Context
+- [MCP Server](../packages/mcp/README.md) - The MCP server of Claude Context
+- [VSCode Extension](../packages/vscode-extension/README.md) - The VSCode extension of Claude Context
+- [Core Package](../packages/core/README.md) - The core package of Claude Context
 
 ### Troubleshooting
 - [❓ FAQ](troubleshooting/faq.md) - Frequently asked questions

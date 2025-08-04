@@ -1,18 +1,18 @@
 # @zilliz/claude-context-mcp
 ![](../../assets/code_context_logo_dark.png)
-Model Context Protocol (MCP) integration for Code Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
+Model Context Protocol (MCP) integration for Claude Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
 [![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
 
-> 📖 **New to Code Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
+> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
 
-## 🚀 Use Code Context as MCP in Claude Code and others
+## 🚀 Use Claude Context as MCP in Claude Code and others
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeUgHZrQT1xNXvPLa5DuPQLpnK5yhHk6yJvLwcq5ZBAaUWo69tcyqalcChWFF4sjQ1mjUSBZgKqLKtD1edKnCPq2af6D_jGRNvwyTEc2UcGnJbsFw1mu_uSmdZHxTLdLO6dFAa8kg?key=_L-CtW461S9w7NRqzdFOIg)
 
-Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants, e.g. Claude Code.
+Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
 
 ## Quick Start
@@ -29,7 +29,7 @@ Before using the MCP server, make sure you have:
 
 #### Embedding Provider Configuration
 
-Code Context MCP supports multiple embedding providers. Choose the one that best fits your needs:
+Claude Context MCP supports multiple embedding providers. Choose the one that best fits your needs:
 
 > 💡 **Tip**: You can also use [global environment variables](../../docs/getting-started/environment-variables.md) for easier configuration management across different MCP clients.
 
@@ -150,7 +150,7 @@ OLLAMA_HOST=http://127.0.0.1:11434
 
 #### Get a free vector database on Zilliz Cloud
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
+Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
 
 ![](../../assets/signup_and_get_apikey.png)
 
@@ -309,10 +309,10 @@ Add to your Claude Desktop configuration:
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Use the command line interface to add the CodeContext MCP server:
+Use the command line interface to add the Claude Context MCP server:
 
 ```bash
-# Add the CodeContext MCP server
+# Add the Claude Context MCP server
 claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
 
 ```
@@ -346,7 +346,7 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 <details>
 <summary><strong>VS Code</strong></summary>
 
-The CodeContext MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
+The Claude Context MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
 
 ```json
 {
@@ -416,7 +416,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 <details>
 <summary><strong>Augment</strong></summary>
 
-To configure Code Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
+To configure Claude Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
 
 #### **A. Using the Augment Code UI**
 
@@ -434,7 +434,7 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
    npx @zilliz/claude-context-mcp@latest
    ```
 
-6. Name the MCP: **Code Context**.
+6. Name the MCP: **Claude Context**.
 
 7. Click the **Add** button.
 
@@ -567,7 +567,7 @@ Clear the search index for a specific codebase.
 
 ## Contributing
 
-This package is part of the CodeContext monorepo. Please see:
+This package is part of the Claude Context monorepo. Please see:
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines  
 - [MCP Package Contributing](CONTRIBUTING.md) - Specific development guide for this package
 

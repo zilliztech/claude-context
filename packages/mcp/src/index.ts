@@ -21,24 +21,24 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { CodeContext } from "@zilliz/claude-context-core";
+import { Context } from "@zilliz/claude-context-core";
 import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
-import { createMcpConfig, logConfigurationSummary, showHelpMessage, CodeContextMcpConfig } from "./config.js";
+import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
 import { createEmbeddingInstance, logEmbeddingProviderInfo } from "./embedding.js";
 import { SnapshotManager } from "./snapshot.js";
 import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
 
-class CodeContextMcpServer {
+class ContextMcpServer {
     private server: Server;
-    private codeContext: CodeContext;
+    private context: Context;
     private snapshotManager: SnapshotManager;
     private syncManager: SyncManager;
     private toolHandlers: ToolHandlers;
 
-    constructor(config: CodeContextMcpConfig) {
+    constructor(config: ContextMcpConfig) {
         // Initialize MCP server
         this.server = new Server(
             {
@@ -65,16 +65,16 @@ class CodeContextMcpServer {
             ...(config.milvusToken && { token: config.milvusToken })
         });
 
-        // Initialize code context
-        this.codeContext = new CodeContext({
+        // Initialize Claude Context
+        this.context = new Context({
             embedding,
             vectorDatabase
         });
 
         // Initialize managers
         this.snapshotManager = new SnapshotManager();
-        this.syncManager = new SyncManager(this.codeContext, this.snapshotManager);
-        this.toolHandlers = new ToolHandlers(this.codeContext, this.snapshotManager);
+        this.syncManager = new SyncManager(this.context, this.snapshotManager);
+        this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager);
 
         // Load existing codebase snapshot on startup
         this.snapshotManager.loadCodebaseSnapshot();
@@ -221,7 +221,7 @@ Search the indexed codebase using natural language queries within a specified ab
 
     async start() {
         console.log('[SYNC-DEBUG] MCP server start() method called');
-        console.log('Starting CodeContext MCP server...');
+        console.log('Starting Context MCP server...');
 
         const transport = new StdioServerTransport();
         console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
@@ -252,7 +252,7 @@ async function main() {
     const config = createMcpConfig();
     logConfigurationSummary(config);
 
-    const server = new CodeContextMcpServer(config);
+    const server = new ContextMcpServer(config);
     await server.start();
 }
 
