@@ -1,6 +1,6 @@
 import { envManager } from "@zilliz/claude-context-core";
 
-export interface CodeContextMcpConfig {
+export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
@@ -58,8 +58,8 @@ export function getEmbeddingModelForProvider(provider: string): string {
     }
 }
 
-export function createMcpConfig(): CodeContextMcpConfig {
-    // Debug: Print all environment variables related to CodeContext
+export function createMcpConfig(): ContextMcpConfig {
+    // Debug: Print all environment variables related to Context
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
     console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${envManager.get('EMBEDDING_PROVIDER') || 'NOT SET'}`);
     console.log(`[DEBUG]   EMBEDDING_MODEL: ${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}`);
@@ -69,8 +69,8 @@ export function createMcpConfig(): CodeContextMcpConfig {
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
-    const config: CodeContextMcpConfig = {
-        name: envManager.get('MCP_SERVER_NAME') || "CodeContext MCP Server",
+    const config: ContextMcpConfig = {
+        name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
         embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
@@ -91,9 +91,9 @@ export function createMcpConfig(): CodeContextMcpConfig {
     return config;
 }
 
-export function logConfigurationSummary(config: CodeContextMcpConfig): void {
+export function logConfigurationSummary(config: ContextMcpConfig): void {
     // Log configuration summary before starting server
-    console.log(`[MCP] 🚀 Starting CodeContext MCP Server`);
+    console.log(`[MCP] 🚀 Starting Context MCP Server`);
     console.log(`[MCP] Configuration Summary:`);
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
@@ -125,7 +125,7 @@ export function logConfigurationSummary(config: CodeContextMcpConfig): void {
 
 export function showHelpMessage(): void {
     console.log(`
-CodeContext MCP Server
+Context MCP Server
 
 Usage: npx @zilliz/claude-context-mcp@latest [options]
 

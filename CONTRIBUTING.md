@@ -1,6 +1,6 @@
-# Contributing to Code Context
+# Contributing to Claude Context
 
-Thank you for your interest in contributing to Code Context! This guide will help you get started.
+Thank you for your interest in contributing to Claude Context! This guide will help you get started.
 
 ## 🚀 Getting Started
 
@@ -155,8 +155,8 @@ When reporting bugs or requesting features:
 
 ## 📄 License
 
-By contributing to Code Context, you agree that your contributions will be licensed under the MIT License.
+By contributing to Claude Context, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-Thank you for contributing to Code Context! 🎉
+Thank you for contributing to Claude Context! 🎉

@@ -2,7 +2,7 @@
     "name": "semanticcodesearch",
     "displayName": "Semantic Code Search",
     "publisher": "zilliz",
-    "description": "Code indexing and semantic search (built by Code Context)",
+    "description": "Code indexing and semantic search (built by Claude Context)",
     "version": "0.0.1",
     "private": true,
     "engines": {

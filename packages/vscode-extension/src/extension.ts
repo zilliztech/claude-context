@@ -5,7 +5,7 @@ import { SearchCommand } from './commands/searchCommand';
 import { IndexCommand } from './commands/indexCommand';
 import { SyncCommand } from './commands/syncCommand';
 import { ConfigManager } from './config/configManager';
-import { CodeContext, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/claude-context-core';
+import { Context, OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, SplitterType } from '@zilliz/claude-context-core';
 import { envManager } from '@zilliz/claude-context-core';
 
 let semanticSearchProvider: SemanticSearchViewProvider;
@@ -13,17 +13,17 @@ let searchCommand: SearchCommand;
 let indexCommand: IndexCommand;
 let syncCommand: SyncCommand;
 let configManager: ConfigManager;
-let codeContext: CodeContext;
+let codeContext: Context;
 let autoSyncDisposable: vscode.Disposable | null = null;
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('CodeContext extension is now active!');
+    console.log('Context extension is now active!');
 
     // Initialize config manager
     configManager = new ConfigManager(context);
 
-    // Initialize shared codeContext instance with embedding configuration
-    codeContext = createCodeContextWithConfig(configManager);
+    // Initialize shared context instance with embedding configuration
+    codeContext = createContextWithConfig(configManager);
 
     // Initialize providers and commands
     searchCommand = new SearchCommand(codeContext);
@@ -46,8 +46,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 event.affectsConfiguration('semanticCodeSearch.milvus') ||
                 event.affectsConfiguration('semanticCodeSearch.splitter') ||
                 event.affectsConfiguration('semanticCodeSearch.autoSync')) {
-                console.log('CodeContext configuration changed, reloading...');
-                reloadCodeContextConfiguration();
+                console.log('Context configuration changed, reloading...');
+                reloadContextConfiguration();
             }
         }),
 
@@ -60,7 +60,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('semanticCodeSearch.indexCodebase', () => indexCommand.execute()),
         vscode.commands.registerCommand('semanticCodeSearch.clearIndex', () => indexCommand.clearIndex()),
-        vscode.commands.registerCommand('semanticCodeSearch.reloadConfiguration', () => reloadCodeContextConfiguration())
+        vscode.commands.registerCommand('semanticCodeSearch.reloadConfiguration', () => reloadContextConfiguration())
     ];
 
     context.subscriptions.push(...disposables);
@@ -73,7 +73,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Show status bar item
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.text = `$(search) CodeContext`;
+    statusBarItem.text = `$(search) Context`;
     statusBarItem.tooltip = 'Click to open semantic search';
     statusBarItem.command = 'semanticCodeSearch.semanticSearch';
     statusBarItem.show();
@@ -118,7 +118,7 @@ function setupAutoSync() {
     }
 }
 
-function createCodeContextWithConfig(configManager: ConfigManager): CodeContext {
+function createContextWithConfig(configManager: ConfigManager): Context {
     const embeddingConfig = configManager.getEmbeddingProviderConfig();
     const milvusConfig = configManager.getMilvusFullConfig();
     const splitterConfig = configManager.getSplitterConfig();
@@ -127,13 +127,13 @@ function createCodeContextWithConfig(configManager: ConfigManager): CodeContext 
         let embedding;
         let vectorDatabase;
 
-        const codeContextConfig: any = {};
+        const contextConfig: any = {};
 
         // Create embedding instance
         if (embeddingConfig) {
             embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
             console.log(`Embedding initialized with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
-            codeContextConfig.embedding = embedding;
+            contextConfig.embedding = embedding;
         } else {
             console.log('No embedding configuration found');
         }
@@ -142,14 +142,14 @@ function createCodeContextWithConfig(configManager: ConfigManager): CodeContext 
         if (milvusConfig) {
             vectorDatabase = new MilvusRestfulVectorDatabase(milvusConfig);
             console.log(`Vector database initialized with Milvus REST API (address: ${milvusConfig.address})`);
-            codeContextConfig.vectorDatabase = vectorDatabase;
+            contextConfig.vectorDatabase = vectorDatabase;
         } else {
             vectorDatabase = new MilvusRestfulVectorDatabase({
                 address: envManager.get('MILVUS_ADDRESS') || 'http://localhost:19530',
                 token: envManager.get('MILVUS_TOKEN') || ''
             });
             console.log('No Milvus configuration found, using default REST API configuration');
-            codeContextConfig.vectorDatabase = vectorDatabase;
+            contextConfig.vectorDatabase = vectorDatabase;
         }
 
         // Create splitter instance
@@ -166,23 +166,23 @@ function createCodeContextWithConfig(configManager: ConfigManager): CodeContext 
                     splitterConfig.chunkOverlap ?? 300
                 );
             }
-            codeContextConfig.codeSplitter = codeSplitter;
+            contextConfig.codeSplitter = codeSplitter;
             console.log(`Splitter configured: ${splitterConfig.type} (chunkSize: ${splitterConfig.chunkSize}, overlap: ${splitterConfig.chunkOverlap})`);
         } else {
             codeSplitter = new AstCodeSplitter(2500, 300);
-            codeContextConfig.codeSplitter = codeSplitter;
+            contextConfig.codeSplitter = codeSplitter;
             console.log('No splitter configuration found, using default AST splitter (chunkSize: 2500, overlap: 300)');
         }
-        return new CodeContext(codeContextConfig);
+        return new Context(contextConfig);
     } catch (error) {
-        console.error('Failed to create CodeContext with user config:', error);
-        vscode.window.showErrorMessage(`Failed to initialize CodeContext: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('Failed to create Context with user config:', error);
+        vscode.window.showErrorMessage(`Failed to initialize Context: ${error instanceof Error ? error.message : 'Unknown error'}`);
         throw error;
     }
 }
 
-function reloadCodeContextConfiguration() {
-    console.log('Reloading CodeContext configuration...');
+function reloadContextConfiguration() {
+    console.log('Reloading Context configuration...');
 
     const embeddingConfig = configManager.getEmbeddingProviderConfig();
     const milvusConfig = configManager.getMilvusFullConfig();
@@ -225,24 +225,24 @@ function reloadCodeContextConfiguration() {
             console.log('No splitter configuration found, using default AST splitter (chunkSize: 2500, overlap: 300)');
         }
 
-        // Update command instances with new codeContext
-        searchCommand.updateCodeContext(codeContext);
-        indexCommand.updateCodeContext(codeContext);
-        syncCommand.updateCodeContext(codeContext);
+        // Update command instances with new context
+        searchCommand.updateContext(codeContext);
+        indexCommand.updateContext(codeContext);
+        syncCommand.updateContext(codeContext);
 
         // Restart auto-sync if it was enabled
         setupAutoSync();
 
-        console.log('CodeContext configuration reloaded successfully');
+        console.log('Context configuration reloaded successfully');
         vscode.window.showInformationMessage('Configuration reloaded successfully!');
     } catch (error) {
-        console.error('Failed to reload CodeContext configuration:', error);
+        console.error('Failed to reload Context configuration:', error);
         vscode.window.showErrorMessage(`Failed to reload configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 
 export function deactivate() {
-    console.log('CodeContext extension is now deactivated');
+    console.log('Context extension is now deactivated');
 
     // Stop auto-sync if running
     if (autoSyncDisposable) {

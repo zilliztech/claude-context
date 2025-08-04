@@ -1,8 +1,8 @@
 # Frequently Asked Questions (FAQ)
 
-## Q: What files does Code Context decide to embed?
+## Q: What files does Claude Context decide to embed?
 
-**A:** Code Context embeds files based on the following rules:
+**A:** Claude Context embeds files based on the following rules:
 
 **Files that are included:**
 - Files with supported extensions from multiple sources:
@@ -17,9 +17,9 @@
   - Environment variable custom ignore patterns (via `CUSTOM_IGNORE_PATTERNS`)
   - Files matching patterns in .gitignore
   - Files matching patterns in any .xxxignore files (e.g., .cursorignore, .codeiumignore)
-  - Files matching patterns in global ~/.codecontext/.codecontextignore
+  - Files matching patterns in global ~/.context/.contextignore
 
-The final rule is: `(DEFAULT_SUPPORTED_EXTENSIONS + MCP custom extensions + custom extensions from env variable) - (DEFAULT_IGNORE_PATTERNS + MCP custom ignore patterns + custom ignore patterns from env variable + .gitignore + .xxxignore files + global .codecontextignore)`
+The final rule is: `(DEFAULT_SUPPORTED_EXTENSIONS + MCP custom extensions + custom extensions from env variable) - (DEFAULT_IGNORE_PATTERNS + MCP custom ignore patterns + custom ignore patterns from env variable + .gitignore + .xxxignore files + global .contextignore)`
 
 **Extension sources (all patterns are combined):**
 1. **Default extensions**: Built-in supported file extensions (.ts, .js, .py, .java, .cpp, .md, etc.)
@@ -32,7 +32,7 @@ The final rule is: `(DEFAULT_SUPPORTED_EXTENSIONS + MCP custom extensions + cust
 3. **Environment custom ignore patterns**: Patterns from `CUSTOM_IGNORE_PATTERNS` env variable (comma-separated)
 4. **.gitignore**: Standard Git ignore patterns in codebase root
 5. **.xxxignore files**: Any file in codebase root matching pattern `.xxxignore` (e.g., `.cursorignore`, `.codeiumignore`)
-6. **Global ignore**: `~/.codecontext/.codecontextignore` for user-wide patterns
+6. **Global ignore**: `~/.context/.contextignore` for user-wide patterns
 
 All patterns are merged together - MCP custom patterns and environment variables will NOT be overwritten by file-based patterns.
 
@@ -42,7 +42,7 @@ All patterns are merged together - MCP custom patterns and environment variables
 
 These environment variables can be set in:
 - System environment variables (highest priority)
-- Global `~/.codecontext/.env` file (lower priority)
+- Global `~/.context/.env` file (lower priority)
 
 Supported extensions include common programming languages (.ts, .js, .py, .java, .cpp, etc.) and documentation files (.md, .markdown). Default ignore patterns cover build outputs, dependencies (node_modules), IDE files, and temporary files.
 
@@ -50,7 +50,7 @@ Supported extensions include common programming languages (.ts, .js, .py, .java,
 
 ## Q: Can I use a fully local deployment setup?
 
-**A:** Yes, you can deploy Code Context entirely on your local infrastructure. While we recommend using the fully managed [Zilliz Cloud](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) service for ease of use, you can also set up your own private local deployment.
+**A:** Yes, you can deploy Claude Context entirely on your local infrastructure. While we recommend using the fully managed [Zilliz Cloud](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) service for ease of use, you can also set up your own private local deployment.
 
 **For local deployment:**
 

@@ -10,7 +10,7 @@ export class SnapshotManager {
 
     constructor() {
         // Initialize snapshot file path
-        this.snapshotFilePath = path.join(os.homedir(), '.codecontext', 'mcp-codebase-snapshot.json');
+        this.snapshotFilePath = path.join(os.homedir(), '.context', 'mcp-codebase-snapshot.json');
     }
 
     public getIndexedCodebases(): string[] {

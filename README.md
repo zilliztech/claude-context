@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/zilliztech/claude-context">
-    <img src="assets/code_context_logo_dark.png" width=600 alt="Code Context Logo">
+    <img src="assets/code_context_logo_dark.png" width=600 alt="Claude Context Logo">
   </a>
   <h3 align="center"> Add Semantic Search to Claude Code</h2>
 </p>
@@ -18,7 +18,7 @@
 <a href="https://discord.gg/mKc3R95yE5"><img height="20" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="discord" /></a>
 </div>
 
-**Code Context** is an MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
+**Claude Context** is an MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
 
 ---
 
@@ -36,7 +36,7 @@
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeUgHZrQT1xNXvPLa5DuPQLpnK5yhHk6yJvLwcq5ZBAaUWo69tcyqalcChWFF4sjQ1mjUSBZgKqLKtD1edKnCPq2af6D_jGRNvwyTEc2UcGnJbsFw1mu_uSmdZHxTLdLO6dFAa8kg?key=_L-CtW461S9w7NRqzdFOIg)
 
-Model Context Protocol (MCP) allows you to integrate Code Context with your favorite AI coding assistants, e.g. Claude Code.
+Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
 ## Quick Start
 ### Prerequisites
@@ -44,7 +44,7 @@ Model Context Protocol (MCP) allows you to integrate Code Context with your favo
 <details>
 <summary>Get a free vector database on Zilliz Cloud</summary>
 
-Code Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
+Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
 
 ![](assets/signup_and_get_apikey.png)
 
@@ -65,10 +65,10 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 #### Claude Code Configuration
 
-Use the command line interface to add the Code Context MCP server:
+Use the command line interface to add the Claude Context MCP server:
 
 ```bash
-# Add the Code Context MCP server
+# Add the Claude Context MCP server
 claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
 ```
 
@@ -226,7 +226,7 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 <details>
 <summary><strong>VS Code</strong></summary>
 
-The Code Context MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
+The Claude Context MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
 
 ```json
 {
@@ -299,7 +299,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 <details>
 <summary><strong>Augment</strong></summary>
 
-To configure Code Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
+To configure Claude Context MCP in Augment Code, you can use either the graphical interface or manual configuration.
 
 #### **A. Using the Augment Code UI**
 
@@ -317,7 +317,7 @@ To configure Code Context MCP in Augment Code, you can use either the graphical 
    npx @zilliz/claude-context-mcp@latest
    ```
 
-6. Name the MCP: **Code Context**.
+6. Name the MCP: **Claude Context**.
 
 7. Click the **Add** button.
 
@@ -399,7 +399,7 @@ For more detailed MCP environment variable configuration, see our [Environment V
 ## 🏗️ Architecture
 ![](assets/Architecture.png)
 
-Code Context is a monorepo containing three main packages:
+Claude Context is a monorepo containing three main packages:
 
 ### Core Components
 
@@ -416,16 +416,16 @@ Code Context is a monorepo containing three main packages:
 
 ---
 
-## 📦 Other Ways to Use Code Context
+## 📦 Other Ways to Use Claude Context
 
-While MCP is the recommended way to use Code Context with AI assistants, you can also use it directly or through the VSCode extension.
+While MCP is the recommended way to use Claude Context with AI assistants, you can also use it directly or through the VSCode extension.
 
 ### Core Package Usage
 
 The `@zilliz/claude-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
 ```typescript
-import { CodeContext, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
+import { Context, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -440,7 +440,7 @@ const vectorDatabase = new MilvusVectorDatabase({
 });
 
 // Create context instance
-const context = new CodeContext({
+const context = new Context({
     embedding,
     vectorDatabase
 });
@@ -462,7 +462,7 @@ results.forEach(result => {
 
 ### VSCode Extension
 
-Integrates Code Context directly into your IDE. Provides an intuitive interface for semantic code search and navigation.
+Integrates Claude Context directly into your IDE. Provides an intuitive interface for semantic code search and navigation.
 
 1. **Direct Link**: [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=zilliz.semanticcodesearch)
 2. **Manual Search**:
@@ -515,7 +515,7 @@ pnpm dev
 
 ### Supported File Extensions
 
-By default, Code Context supports:
+By default, Claude Context supports:
 - Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`
 - Documentation: `.md`, `.markdown`
 
