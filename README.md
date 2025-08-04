@@ -1,5 +1,5 @@
 ![](assets/claude-context.png)
-### Add Semantic Search to Claude Code
+### Bring your codebase as context to Claude Code
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
