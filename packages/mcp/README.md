@@ -1,5 +1,5 @@
 # @zilliz/claude-context-mcp
-![](../../assets/code_context_logo_dark.png)
+![](../../assets/claude-context.png)
 Model Context Protocol (MCP) integration for Claude Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
 [![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
