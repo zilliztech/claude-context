@@ -36,7 +36,7 @@ Model Context Protocol (MCP) allows you to integrate Claude Context with your fa
 ### Prerequisites
 
 <details>
-<summary>Get a free vector database on Zilliz Cloud</summary>
+<summary>Get a free vector database on Zilliz Cloud 👈</summary>
 
 Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
 
