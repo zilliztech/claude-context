@@ -358,7 +358,7 @@ export class ToolHandlers {
             const collectionName = `code_chunks_${hash.substring(0, 8)}`;
 
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
-            await this.codeContext['loadGitignorePatterns'](absolutePath);
+            await this.context['loadGitignorePatterns'](absolutePath);
             
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
