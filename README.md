@@ -16,14 +16,11 @@
 
 ---
 
-## ✨ Features
+## ✨ Core Value
 
-- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
-- 🧠 **Context-Aware**: Discover large codebase, understand how different parts of your codebase relate, even across millions of lines of code.
-- ⚡ **Incremental Indexing**: Efficiently re-index only changed files using Merkle trees.
-- 🧩 **Intelligent Code Chunking**: Analyze code in Abstract Syntax Trees (AST) for chunking.
-- 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
-- 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
+- 🧠 **Your Entire Codebase as Context**: Unlike traditional keyword matching that can easily miss relevant code, it uses semantic search to retrieve all your care about from millions of lines of code, without going through multiple hops of discovery, and add to LLM context.
+- 💰 **Don’t go bankrupt working with large codebase**: Compared to simply stuffing a whole directory of files in LLM context for each call, efficient indexing and search in vector database avoids breaking your budget.
+
 ---
 
 ## 🚀 Demo
@@ -389,6 +386,16 @@ For more detailed MCP environment variable configuration, see our [Environment V
 📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
 
 ---
+## 🔧 Implementation Features
+
+- 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
+- 🧠 **Context-Aware**: Discover large codebase, understand how different parts of your codebase relate, even across millions of lines of code.
+- ⚡ **Incremental Indexing**: Efficiently re-index only changed files using Merkle trees.
+- 🧩 **Intelligent Code Chunking**: Analyze code in Abstract Syntax Trees (AST) for chunking.
+- 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
+- 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
+
+---
 
 ## 🏗️ Architecture
 ![](assets/Architecture.png)
@@ -511,14 +518,20 @@ pnpm dev
 
 By default, Claude Context supports:
 - Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`
-- Documentation: `.md`, `.markdown`
+- Documentation: `.md`, `.markdown`, `.ipynb`
 
 ### Ignore Patterns
 
 Common directories and files are automatically ignored:
-- `node_modules/**`, `dist/**`, `build/**`
-- `.git/**`, `.vscode/**`, `.idea/**`
-- `*.log`, `*.min.js`, `*.map`
+- Build outputs: `node_modules/**`, `dist/**`, `build/**`, `out/**`, `target/**`, `coverage/**`, `.nyc_output/**`
+- Version control: `.git/**`, `.svn/**`, `.hg/**`
+- IDE/Editor files: `.vscode/**`, `.idea/**`, `*.swp`, `*.swo`
+- Cache directories: `.cache/**`, `__pycache__/**`, `.pytest_cache/**`
+- Logs and temporary: `logs/**`, `tmp/**`, `temp/**`, `*.log`
+- Environment files: `.env`, `.env.*`, `*.local`
+- Minified/bundled files: `*.min.js`, `*.min.css`, `*.bundle.js`, `*.bundle.css`, `*.chunk.js`, `*.map`
+
+See [FAQ Guide](docs/troubleshooting/faq.md) for detailed and customized configuration of supported file extensions and ignore patterns. 
 
 ---
 
