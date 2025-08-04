@@ -153,6 +153,31 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 </details>
 
 <details>
+<summary><strong>Void</strong></summary>
+
+Go to: `Settings` -> `MCP` -> `Add new global MCP server`
+
+Add the following configuration to your Void MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/code-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
 <summary><strong>Claude Desktop</strong></summary>
 
 Add to your Claude Desktop configuration:
