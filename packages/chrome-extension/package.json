@@ -1,6 +1,6 @@
 {
     "name": "@zilliz/claude-context-chrome-extension",
-    "version": "0.0.2",
+    "version": "0.0.12",
     "description": "Claude Context Chrome extension for web-based code indexing",
     "private": true,
     "scripts": {
