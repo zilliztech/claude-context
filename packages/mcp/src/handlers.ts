@@ -33,7 +33,7 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
 
             // Get all collections using the interface method
-            const vectorDb = this.context['vectorDatabase'];
+            const vectorDb = this.context.getVectorDatabase();
 
             // Use the new listCollections method from the interface
             const collections = await vectorDb.listCollections();
@@ -334,27 +334,27 @@ export class ToolHandlers {
             }
 
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
-            await this.context['loadGitignorePatterns'](absolutePath);
+            await this.context.getLoadedIgnorePatterns(absolutePath);
 
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
-            const ignorePatterns = this.context['ignorePatterns'] || [];
+            const ignorePatterns = this.context.getIgnorePatterns() || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
 
             // Store synchronizer in the context (let context manage collection names)
-            await this.context['prepareCollection'](absolutePath);
-            const collectionName = this.context['getCollectionName'](absolutePath);
-            this.context['synchronizers'].set(collectionName, synchronizer);
+            await this.context.getPreparedCollection(absolutePath);
+            const collectionName = this.context.getCollectionName(absolutePath);
+            this.context.setSynchronizer(collectionName, synchronizer);
             if (contextForThisTask !== this.context) {
-                contextForThisTask['synchronizers'].set(collectionName, synchronizer);
+                contextForThisTask.setSynchronizer(collectionName, synchronizer);
             }
 
             console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
             // Log embedding provider information before indexing
-            const embeddingProvider = this.context['embedding'];
+            const embeddingProvider = this.context.getEmbedding();
             console.log(`[BACKGROUND-INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
             // Start indexing with the appropriate context
@@ -448,7 +448,7 @@ export class ToolHandlers {
             console.log(`[SEARCH] Indexing status: ${isIndexing ? 'In Progress' : 'Completed'}`);
 
             // Log embedding provider information before search
-            const embeddingProvider = this.context['embedding'];
+            const embeddingProvider = this.context.getEmbedding();
             console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 

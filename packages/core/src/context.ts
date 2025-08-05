@@ -155,6 +155,69 @@ export class Context {
     }
 
     /**
+     * Get embedding instance
+     */
+    getEmbedding(): Embedding {
+        return this.embedding;
+    }
+
+    /**
+     * Get vector database instance
+     */
+    getVectorDatabase(): VectorDatabase {
+        return this.vectorDatabase;
+    }
+
+    /**
+     * Get code splitter instance
+     */
+    getCodeSplitter(): Splitter {
+        return this.codeSplitter;
+    }
+
+    /**
+     * Get supported extensions
+     */
+    getSupportedExtensions(): string[] {
+        return [...this.supportedExtensions];
+    }
+
+    /**
+     * Get ignore patterns
+     */
+    getIgnorePatterns(): string[] {
+        return [...this.ignorePatterns];
+    }
+
+    /**
+     * Get synchronizers map
+     */
+    getSynchronizers(): Map<string, FileSynchronizer> {
+        return new Map(this.synchronizers);
+    }
+
+    /**
+     * Set synchronizer for a collection
+     */
+    setSynchronizer(collectionName: string, synchronizer: FileSynchronizer): void {
+        this.synchronizers.set(collectionName, synchronizer);
+    }
+
+    /**
+     * Public wrapper for loadIgnorePatterns private method
+     */
+    async getLoadedIgnorePatterns(codebasePath: string): Promise<void> {
+        return this.loadIgnorePatterns(codebasePath);
+    }
+
+    /**
+     * Public wrapper for prepareCollection private method
+     */
+    async getPreparedCollection(codebasePath: string): Promise<void> {
+        return this.prepareCollection(codebasePath);
+    }
+
+    /**
      * Get isHybrid setting from environment variable with default true
      */
     private getIsHybrid(): boolean {
@@ -168,7 +231,7 @@ export class Context {
     /**
      * Generate collection name based on codebase path and hybrid mode
      */
-    private getCollectionName(codebasePath: string): string {
+    public getCollectionName(codebasePath: string): string {
         const isHybrid = this.getIsHybrid();
         const normalizedPath = path.resolve(codebasePath);
         const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
@@ -191,7 +254,7 @@ export class Context {
         console.log(`🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
 
         // 1. Load ignore patterns from various ignore files
-        await this.loadGitignorePatterns(codebasePath);
+        await this.loadIgnorePatterns(codebasePath);
 
         // 2. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
@@ -256,7 +319,7 @@ export class Context {
 
         if (!synchronizer) {
             // Load project-specific ignore patterns before creating FileSynchronizer
-            await this.loadGitignorePatterns(codebasePath);
+            await this.loadIgnorePatterns(codebasePath);
 
             // To be safe, let's initialize if it's not there.
             const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns);
@@ -869,27 +932,22 @@ export class Context {
      * This method preserves any existing custom patterns that were added before
      * @param codebasePath Path to the codebase
      */
-    private async loadGitignorePatterns(codebasePath: string): Promise<void> {
+    private async loadIgnorePatterns(codebasePath: string): Promise<void> {
         try {
             let fileBasedPatterns: string[] = [];
 
-            // 1. Load .gitignore
-            const gitignorePath = path.join(codebasePath, '.gitignore');
-            const gitignorePatterns = await this.loadIgnoreFile(gitignorePath, '.gitignore');
-            fileBasedPatterns.push(...gitignorePatterns);
-
-            // 2. Load all .xxxignore files in codebase directory
+            // Load all .xxxignore files in codebase directory
             const ignoreFiles = await this.findIgnoreFiles(codebasePath);
             for (const ignoreFile of ignoreFiles) {
                 const patterns = await this.loadIgnoreFile(ignoreFile, path.basename(ignoreFile));
                 fileBasedPatterns.push(...patterns);
             }
 
-            // 3. Load global ~/.context/.contextignore
+            // Load global ~/.context/.contextignore
             const globalIgnorePatterns = await this.loadGlobalIgnoreFile();
             fileBasedPatterns.push(...globalIgnorePatterns);
 
-            // 4. Merge file-based patterns with existing patterns (which may include custom MCP patterns)
+            // Merge file-based patterns with existing patterns (which may include custom MCP patterns)
             if (fileBasedPatterns.length > 0) {
                 this.addCustomIgnorePatterns(fileBasedPatterns);
                 console.log(`🚫 Loaded total ${fileBasedPatterns.length} ignore patterns from all ignore files`);
@@ -903,7 +961,7 @@ export class Context {
     }
 
     /**
-     * Find all .xxxignore files in the codebase directory (excluding .gitignore as it's handled separately)
+     * Find all .xxxignore files in the codebase directory
      * @param codebasePath Path to the codebase
      * @returns Array of ignore file paths
      */
@@ -915,14 +973,13 @@ export class Context {
             for (const entry of entries) {
                 if (entry.isFile() &&
                     entry.name.startsWith('.') &&
-                    entry.name.endsWith('ignore') &&
-                    entry.name !== '.gitignore') { // Exclude .gitignore as it's handled separately
+                    entry.name.endsWith('ignore')) {
                     ignoreFiles.push(path.join(codebasePath, entry.name));
                 }
             }
 
             if (ignoreFiles.length > 0) {
-                console.log(`📄 Found additional ignore files: ${ignoreFiles.map(f => path.basename(f)).join(', ')}`);
+                console.log(`📄 Found ignore files: ${ignoreFiles.map(f => path.basename(f)).join(', ')}`);
             }
 
             return ignoreFiles;
@@ -968,7 +1025,7 @@ export class Context {
                 return [];
             }
         } catch (error) {
-            if (fileName === '.gitignore' || fileName.includes('global')) {
+            if (fileName.includes('global')) {
                 console.log(`📄 No ${fileName} file found`);
             }
             return [];
