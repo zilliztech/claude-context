@@ -3,7 +3,6 @@ import {
     SearchOptions,
     VectorSearchResult,
     VectorDatabase,
-    HybridVectorDocument,
     HybridSearchRequest,
     HybridSearchOptions,
     HybridSearchResult,
@@ -607,7 +606,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    async insertHybrid(collectionName: string, documents: HybridVectorDocument[]): Promise<void> {
+    async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
 
         try {

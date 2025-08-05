@@ -61,7 +61,7 @@ export class ToolHandlers {
             // Check each collection for codebase path
             for (const collectionName of collections) {
                 try {
-                    // Skip collections that don't match the code_chunks pattern (support both legacy and hybrid collections)
+                    // Skip collections that don't match the code_chunks pattern (support both legacy and new collections)
                     if (!collectionName.startsWith('code_chunks_') && !collectionName.startsWith('hybrid_code_chunks_')) {
                         console.log(`[SYNC-CLOUD] ⏭️  Skipping non-code collection: ${collectionName}`);
                         continue;
@@ -218,41 +218,19 @@ export class ToolHandlers {
 
             // CRITICAL: Pre-index collection creation validation
             try {
-                const normalizedPath = path.resolve(absolutePath);
-                const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-                const collectionName = `hybrid_code_chunks_${hash.substring(0, 8)}`;
+                console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation capability`);
 
-                console.log(`[INDEX-VALIDATION] 🔍 Validating hybrid collection creation for: ${collectionName}`);
-
-                // Get embedding dimension for collection creation
-                const embeddingProvider = this.context['embedding'];
-                const dimension = embeddingProvider.getDimension();
-
-                // Check if collection already exists and clear it to avoid schema conflicts
-                const collectionExists = await this.context['vectorDatabase'].hasCollection(collectionName);
-                if (collectionExists) {
-                    console.log(`[INDEX-VALIDATION] 📋 Hybrid collection ${collectionName} already exists, clearing for validation`);
-                    try {
-                        await this.context['vectorDatabase'].dropCollection(collectionName);
-                        console.log(`[INDEX-VALIDATION] ✅ Existing hybrid collection cleared for validation: ${collectionName}`);
-                    } catch (dropError: any) {
-                        console.log(`[INDEX-VALIDATION] ⚠️  Error clearing existing collection: ${dropError.message || dropError}`);
-                        // Continue anyway, as the creation might still work
-                    }
-                } else if (forceReindex) {
-                    console.log(`[INDEX-VALIDATION] ℹ️  Force reindex enabled, but hybrid collection ${collectionName} does not exist`);
+                // Check if collection can be created (this will be handled entirely by context.ts)
+                const hasExistingIndex = await this.context.hasIndex(absolutePath);
+                if (hasExistingIndex && forceReindex) {
+                    console.log(`[INDEX-VALIDATION] ℹ️  Force reindex enabled, existing index will be cleared`);
+                    await this.context.clearIndex(absolutePath);
+                    console.log(`[INDEX-VALIDATION] ✅ Existing index cleared for re-indexing`);
+                } else if (hasExistingIndex) {
+                    console.log(`[INDEX-VALIDATION] ℹ️  Index already exists for this codebase`);
                 }
 
-                // Attempt to create hybrid collection with BM25 support - this will throw COLLECTION_LIMIT_MESSAGE if limit reached
-                await this.context['vectorDatabase'].createHybridCollection(
-                    collectionName,
-                    dimension,
-                    `Hybrid code context collection: ${collectionName}`
-                );
-
-                // If creation succeeds, immediately drop the test collection
-                await this.context['vectorDatabase'].dropCollection(collectionName);
-                console.log(`[INDEX-VALIDATION] ✅ Hybrid collection creation validated successfully`);
+                console.log(`[INDEX-VALIDATION] ✅  Collection creation validation completed`);
 
             } catch (validationError: any) {
                 const errorMessage = typeof validationError === 'string' ? validationError :
@@ -355,11 +333,6 @@ export class ToolHandlers {
                 console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
-            // Generate hybrid collection name
-            const normalizedPath = path.resolve(absolutePath);
-            const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-            const collectionName = `hybrid_code_chunks_${hash.substring(0, 8)}`;
-
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
             await this.context['loadGitignorePatterns'](absolutePath);
 
@@ -370,7 +343,9 @@ export class ToolHandlers {
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
 
-            // Store synchronizer in the context's internal map
+            // Store synchronizer in the context (let context manage collection names)
+            await this.context['prepareCollection'](absolutePath);
+            const collectionName = this.context['getCollectionName'](absolutePath);
             this.context['synchronizers'].set(collectionName, synchronizer);
             if (contextForThisTask !== this.context) {
                 contextForThisTask['synchronizers'].set(collectionName, synchronizer);
@@ -384,7 +359,7 @@ export class ToolHandlers {
 
             // Start indexing with the appropriate context
             console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
-            const stats = await contextForThisTask.indexCodebaseHybrid(absolutePath);
+            const stats = await contextForThisTask.indexCodebase(absolutePath);
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Move from indexing to indexed list
@@ -474,18 +449,18 @@ export class ToolHandlers {
 
             // Log embedding provider information before search
             const embeddingProvider = this.context['embedding'];
-            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for hybrid search`);
+            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
-            // Search in the specified codebase using hybrid search
-            const searchResults = await this.context.hybridSemanticSearch(
+            // Search in the specified codebase
+            const searchResults = await this.context.semanticSearch(
                 absolutePath,
                 query,
                 Math.min(resultLimit, 50),
                 0.3
             );
 
-            console.log(`[SEARCH] ✅ Hybrid search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
+            console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
 
             if (searchResults.length === 0) {
                 let noResultsMessage = `No results found for query: "${query}" in codebase '${absolutePath}'`;
@@ -606,8 +581,8 @@ export class ToolHandlers {
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
             try {
-                await this.context.clearHybridIndex(absolutePath);
-                console.log(`[CLEAR] Successfully cleared hybrid index for: ${absolutePath}`);
+                await this.context.clearIndex(absolutePath);
+                console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
             } catch (error: any) {
                 const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;
                 console.error(`[CLEAR] ${errorMsg}`);

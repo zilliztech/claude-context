@@ -4,7 +4,6 @@ import {
     SearchOptions,
     VectorSearchResult,
     VectorDatabase,
-    HybridVectorDocument,
     HybridSearchRequest,
     HybridSearchOptions,
     HybridSearchResult,
@@ -416,7 +415,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
         });
     }
 
-    async insertHybrid(collectionName: string, documents: HybridVectorDocument[]): Promise<void> {
+    async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
 
         const data = documents.map(doc => ({
