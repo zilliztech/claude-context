@@ -16,7 +16,30 @@ export interface SearchOptions {
     threshold?: number;
 }
 
+// New interfaces for hybrid search
+export interface HybridSearchRequest {
+    data: number[] | string; // Query vector or text
+    anns_field: string; // Vector field name (vector or sparse_vector)
+    param: Record<string, any>; // Search parameters
+    limit: number;
+}
+
+export interface HybridSearchOptions {
+    rerank?: RerankStrategy;
+    limit?: number;
+}
+
+export interface RerankStrategy {
+    strategy: 'rrf' | 'weighted';
+    params?: Record<string, any>;
+}
+
 export interface VectorSearchResult {
+    document: VectorDocument;
+    score: number;
+}
+
+export interface HybridSearchResult {
     document: VectorDocument;
     score: number;
 }
@@ -29,6 +52,14 @@ export interface VectorDatabase {
      * @param description Collection description
      */
     createCollection(collectionName: string, dimension: number, description?: string): Promise<void>;
+
+    /**
+     * Create collection with hybrid search support
+     * @param collectionName Collection name
+     * @param dimension Dense vector dimension
+     * @param description Collection description
+     */
+    createHybridCollection(collectionName: string, dimension: number, description?: string): Promise<void>;
 
     /**
      * Drop collection
@@ -55,12 +86,27 @@ export interface VectorDatabase {
     insert(collectionName: string, documents: VectorDocument[]): Promise<void>;
 
     /**
+     * Insert hybrid vector documents
+     * @param collectionName Collection name
+     * @param documents Document array
+     */
+    insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void>;
+
+    /**
      * Search similar vectors
      * @param collectionName Collection name
      * @param queryVector Query vector
      * @param options Search options
      */
     search(collectionName: string, queryVector: number[], options?: SearchOptions): Promise<VectorSearchResult[]>;
+
+    /**
+     * Hybrid search with multiple vector fields
+     * @param collectionName Collection name
+     * @param searchRequests Array of search requests for different fields
+     * @param options Hybrid search options including reranking
+     */
+    hybridSearch(collectionName: string, searchRequests: HybridSearchRequest[], options?: HybridSearchOptions): Promise<HybridSearchResult[]>;
 
     /**
      * Delete documents
@@ -70,11 +116,11 @@ export interface VectorDatabase {
     delete(collectionName: string, ids: string[]): Promise<void>;
 
     /**
-     * Query documents by filter
+     * Query documents with filter conditions
      * @param collectionName Collection name
-     * @param filter Filter expression string
+     * @param filter Filter expression
      * @param outputFields Fields to return
-     * @param limit Maximum number of results to return (optional)
+     * @param limit Maximum number of results
      */
     query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
 }

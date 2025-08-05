@@ -3,6 +3,9 @@ import {
     SearchOptions,
     VectorSearchResult,
     VectorDatabase,
+    HybridSearchRequest,
+    HybridSearchOptions,
+    HybridSearchResult,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
 import { ClusterManager } from './zilliz-utils';
@@ -464,6 +467,279 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         } catch (error) {
             console.error(`❌ Failed to query collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    async createHybridCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+
+            const collectionSchema = {
+                collectionName,
+                dbName: restfulConfig.database,
+                schema: {
+                    enableDynamicField: false,
+                    functions: [
+                        {
+                            name: "content_bm25_emb",
+                            description: "content bm25 function",
+                            type: "BM25",
+                            inputFieldNames: ["content"],
+                            outputFieldNames: ["sparse_vector"],
+                            params: {},
+                        },
+                    ],
+                    fields: [
+                        {
+                            fieldName: "id",
+                            dataType: "VarChar",
+                            isPrimary: true,
+                            elementTypeParams: {
+                                max_length: 512
+                            }
+                        },
+                        {
+                            fieldName: "content",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 65535,
+                                enable_analyzer: true
+                            }
+                        },
+                        {
+                            fieldName: "vector",
+                            dataType: "FloatVector",
+                            elementTypeParams: {
+                                dim: dimension
+                            }
+                        },
+                        {
+                            fieldName: "sparse_vector",
+                            dataType: "SparseFloatVector"
+                        },
+                        {
+                            fieldName: "relativePath",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 1024
+                            }
+                        },
+                        {
+                            fieldName: "startLine",
+                            dataType: "Int64"
+                        },
+                        {
+                            fieldName: "endLine",
+                            dataType: "Int64"
+                        },
+                        {
+                            fieldName: "fileExtension",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 32
+                            }
+                        },
+                        {
+                            fieldName: "metadata",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 65535
+                            }
+                        }
+                    ]
+                }
+            };
+
+            // Step 1: Create collection with schema and functions
+            await createCollectionWithLimitCheck(this.makeRequest.bind(this), collectionSchema);
+
+            // Step 2: Create indexes for both vector fields
+            await this.createHybridIndexes(collectionName);
+
+            // Step 3: Load collection to memory for searching
+            await this.loadCollection(collectionName);
+
+        } catch (error) {
+            console.error(`❌ Failed to create hybrid collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    private async createHybridIndexes(collectionName: string): Promise<void> {
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+
+            // Create index for dense vector
+            const denseIndexParams = {
+                collectionName,
+                dbName: restfulConfig.database,
+                indexParams: [
+                    {
+                        fieldName: "vector",
+                        indexName: "vector_index",
+                        metricType: "COSINE",
+                        index_type: "AUTOINDEX"
+                    }
+                ]
+            };
+            await this.makeRequest('/indexes/create', 'POST', denseIndexParams);
+
+            // Create index for sparse vector
+            const sparseIndexParams = {
+                collectionName,
+                dbName: restfulConfig.database,
+                indexParams: [
+                    {
+                        fieldName: "sparse_vector",
+                        indexName: "sparse_vector_index",
+                        metricType: "BM25",
+                        index_type: "SPARSE_INVERTED_INDEX"
+                    }
+                ]
+            };
+            await this.makeRequest('/indexes/create', 'POST', sparseIndexParams);
+
+        } catch (error) {
+            console.error(`❌ Failed to create hybrid indexes for collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
+        await this.ensureInitialized();
+
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+
+            const data = documents.map(doc => ({
+                id: doc.id,
+                content: doc.content,
+                vector: doc.vector,
+                relativePath: doc.relativePath,
+                startLine: doc.startLine,
+                endLine: doc.endLine,
+                fileExtension: doc.fileExtension,
+                metadata: JSON.stringify(doc.metadata),
+            }));
+
+            const insertRequest = {
+                collectionName,
+                dbName: restfulConfig.database,
+                data: data
+            };
+
+            const response = await this.makeRequest('/entities/insert', 'POST', insertRequest);
+
+            if (response.code !== 0) {
+                throw new Error(`Insert failed: ${response.message || 'Unknown error'}`);
+            }
+
+        } catch (error) {
+            console.error(`❌ Failed to insert hybrid documents to collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    async hybridSearch(collectionName: string, searchRequests: HybridSearchRequest[], options?: HybridSearchOptions): Promise<HybridSearchResult[]> {
+        await this.ensureInitialized();
+
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+
+            console.log(`🔍 Preparing hybrid search for collection: ${collectionName}`);
+
+            // Prepare search requests according to Milvus REST API hybrid search specification
+            // For dense vector search - data must be array of vectors: [[0.1, 0.2, 0.3, ...]]
+            const search_param_1 = {
+                data: Array.isArray(searchRequests[0].data) ? [searchRequests[0].data] : [[searchRequests[0].data]],
+                annsField: searchRequests[0].anns_field, // "vector"
+                limit: searchRequests[0].limit,
+                outputFields: ["*"],
+                searchParams: {
+                    metricType: "COSINE",
+                    params: searchRequests[0].param || { "nprobe": 10 }
+                }
+            };
+
+            // For sparse vector search - data must be array of queries: ["query text"]
+            const search_param_2 = {
+                data: Array.isArray(searchRequests[1].data) ? searchRequests[1].data : [searchRequests[1].data],
+                annsField: searchRequests[1].anns_field, // "sparse_vector"
+                limit: searchRequests[1].limit,
+                outputFields: ["*"],
+                searchParams: {
+                    metricType: "BM25",
+                    params: searchRequests[1].param || { "drop_ratio_search": 0.2 }
+                }
+            };
+
+            const rerank_strategy = {
+                strategy: "rrf",
+                params: {
+                    k: 100
+                }
+            };
+
+            console.log(`🔍 Dense search params:`, JSON.stringify({
+                annsField: search_param_1.annsField,
+                limit: search_param_1.limit,
+                data_length: Array.isArray(search_param_1.data[0]) ? search_param_1.data[0].length : 'N/A',
+                searchParams: search_param_1.searchParams
+            }, null, 2));
+            console.log(`🔍 Sparse search params:`, JSON.stringify({
+                annsField: search_param_2.annsField,
+                limit: search_param_2.limit,
+                query_text: typeof search_param_2.data[0] === 'string' ? search_param_2.data[0].substring(0, 50) + '...' : 'N/A',
+                searchParams: search_param_2.searchParams
+            }, null, 2));
+
+            const hybridSearchRequest = {
+                collectionName,
+                dbName: restfulConfig.database,
+                search: [search_param_1, search_param_2],
+                rerank: rerank_strategy,
+                limit: options?.limit || searchRequests[0]?.limit || 10,
+                outputFields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
+            };
+
+            console.log(`🔍 Complete REST API request:`, JSON.stringify({
+                collectionName: hybridSearchRequest.collectionName,
+                dbName: hybridSearchRequest.dbName,
+                search_count: hybridSearchRequest.search.length,
+                rerank: hybridSearchRequest.rerank,
+                limit: hybridSearchRequest.limit,
+                outputFields: hybridSearchRequest.outputFields
+            }, null, 2));
+
+            console.log(`🔍 Executing REST API hybrid search...`);
+            const response = await this.makeRequest('/entities/hybrid_search', 'POST', hybridSearchRequest);
+
+            if (response.code !== 0) {
+                throw new Error(`Hybrid search failed: ${response.message || 'Unknown error'}`);
+            }
+
+            const results = response.data || [];
+            console.log(`✅ Found ${results.length} results from hybrid search`);
+
+            // Transform response to HybridSearchResult format
+            return results.map((result: any) => ({
+                document: {
+                    id: result.id,
+                    content: result.content,
+                    vector: [], // Vector not returned in search results
+                    sparse_vector: [], // Vector not returned in search results
+                    relativePath: result.relativePath,
+                    startLine: result.startLine,
+                    endLine: result.endLine,
+                    fileExtension: result.fileExtension,
+                    metadata: JSON.parse(result.metadata || '{}'),
+                },
+                score: result.score || result.distance || 0,
+            }));
+
+        } catch (error) {
+            console.error(`❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
             throw error;
         }
     }

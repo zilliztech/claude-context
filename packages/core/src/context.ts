@@ -11,7 +11,10 @@ import {
 import {
     VectorDatabase,
     VectorDocument,
-    VectorSearchResult
+    VectorSearchResult,
+    HybridSearchRequest,
+    HybridSearchOptions,
+    HybridSearchResult
 } from './vectordb';
 import { SemanticSearchResult } from './types';
 import { envManager } from './utils/env-manager';
@@ -152,17 +155,30 @@ export class Context {
     }
 
     /**
-     * Generate collection name based on codebase path
+     * Get isHybrid setting from environment variable with default true
      */
-    private getCollectionName(codebasePath: string): string {
-        const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-        return `code_chunks_${hash.substring(0, 8)}`;
+    private getIsHybrid(): boolean {
+        const isHybridEnv = envManager.get('HYBRID_MODE');
+        if (isHybridEnv === undefined || isHybridEnv === null) {
+            return true; // Default to true
+        }
+        return isHybridEnv.toLowerCase() === 'true';
     }
 
     /**
-     * Index entire codebase
-     * @param codebasePath Codebase path
+     * Generate collection name based on codebase path and hybrid mode
+     */
+    private getCollectionName(codebasePath: string): string {
+        const isHybrid = this.getIsHybrid();
+        const normalizedPath = path.resolve(codebasePath);
+        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+        const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
+        return `${prefix}_${hash.substring(0, 8)}`;
+    }
+
+    /**
+     * Index a codebase for semantic search
+     * @param codebasePath Codebase root path
      * @param progressCallback Optional progress callback function
      * @returns Indexing statistics
      */
@@ -170,7 +186,9 @@ export class Context {
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
-        console.log(`🚀 Starting to index codebase: ${codebasePath}`);
+        const isHybrid = this.getIsHybrid();
+        const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
+        console.log(`🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
 
         // 1. Load ignore patterns from various ignore files
         await this.loadGitignorePatterns(codebasePath);
@@ -239,7 +257,7 @@ export class Context {
         if (!synchronizer) {
             // Load project-specific ignore patterns before creating FileSynchronizer
             await this.loadGitignorePatterns(codebasePath);
-            
+
             // To be safe, let's initialize if it's not there.
             const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns);
             await newSynchronizer.initialize();
@@ -317,37 +335,118 @@ export class Context {
     }
 
     /**
-     * Semantic search
+     * Semantic search with unified implementation
      * @param codebasePath Codebase path to search in
      * @param query Search query
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
     async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5): Promise<SemanticSearchResult[]> {
-        console.log(`🔍 Executing semantic search: "${query}" in ${codebasePath}`);
+        const isHybrid = this.getIsHybrid();
+        const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
+        console.log(`🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
 
-        // 1. Generate query vector
-        const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+        const collectionName = this.getCollectionName(codebasePath);
+        console.log(`🔍 Using collection: ${collectionName}`);
 
-        // 2. Search in vector database
-        const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
-            this.getCollectionName(codebasePath),
-            queryEmbedding.vector,
-            { topK, threshold }
-        );
+        // Check if collection exists and has data
+        const hasCollection = await this.vectorDatabase.hasCollection(collectionName);
+        if (!hasCollection) {
+            console.log(`⚠️  Collection '${collectionName}' does not exist. Please index the codebase first.`);
+            return [];
+        }
 
-        // 3. Convert to semantic search result format
-        const results: SemanticSearchResult[] = searchResults.map(result => ({
-            content: result.document.content,
-            relativePath: result.document.relativePath,
-            startLine: result.document.startLine,
-            endLine: result.document.endLine,
-            language: result.document.metadata.language || 'unknown',
-            score: result.score
-        }));
+        if (isHybrid === true) {
+            try {
+                // Check collection stats to see if it has data
+                const stats = await this.vectorDatabase.query(collectionName, '', ['id'], 1);
+                console.log(`🔍 Collection '${collectionName}' exists and appears to have data`);
+            } catch (error) {
+                console.log(`⚠️  Collection '${collectionName}' exists but may be empty or not properly indexed:`, error);
+            }
 
-        console.log(`✅ Found ${results.length} relevant results`);
-        return results;
+            // 1. Generate query vector
+            console.log(`🔍 Generating embeddings for query: "${query}"`);
+            const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+            console.log(`✅ Generated embedding vector with dimension: ${queryEmbedding.vector.length}`);
+            console.log(`🔍 First 5 embedding values: [${queryEmbedding.vector.slice(0, 5).join(', ')}]`);
+
+            // 2. Prepare hybrid search requests
+            const searchRequests: HybridSearchRequest[] = [
+                {
+                    data: queryEmbedding.vector,
+                    anns_field: "vector",
+                    param: { "nprobe": 10 },
+                    limit: topK
+                },
+                {
+                    data: query,
+                    anns_field: "sparse_vector",
+                    param: { "drop_ratio_search": 0.2 },
+                    limit: topK
+                }
+            ];
+
+            console.log(`🔍 Search request 1 (dense): anns_field="${searchRequests[0].anns_field}", vector_dim=${queryEmbedding.vector.length}, limit=${searchRequests[0].limit}`);
+            console.log(`🔍 Search request 2 (sparse): anns_field="${searchRequests[1].anns_field}", query_text="${query}", limit=${searchRequests[1].limit}`);
+
+            // 3. Execute hybrid search
+            console.log(`🔍 Executing hybrid search with RRF reranking...`);
+            const searchResults: HybridSearchResult[] = await this.vectorDatabase.hybridSearch(
+                collectionName,
+                searchRequests,
+                {
+                    rerank: {
+                        strategy: 'rrf',
+                        params: { k: 100 }
+                    },
+                    limit: topK
+                }
+            );
+
+            console.log(`🔍 Raw search results count: ${searchResults.length}`);
+
+            // 4. Convert to semantic search result format
+            const results: SemanticSearchResult[] = searchResults.map(result => ({
+                content: result.document.content,
+                relativePath: result.document.relativePath,
+                startLine: result.document.startLine,
+                endLine: result.document.endLine,
+                language: result.document.metadata.language || 'unknown',
+                score: result.score
+            }));
+
+            console.log(`✅ Found ${results.length} relevant hybrid results`);
+            if (results.length > 0) {
+                console.log(`🔍 Top result score: ${results[0].score}, path: ${results[0].relativePath}`);
+            }
+
+            return results;
+        } else {
+            // Regular semantic search
+            // 1. Generate query vector
+            const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+
+            // 2. Search in vector database
+            const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
+                collectionName,
+                queryEmbedding.vector,
+                { topK, threshold }
+            );
+
+            // 3. Convert to semantic search result format
+            const results: SemanticSearchResult[] = searchResults.map(result => ({
+                content: result.document.content,
+                relativePath: result.document.relativePath,
+                startLine: result.document.startLine,
+                endLine: result.document.endLine,
+                language: result.document.metadata.language || 'unknown',
+                score: result.score
+            }));
+
+            console.log(`✅ Found ${results.length} relevant results`);
+            return results;
+        }
     }
 
     /**
@@ -458,9 +557,17 @@ export class Context {
      * Prepare vector collection
      */
     private async prepareCollection(codebasePath: string): Promise<void> {
-        // Create new collection
-        console.log(`🔧 Preparing vector collection for codebase: ${codebasePath}`);
+        const isHybrid = this.getIsHybrid();
+        const collectionType = isHybrid === true ? 'hybrid vector' : 'vector';
+        console.log(`🔧 Preparing ${collectionType} collection for codebase: ${codebasePath}`);
         const collectionName = this.getCollectionName(codebasePath);
+
+        // Check if collection already exists
+        const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
+        if (collectionExists) {
+            console.log(`📋 Collection ${collectionName} already exists, skipping creation`);
+            return;
+        }
 
         // For Ollama embeddings, ensure dimension is detected before creating collection
         if (this.embedding.getProvider() === 'Ollama' && typeof (this.embedding as any).initializeDimension === 'function') {
@@ -469,7 +576,13 @@ export class Context {
 
         const dimension = this.embedding.getDimension();
         const dirName = path.basename(codebasePath);
-        await this.vectorDatabase.createCollection(collectionName, dimension, `Index for ${dirName}`);
+
+        if (isHybrid === true) {
+            await this.vectorDatabase.createHybridCollection(collectionName, dimension, `Hybrid Index for ${dirName}`);
+        } else {
+            await this.vectorDatabase.createCollection(collectionName, dimension, `Index for ${dirName}`);
+        }
+
         console.log(`✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
     }
 
@@ -517,6 +630,7 @@ export class Context {
         codebasePath: string,
         onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void
     ): Promise<{ processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
+        const isHybrid = this.getIsHybrid();
         const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(envManager.get('EMBEDDING_BATCH_SIZE') || '100', 10));
         const CHUNK_LIMIT = 450000;
         console.log(`🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
@@ -551,8 +665,8 @@ export class Context {
                         try {
                             await this.processChunkBuffer(chunkBuffer);
                         } catch (error) {
-                            // TODO: 
-                            console.error(`❌ Failed to process chunk batch: ${error}`);
+                            const searchType = isHybrid === true ? 'hybrid' : 'regular';
+                            console.error(`❌ Failed to process chunk batch for ${searchType}: ${error}`);
                         } finally {
                             chunkBuffer = []; // Always clear buffer, even on failure
                         }
@@ -580,11 +694,12 @@ export class Context {
 
         // Process any remaining chunks in the buffer
         if (chunkBuffer.length > 0) {
-            console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks`);
+            const searchType = isHybrid === true ? 'hybrid' : 'regular';
+            console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks for ${searchType}`);
             try {
                 await this.processChunkBuffer(chunkBuffer);
             } catch (error) {
-                console.error(`❌ Failed to process final chunk batch: ${error}`);
+                console.error(`❌ Failed to process final chunk batch for ${searchType}: ${error}`);
             }
         }
 
@@ -608,7 +723,9 @@ export class Context {
         // Estimate tokens (rough estimation: 1 token ≈ 4 characters)
         const estimatedTokens = chunks.reduce((sum, chunk) => sum + Math.ceil(chunk.content.length / 4), 0);
 
-        console.log(`🔄 Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens)`);
+        const isHybrid = this.getIsHybrid();
+        const searchType = isHybrid === true ? 'hybrid' : 'regular';
+        console.log(`🔄 Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens) for ${searchType}`);
         await this.processChunkBatch(chunks, codebasePath);
     }
 
@@ -616,44 +733,74 @@ export class Context {
      * Process a batch of chunks
      */
     private async processChunkBatch(chunks: CodeChunk[], codebasePath: string): Promise<void> {
+        const isHybrid = this.getIsHybrid();
+
         // Generate embedding vectors
         const chunkContents = chunks.map(chunk => chunk.content);
-        const embeddings: EmbeddingVector[] = await this.embedding.embedBatch(chunkContents);
+        const embeddings = await this.embedding.embedBatch(chunkContents);
 
-        // Prepare vector documents
-        const documents: VectorDocument[] = chunks.map((chunk, index) => {
-            if (!chunk.metadata.filePath) {
-                throw new Error(`Missing filePath in chunk metadata at index ${index}`);
-            }
-
-            const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
-            const fileExtension = path.extname(chunk.metadata.filePath);
-
-            // Extract metadata that should be stored separately
-            const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
-
-            return {
-                id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
-                vector: embeddings[index].vector,
-                content: chunk.content,
-                relativePath,
-                startLine: chunk.metadata.startLine || 0,
-                endLine: chunk.metadata.endLine || 0,
-                fileExtension,
-                metadata: {
-                    ...restMetadata,
-                    codebasePath,
-                    language: chunk.metadata.language || 'unknown',
-                    chunkIndex: index
+        if (isHybrid === true) {
+            // Create hybrid vector documents
+            const documents: VectorDocument[] = chunks.map((chunk, index) => {
+                if (!chunk.metadata.filePath) {
+                    throw new Error(`Missing filePath in chunk metadata at index ${index}`);
                 }
-            };
-        });
 
-        // Store to vector database
-        await this.vectorDatabase.insert(this.getCollectionName(codebasePath), documents);
+                const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
+                const fileExtension = path.extname(chunk.metadata.filePath);
+                const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
+
+                return {
+                    id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
+                    content: chunk.content, // Full text content for BM25 and storage
+                    vector: embeddings[index].vector, // Dense vector
+                    relativePath,
+                    startLine: chunk.metadata.startLine || 0,
+                    endLine: chunk.metadata.endLine || 0,
+                    fileExtension,
+                    metadata: {
+                        ...restMetadata,
+                        codebasePath,
+                        language: chunk.metadata.language || 'unknown',
+                        chunkIndex: index
+                    }
+                };
+            });
+
+            // Store to vector database
+            await this.vectorDatabase.insertHybrid(this.getCollectionName(codebasePath), documents);
+        } else {
+            // Create regular vector documents
+            const documents: VectorDocument[] = chunks.map((chunk, index) => {
+                if (!chunk.metadata.filePath) {
+                    throw new Error(`Missing filePath in chunk metadata at index ${index}`);
+                }
+
+                const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
+                const fileExtension = path.extname(chunk.metadata.filePath);
+                const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
+
+                return {
+                    id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
+                    vector: embeddings[index].vector,
+                    content: chunk.content,
+                    relativePath,
+                    startLine: chunk.metadata.startLine || 0,
+                    endLine: chunk.metadata.endLine || 0,
+                    fileExtension,
+                    metadata: {
+                        ...restMetadata,
+                        codebasePath,
+                        language: chunk.metadata.language || 'unknown',
+                        chunkIndex: index
+                    }
+                };
+            });
+
+            // Store to vector database
+            await this.vectorDatabase.insert(this.getCollectionName(codebasePath), documents);
+        }
     }
-
-
 
     /**
      * Get programming language based on file extension

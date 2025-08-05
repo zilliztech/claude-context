@@ -1,9 +1,12 @@
-import { MilvusClient, DataType, MetricType } from '@zilliz/milvus2-sdk-node';
+import { MilvusClient, DataType, MetricType, FunctionType } from '@zilliz/milvus2-sdk-node';
 import {
     VectorDocument,
     SearchOptions,
     VectorSearchResult,
     VectorDatabase,
+    HybridSearchRequest,
+    HybridSearchOptions,
+    HybridSearchResult,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
 import { ClusterManager } from './zilliz-utils';
@@ -295,6 +298,233 @@ export class MilvusVectorDatabase implements VectorDatabase {
             return result.data || [];
         } catch (error) {
             console.error(`❌ Failed to query collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    async createHybridCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
+        await this.ensureInitialized();
+
+        console.log('Beginning hybrid collection creation:', collectionName);
+        console.log('Collection dimension:', dimension);
+
+        const schema = [
+            {
+                name: 'id',
+                description: 'Document ID',
+                data_type: DataType.VarChar,
+                max_length: 512,
+                is_primary_key: true,
+            },
+            {
+                name: 'content',
+                description: 'Full text content for BM25 and storage',
+                data_type: DataType.VarChar,
+                max_length: 65535,
+                enable_analyzer: true,
+            },
+            {
+                name: 'vector',
+                description: 'Dense vector embedding',
+                data_type: DataType.FloatVector,
+                dim: dimension,
+            },
+            {
+                name: 'sparse_vector',
+                description: 'Sparse vector embedding from BM25',
+                data_type: DataType.SparseFloatVector,
+            },
+            {
+                name: 'relativePath',
+                description: 'Relative path to the codebase',
+                data_type: DataType.VarChar,
+                max_length: 1024,
+            },
+            {
+                name: 'startLine',
+                description: 'Start line number of the chunk',
+                data_type: DataType.Int64,
+            },
+            {
+                name: 'endLine',
+                description: 'End line number of the chunk',
+                data_type: DataType.Int64,
+            },
+            {
+                name: 'fileExtension',
+                description: 'File extension',
+                data_type: DataType.VarChar,
+                max_length: 32,
+            },
+            {
+                name: 'metadata',
+                description: 'Additional document metadata as JSON string',
+                data_type: DataType.VarChar,
+                max_length: 65535,
+            },
+        ];
+
+        // Add BM25 function
+        const functions = [
+            {
+                name: "content_bm25_emb",
+                description: "content bm25 function",
+                type: FunctionType.BM25,
+                input_field_names: ["content"],
+                output_field_names: ["sparse_vector"],
+                params: {},
+            },
+        ];
+
+        const createCollectionParams = {
+            collection_name: collectionName,
+            description: description || `Hybrid code context collection: ${collectionName}`,
+            fields: schema,
+            functions: functions,
+        };
+
+        await createCollectionWithLimitCheck(this.client!, createCollectionParams);
+
+        // Create indexes for both vector fields
+        // Index for dense vector
+        const denseIndexParams = {
+            collection_name: collectionName,
+            field_name: 'vector',
+            index_type: 'AUTOINDEX',
+            metric_type: MetricType.COSINE,
+        };
+        await this.client!.createIndex(denseIndexParams);
+
+        // Index for sparse vector
+        const sparseIndexParams = {
+            collection_name: collectionName,
+            field_name: 'sparse_vector',
+            index_type: 'SPARSE_INVERTED_INDEX',
+            metric_type: MetricType.BM25,
+        };
+        await this.client!.createIndex(sparseIndexParams);
+
+        // Load collection to memory
+        await this.client!.loadCollection({
+            collection_name: collectionName,
+        });
+
+        // Verify collection is created correctly
+        await this.client!.describeCollection({
+            collection_name: collectionName,
+        });
+    }
+
+    async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
+        await this.ensureInitialized();
+
+        const data = documents.map(doc => ({
+            id: doc.id,
+            content: doc.content,
+            vector: doc.vector,
+            relativePath: doc.relativePath,
+            startLine: doc.startLine,
+            endLine: doc.endLine,
+            fileExtension: doc.fileExtension,
+            metadata: JSON.stringify(doc.metadata),
+        }));
+
+        await this.client!.insert({
+            collection_name: collectionName,
+            data: data,
+        });
+    }
+
+    async hybridSearch(collectionName: string, searchRequests: HybridSearchRequest[], options?: HybridSearchOptions): Promise<HybridSearchResult[]> {
+        await this.ensureInitialized();
+
+        try {
+            // Generate OpenAI embedding for the first search request (dense)
+            console.log(`🔍 Preparing hybrid search for collection: ${collectionName}`);
+
+            // Prepare search requests in the correct Milvus format
+            const search_param_1 = {
+                data: Array.isArray(searchRequests[0].data) ? searchRequests[0].data : [searchRequests[0].data],
+                anns_field: searchRequests[0].anns_field, // "vector"
+                param: searchRequests[0].param, // {"nprobe": 10}
+                limit: searchRequests[0].limit
+            };
+
+            const search_param_2 = {
+                data: searchRequests[1].data, // query text for sparse search
+                anns_field: searchRequests[1].anns_field, // "sparse_vector"
+                param: searchRequests[1].param, // {"drop_ratio_search": 0.2}
+                limit: searchRequests[1].limit
+            };
+
+            // Set rerank strategy to RRF (100) by default
+            const rerank_strategy = {
+                strategy: "rrf",
+                params: {
+                    k: 100
+                }
+            };
+
+            console.log(`🔍 Dense search params:`, JSON.stringify({
+                anns_field: search_param_1.anns_field,
+                param: search_param_1.param,
+                limit: search_param_1.limit,
+                data_length: Array.isArray(search_param_1.data[0]) ? search_param_1.data[0].length : 'N/A'
+            }, null, 2));
+            console.log(`🔍 Sparse search params:`, JSON.stringify({
+                anns_field: search_param_2.anns_field,
+                param: search_param_2.param,
+                limit: search_param_2.limit,
+                query_text: typeof search_param_2.data === 'string' ? search_param_2.data.substring(0, 50) + '...' : 'N/A'
+            }, null, 2));
+            console.log(`🔍 Rerank strategy:`, JSON.stringify(rerank_strategy, null, 2));
+
+            // Execute hybrid search using the correct client.search format
+            const searchParams = {
+                collection_name: collectionName,
+                data: [search_param_1, search_param_2],
+                limit: options?.limit || searchRequests[0]?.limit || 10,
+                rerank: rerank_strategy,
+                output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
+            };
+
+            console.log(`🔍 Complete search request:`, JSON.stringify({
+                collection_name: searchParams.collection_name,
+                data_count: searchParams.data.length,
+                limit: searchParams.limit,
+                rerank: searchParams.rerank,
+                output_fields: searchParams.output_fields
+            }, null, 2));
+
+            const searchResult = await this.client!.search(searchParams);
+
+            console.log(`🔍 Search executed, processing results...`);
+
+            if (!searchResult.results || searchResult.results.length === 0) {
+                console.log(`⚠️  No results returned from Milvus search`);
+                return [];
+            }
+
+            console.log(`✅ Found ${searchResult.results.length} results from hybrid search`);
+
+            // Transform results to HybridSearchResult format
+            return searchResult.results.map((result: any) => ({
+                document: {
+                    id: result.id,
+                    content: result.content,
+                    vector: [],
+                    sparse_vector: [],
+                    relativePath: result.relativePath,
+                    startLine: result.startLine,
+                    endLine: result.endLine,
+                    fileExtension: result.fileExtension,
+                    metadata: JSON.parse(result.metadata || '{}'),
+                },
+                score: result.score,
+            }));
+
+        } catch (error) {
+            console.error(`❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
             throw error;
         }
     }

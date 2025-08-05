@@ -52,12 +52,24 @@ export class SearchCommand {
                 }
                 const codebasePath = workspaceFolders[0].uri.fsPath;
 
-                // Use the new semantic search service
+                // Check if index exists
+                progress.report({ increment: 20, message: 'Checking index...' });
+                const hasIndex = await this.context.hasIndex(codebasePath);
+
+                if (!hasIndex) {
+                    vscode.window.showErrorMessage('Index not found. Please index the codebase first.');
+                    return;
+                }
+
+                // Use semantic search
                 const query: SearchQuery = {
                     term: searchTerm,
                     includeContent: true,
                     limit: 20
                 };
+
+                console.log('🔍 Using semantic search...');
+                progress.report({ increment: 50, message: 'Executing semantic search...' });
 
                 const results = await this.context.semanticSearch(
                     codebasePath,
@@ -66,7 +78,7 @@ export class SearchCommand {
                     0.3 // similarity threshold
                 );
 
-                progress.report({ increment: 100, message: 'Semantic search complete!' });
+                progress.report({ increment: 100, message: 'Search complete!' });
 
                 if (results.length === 0) {
                     vscode.window.showInformationMessage(`No results found for "${searchTerm}"`);
@@ -77,7 +89,7 @@ export class SearchCommand {
                 const quickPickItems = this.generateQuickPickItems(results, searchTerm, codebasePath);
 
                 const selected = await vscode.window.showQuickPick(quickPickItems, {
-                    placeHolder: `Found ${results.length} results for "${searchTerm}"`,
+                    placeHolder: `Found ${results.length} results for "${searchTerm}" using semantic search`,
                     matchOnDescription: true,
                     matchOnDetail: true
                 });
@@ -88,8 +100,8 @@ export class SearchCommand {
             });
 
         } catch (error) {
-            console.error('Semantic search failed:', error);
-            vscode.window.showErrorMessage(`Semantic search failed: ${error}`);
+            console.error('Search failed:', error);
+            vscode.window.showErrorMessage(`Search failed: ${error}. Please ensure the codebase is indexed.`);
         }
     }
 
@@ -135,7 +147,13 @@ export class SearchCommand {
         }
         const codebasePath = workspaceFolders[0].uri.fsPath;
 
-        // Use the semantic search service
+        // Check if index exists
+        const hasIndex = await this.context.hasIndex(codebasePath);
+        if (!hasIndex) {
+            throw new Error('Index not found. Please index the codebase first.');
+        }
+
+        console.log('🔍 Using semantic search for webview...');
         return await this.context.semanticSearch(
             codebasePath,
             searchTerm,
@@ -148,23 +166,31 @@ export class SearchCommand {
      * Check if index exists for the given codebase path
      */
     async hasIndex(codebasePath: string): Promise<boolean> {
-        return await this.context.hasIndex(codebasePath);
+        try {
+            return await this.context.hasIndex(codebasePath);
+        } catch (error) {
+            console.error('Error checking index existence:', error);
+            return false;
+        }
     }
 
     /**
      * Generate quick pick items for VS Code
      */
     private generateQuickPickItems(results: SemanticSearchResult[], searchTerm: string, workspaceRoot?: string) {
-        return results.slice(0, 20).map(result => {
+        return results.slice(0, 20).map((result, index) => {
             let displayPath = result.relativePath;
             // Truncate content for display
             const truncatedContent = result.content.length <= 150
                 ? result.content
                 : result.content.substring(0, 150) + '...';
 
+            // Add rank info to description
+            const rankText = ` (rank: ${index + 1})`;
+
             return {
                 label: `$(file-code) ${displayPath}`,
-                description: `1 match in ${displayPath}`,
+                description: `$(search) semantic search${rankText}`,
                 detail: truncatedContent,
                 result: result
             };

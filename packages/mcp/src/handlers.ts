@@ -61,8 +61,8 @@ export class ToolHandlers {
             // Check each collection for codebase path
             for (const collectionName of collections) {
                 try {
-                    // Skip collections that don't match the code_chunks pattern
-                    if (!collectionName.startsWith('code_chunks_')) {
+                    // Skip collections that don't match the code_chunks pattern (support both legacy and new collections)
+                    if (!collectionName.startsWith('code_chunks_') && !collectionName.startsWith('hybrid_code_chunks_')) {
                         console.log(`[SYNC-CLOUD] ⏭️  Skipping non-code collection: ${collectionName}`);
                         continue;
                     }
@@ -218,38 +218,19 @@ export class ToolHandlers {
 
             // CRITICAL: Pre-index collection creation validation
             try {
-                const normalizedPath = path.resolve(absolutePath);
-                const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-                const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+                console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation capability`);
 
-                console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation for: ${collectionName}`);
-
-                // Get embedding dimension for collection creation
-                const embeddingProvider = this.context['embedding'];
-                const dimension = embeddingProvider.getDimension();
-
-                // If force reindex, clear existing collection first
-                if (forceReindex) {
-                    console.log(`[INDEX-VALIDATION] 🧹 Force reindex enabled, clearing existing collection: ${collectionName}`);
-                    try {
-                        await this.context['vectorDatabase'].dropCollection(collectionName);
-                        console.log(`[INDEX-VALIDATION] ✅ Existing collection cleared: ${collectionName}`);
-                    } catch (dropError: any) {
-                        // Collection might not exist, which is fine
-                        console.log(`[INDEX-VALIDATION] ℹ️  Collection ${collectionName} does not exist or already cleared`);
-                    }
+                // Check if collection can be created (this will be handled entirely by context.ts)
+                const hasExistingIndex = await this.context.hasIndex(absolutePath);
+                if (hasExistingIndex && forceReindex) {
+                    console.log(`[INDEX-VALIDATION] ℹ️  Force reindex enabled, existing index will be cleared`);
+                    await this.context.clearIndex(absolutePath);
+                    console.log(`[INDEX-VALIDATION] ✅ Existing index cleared for re-indexing`);
+                } else if (hasExistingIndex) {
+                    console.log(`[INDEX-VALIDATION] ℹ️  Index already exists for this codebase`);
                 }
 
-                // Attempt to create collection - this will throw COLLECTION_LIMIT_MESSAGE if limit reached
-                await this.context['vectorDatabase'].createCollection(
-                    collectionName,
-                    dimension,
-                    `Claude Context collection: ${collectionName}`
-                );
-
-                // If creation succeeds, immediately drop the test collection
-                await this.context['vectorDatabase'].dropCollection(collectionName);
-                console.log(`[INDEX-VALIDATION] ✅ Collection creation validated successfully`);
+                console.log(`[INDEX-VALIDATION] ✅  Collection creation validation completed`);
 
             } catch (validationError: any) {
                 const errorMessage = typeof validationError === 'string' ? validationError :
@@ -352,14 +333,9 @@ export class ToolHandlers {
                 console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
-            // Generate collection name
-            const normalizedPath = path.resolve(absolutePath);
-            const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-            const collectionName = `code_chunks_${hash.substring(0, 8)}`;
-
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
             await this.context['loadGitignorePatterns'](absolutePath);
-            
+
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
             const ignorePatterns = this.context['ignorePatterns'] || [];
@@ -367,7 +343,9 @@ export class ToolHandlers {
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
 
-            // Store synchronizer in the context's internal map
+            // Store synchronizer in the context (let context manage collection names)
+            await this.context['prepareCollection'](absolutePath);
+            const collectionName = this.context['getCollectionName'](absolutePath);
             this.context['synchronizers'].set(collectionName, synchronizer);
             if (contextForThisTask !== this.context) {
                 contextForThisTask['synchronizers'].set(collectionName, synchronizer);
@@ -471,7 +449,7 @@ export class ToolHandlers {
 
             // Log embedding provider information before search
             const embeddingProvider = this.context['embedding'];
-            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for semantic search`);
+            console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
             // Search in the specified codebase
@@ -505,7 +483,7 @@ export class ToolHandlers {
 
                 return `${index + 1}. Code snippet (${result.language}) [${codebaseInfo}]\n` +
                     `   Location: ${location}\n` +
-                    `   Score: ${result.score.toFixed(3)}\n` +
+                    `   Rank: ${index + 1}\n` +
                     `   Context: \n\`\`\`${result.language}\n${context}\n\`\`\`\n`;
             }).join('\n');
 

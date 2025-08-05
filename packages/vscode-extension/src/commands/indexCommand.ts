@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { Context } from '@zilliz/claude-context-core';
 import * as path from 'path';
-import * as crypto from 'crypto';
 
 export class IndexCommand {
     private context: Context;
@@ -78,10 +77,9 @@ export class IndexCommand {
                 const { FileSynchronizer } = await import("@zilliz/claude-context-core");
                 const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.context['ignorePatterns'] || []);
                 await synchronizer.initialize();
-                // Store synchronizer in the context's internal map using the same collection name generation logic
-                const normalizedPath = path.resolve(selectedFolder.uri.fsPath);
-                const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-                const collectionName = `code_chunks_${hash.substring(0, 8)}`;
+                // Store synchronizer in the context's internal map using the collection name from context
+                await this.context['prepareCollection'](selectedFolder.uri.fsPath);
+                const collectionName = this.context['getCollectionName'](selectedFolder.uri.fsPath);
                 this.context['synchronizers'].set(collectionName, synchronizer);
 
                 // Start indexing with progress callback
