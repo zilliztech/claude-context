@@ -21,7 +21,7 @@ export interface ContextMcpConfig {
 
 export interface CodebaseSnapshot {
     indexedCodebases: string[];
-    indexingCodebases: string[];  // List of codebases currently being indexed
+    indexingCodebases: string[] | Record<string, number>;  // Array (legacy) or Map of codebase path to progress percentage
     lastUpdated: string;
 }
 

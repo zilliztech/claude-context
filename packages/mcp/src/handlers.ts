@@ -318,6 +318,7 @@ export class ToolHandlers {
 
     private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string) {
         const absolutePath = codebasePath;
+        let lastSaveTime = 0; // Track last save timestamp
 
         try {
             console.log(`[BACKGROUND-INDEX] Starting background indexing for: ${absolutePath}`);
@@ -357,9 +358,22 @@ export class ToolHandlers {
             const embeddingProvider = this.context.getEmbedding();
             console.log(`[BACKGROUND-INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
-            // Start indexing with the appropriate context
+            // Start indexing with the appropriate context and progress tracking
             console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
-            const stats = await contextForThisTask.indexCodebase(absolutePath);
+            const stats = await contextForThisTask.indexCodebase(absolutePath, (progress) => {
+                // Update progress in snapshot manager
+                this.snapshotManager.updateIndexingProgress(absolutePath, progress.percentage);
+
+                // Save snapshot periodically (every 2 seconds to avoid too frequent saves)
+                const currentTime = Date.now();
+                if (currentTime - lastSaveTime >= 2000) { // 2 seconds = 2000ms
+                    this.snapshotManager.saveCodebaseSnapshot();
+                    lastSaveTime = currentTime;
+                    console.log(`[BACKGROUND-INDEX] 💾 Saved progress snapshot at ${progress.percentage.toFixed(1)}%`);
+                }
+
+                console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
+            });
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Move from indexing to indexed list
@@ -640,6 +654,81 @@ export class ToolHandlers {
                 content: [{
                     type: "text",
                     text: `Error clearing index: ${errorMessage}`
+                }],
+                isError: true
+            };
+        }
+    }
+
+    public async handleGetIndexingStatus(args: any) {
+        const { path: codebasePath } = args;
+
+        try {
+            // Force absolute path resolution
+            const absolutePath = ensureAbsolutePath(codebasePath);
+
+            // Validate path exists
+            if (!fs.existsSync(absolutePath)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Path '${absolutePath}' does not exist. Original input: '${codebasePath}'`
+                    }],
+                    isError: true
+                };
+            }
+
+            // Check if it's a directory
+            const stat = fs.statSync(absolutePath);
+            if (!stat.isDirectory()) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error: Path '${absolutePath}' is not a directory`
+                    }],
+                    isError: true
+                };
+            }
+
+            // Check indexing status
+            const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
+            const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
+            const indexingProgress = this.snapshotManager.getIndexingProgress(absolutePath);
+
+            let statusMessage = '';
+
+            if (isIndexed) {
+                statusMessage = `✅ Codebase '${absolutePath}' is fully indexed and ready for search.`;
+            } else if (isIndexing) {
+                const progressPercentage = indexingProgress !== undefined ? indexingProgress : 0;
+                statusMessage = `🔄 Codebase '${absolutePath}' is currently being indexed. Progress: ${progressPercentage.toFixed(1)}%`;
+
+                // Add more detailed status based on progress
+                if (progressPercentage < 10) {
+                    statusMessage += ' (Preparing and scanning files...)';
+                } else if (progressPercentage < 100) {
+                    statusMessage += ' (Processing files and generating embeddings...)';
+                }
+            } else {
+                statusMessage = `❌ Codebase '${absolutePath}' is not indexed. Please use the index_codebase tool to index it first.`;
+            }
+
+            const pathInfo = codebasePath !== absolutePath
+                ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
+                : '';
+
+            return {
+                content: [{
+                    type: "text",
+                    text: statusMessage + pathInfo
+                }]
+            };
+
+        } catch (error: any) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error getting indexing status: ${error.message || error}`
                 }],
                 isError: true
             };

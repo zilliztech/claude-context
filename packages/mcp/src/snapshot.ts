@@ -6,7 +6,7 @@ import { CodebaseSnapshot } from "./config.js";
 export class SnapshotManager {
     private snapshotFilePath: string;
     private indexedCodebases: string[] = [];
-    private indexingCodebases: string[] = [];
+    private indexingCodebases: Map<string, number> = new Map(); // Map of codebase path to progress percentage
 
     constructor() {
         // Initialize snapshot file path
@@ -14,21 +14,93 @@ export class SnapshotManager {
     }
 
     public getIndexedCodebases(): string[] {
-        return [...this.indexedCodebases];
+        // Read from JSON file to ensure consistency and persistence
+        try {
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                return [];
+            }
+
+            const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
+            const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
+
+            return snapshot.indexedCodebases || [];
+        } catch (error) {
+            console.warn(`[SNAPSHOT-DEBUG] Error reading indexed codebases from file:`, error);
+            // Fallback to memory if file reading fails
+            return [...this.indexedCodebases];
+        }
     }
 
     public getIndexingCodebases(): string[] {
-        return [...this.indexingCodebases];
+        // Read from JSON file to ensure consistency and persistence
+        try {
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                return [];
+            }
+
+            const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
+            const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
+
+            // Handle both legacy array format and new object format
+            if (Array.isArray(snapshot.indexingCodebases)) {
+                // Legacy format: return the array directly
+                return snapshot.indexingCodebases;
+            } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                // New format: return the keys of the object
+                return Object.keys(snapshot.indexingCodebases);
+            }
+
+            return [];
+        } catch (error) {
+            console.warn(`[SNAPSHOT-DEBUG] Error reading indexing codebases from file:`, error);
+            // Fallback to memory if file reading fails
+            return Array.from(this.indexingCodebases.keys());
+        }
     }
 
-    public addIndexingCodebase(codebasePath: string): void {
-        if (!this.indexingCodebases.includes(codebasePath)) {
-            this.indexingCodebases.push(codebasePath);
+    public getIndexingCodebasesWithProgress(): Map<string, number> {
+        return new Map(this.indexingCodebases);
+    }
+
+    public getIndexingProgress(codebasePath: string): number | undefined {
+        // Read from JSON file to ensure consistency and persistence
+        try {
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                return undefined;
+            }
+
+            const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
+            const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
+
+            // Handle both legacy array format and new object format
+            if (Array.isArray(snapshot.indexingCodebases)) {
+                // Legacy format: if path exists in array, assume 0% progress
+                return snapshot.indexingCodebases.includes(codebasePath) ? 0 : undefined;
+            } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                // New format: return the actual progress percentage
+                return snapshot.indexingCodebases[codebasePath];
+            }
+
+            return undefined;
+        } catch (error) {
+            console.warn(`[SNAPSHOT-DEBUG] Error reading progress from file for ${codebasePath}:`, error);
+            // Fallback to memory if file reading fails
+            return this.indexingCodebases.get(codebasePath);
+        }
+    }
+
+    public addIndexingCodebase(codebasePath: string, progress: number = 0): void {
+        this.indexingCodebases.set(codebasePath, progress);
+    }
+
+    public updateIndexingProgress(codebasePath: string, progress: number): void {
+        if (this.indexingCodebases.has(codebasePath)) {
+            this.indexingCodebases.set(codebasePath, progress);
         }
     }
 
     public removeIndexingCodebase(codebasePath: string): void {
-        this.indexingCodebases = this.indexingCodebases.filter(path => path !== codebasePath);
+        this.indexingCodebases.delete(codebasePath);
     }
 
     public addIndexedCodebase(codebasePath: string): void {
@@ -72,8 +144,19 @@ export class SnapshotManager {
             }
 
             // Handle indexing codebases - treat them as not indexed since they were interrupted
-            const validIndexingCodebases: string[] = [];
-            for (const codebasePath of snapshot.indexingCodebases || []) {
+            // Support both legacy array format and new object format
+            let indexingCodebasesList: string[] = [];
+            if (Array.isArray(snapshot.indexingCodebases)) {
+                // Legacy format: string[]
+                indexingCodebasesList = snapshot.indexingCodebases;
+                console.log(`[SNAPSHOT-DEBUG] Found legacy indexingCodebases array format with ${indexingCodebasesList.length} entries`);
+            } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                // New format: Record<string, number>
+                indexingCodebasesList = Object.keys(snapshot.indexingCodebases);
+                console.log(`[SNAPSHOT-DEBUG] Found new indexingCodebases object format with ${indexingCodebasesList.length} entries`);
+            }
+
+            for (const codebasePath of indexingCodebasesList) {
                 if (fs.existsSync(codebasePath)) {
                     console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath}. Treating as not indexed.`);
                     // Don't add to validIndexingCodebases - treat as not indexed
@@ -84,14 +167,17 @@ export class SnapshotManager {
 
             // Restore state - only fully indexed codebases
             this.indexedCodebases = validCodebases;
-            this.indexingCodebases = []; // Reset indexing codebases since they were interrupted
+            this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
 
             console.log(`[SNAPSHOT-DEBUG] Restored ${validCodebases.length} fully indexed codebases.`);
-            console.log(`[SNAPSHOT-DEBUG] Reset ${snapshot.indexingCodebases?.length || 0} interrupted indexing codebases.`);
+            console.log(`[SNAPSHOT-DEBUG] Reset ${indexingCodebasesList.length} interrupted indexing codebases.`);
 
             // Save updated snapshot if we removed any invalid paths or reset indexing codebases
-            if (validCodebases.length !== snapshot.indexedCodebases.length ||
-                (snapshot.indexingCodebases && snapshot.indexingCodebases.length > 0)) {
+            const originalIndexingCount = Array.isArray(snapshot.indexingCodebases)
+                ? snapshot.indexingCodebases.length
+                : Object.keys(snapshot.indexingCodebases || {}).length;
+
+            if (validCodebases.length !== snapshot.indexedCodebases.length || originalIndexingCount > 0) {
                 this.saveCodebaseSnapshot();
             }
 
@@ -112,14 +198,20 @@ export class SnapshotManager {
                 console.log('[SNAPSHOT-DEBUG] Created snapshot directory:', snapshotDir);
             }
 
+            // Convert Map to object for JSON serialization
+            const indexingCodebasesObject: Record<string, number> = {};
+            this.indexingCodebases.forEach((progress, path) => {
+                indexingCodebasesObject[path] = progress;
+            });
+
             const snapshot: CodebaseSnapshot = {
                 indexedCodebases: this.indexedCodebases,
-                indexingCodebases: this.indexingCodebases,
+                indexingCodebases: indexingCodebasesObject,
                 lastUpdated: new Date().toISOString()
             };
 
             fs.writeFileSync(this.snapshotFilePath, JSON.stringify(snapshot, null, 2));
-            console.log('[SNAPSHOT-DEBUG] Snapshot saved successfully. Indexed codebases:', this.indexedCodebases.length, 'Indexing codebases:', this.indexingCodebases.length);
+            console.log('[SNAPSHOT-DEBUG] Snapshot saved successfully. Indexed codebases:', this.indexedCodebases.length, 'Indexing codebases:', this.indexingCodebases.size);
 
         } catch (error: any) {
             console.error('[SNAPSHOT-DEBUG] Error saving snapshot:', error);

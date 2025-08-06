@@ -197,6 +197,20 @@ Search the indexed codebase using natural language queries within a specified ab
                             required: ["path"]
                         }
                     },
+                    {
+                        name: "get_indexing_status",
+                        description: `Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases. Current working directory is: ${currentWorkingDirectory}.`,
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                path: {
+                                    type: "string",
+                                    description: `ABSOLUTE path to the codebase directory to check status for. Current working directory is: ${currentWorkingDirectory}. You can use this path directly or adjust as needed.`
+                                }
+                            },
+                            required: ["path"]
+                        }
+                    },
                 ]
             };
         });
@@ -212,6 +226,8 @@ Search the indexed codebase using natural language queries within a specified ab
                     return await this.toolHandlers.handleSearchCode(args);
                 case "clear_index":
                     return await this.toolHandlers.handleClearIndex(args);
+                case "get_indexing_status":
+                    return await this.toolHandlers.handleGetIndexingStatus(args);
 
                 default:
                     throw new Error(`Unknown tool: ${name}`);
