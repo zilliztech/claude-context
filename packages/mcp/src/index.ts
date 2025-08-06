@@ -83,17 +83,11 @@ class ContextMcpServer {
     }
 
     private setupTools() {
-        // Get current working directory to provide to LLM
-        const currentWorkingDirectory = process.cwd();
-
         const index_description = `
 Index a codebase directory to enable semantic search using a configurable code splitter.
 
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path to the target codebase.
-- Relative paths will be automatically resolved to absolute paths.
-- Current working directory: ${currentWorkingDirectory}.
-    You MUST use this directly and DO NOT append any subfolder.
 
 ✨ **Usage Guidance**:
 - This tool is typically used when search fails due to an unindexed codebase.
@@ -106,8 +100,6 @@ Search the indexed codebase using natural language queries within a specified ab
 
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path.
-- The current working directory is: ${currentWorkingDirectory}.
-- You MUST use this as the default path and DO NOT append any subfolder.
 
 ✨ **Usage Guidance**:
 - If the codebase is not indexed, this tool will return a clear error message indicating that indexing is required first.
@@ -126,7 +118,7 @@ Search the indexed codebase using natural language queries within a specified ab
                             properties: {
                                 path: {
                                     type: "string",
-                                    description: `ABSOLUTE path to the codebase directory to index. Current working directory is: ${currentWorkingDirectory}. You can use this path directly or adjust as needed.`
+                                    description: `ABSOLUTE path to the codebase directory to index.`
                                 },
                                 force: {
                                     type: "boolean",
@@ -167,7 +159,7 @@ Search the indexed codebase using natural language queries within a specified ab
                             properties: {
                                 path: {
                                     type: "string",
-                                    description: `ABSOLUTE path to the codebase directory to search in. Current working directory is: ${currentWorkingDirectory}. You can use this path directly or adjust as needed.`
+                                    description: `ABSOLUTE path to the codebase directory to search in.`
                                 },
                                 query: {
                                     type: "string",
@@ -185,13 +177,27 @@ Search the indexed codebase using natural language queries within a specified ab
                     },
                     {
                         name: "clear_index",
-                        description: `Clear the search index. IMPORTANT: You MUST provide an absolute path. Current working directory is: ${currentWorkingDirectory}. You can use this as the default path or adjust as needed (e.g., ${currentWorkingDirectory}/subfolder).`,
+                        description: `Clear the search index. IMPORTANT: You MUST provide an absolute path.`,
                         inputSchema: {
                             type: "object",
                             properties: {
                                 path: {
                                     type: "string",
-                                    description: `ABSOLUTE path to the codebase directory to clear. Current working directory is: ${currentWorkingDirectory}. You can use this path directly or adjust as needed.`
+                                    description: `ABSOLUTE path to the codebase directory to clear.`
+                                }
+                            },
+                            required: ["path"]
+                        }
+                    },
+                    {
+                        name: "get_indexing_status",
+                        description: `Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.`,
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                path: {
+                                    type: "string",
+                                    description: `ABSOLUTE path to the codebase directory to check status for.`
                                 }
                             },
                             required: ["path"]
@@ -212,6 +218,8 @@ Search the indexed codebase using natural language queries within a specified ab
                     return await this.toolHandlers.handleSearchCode(args);
                 case "clear_index":
                     return await this.toolHandlers.handleClearIndex(args);
+                case "get_indexing_status":
+                    return await this.toolHandlers.handleGetIndexingStatus(args);
 
                 default:
                     throw new Error(`Unknown tool: ${name}`);
