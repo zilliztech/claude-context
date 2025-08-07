@@ -735,7 +735,10 @@ export class Context {
                             await this.processChunkBuffer(chunkBuffer);
                         } catch (error) {
                             const searchType = isHybrid === true ? 'hybrid' : 'regular';
-                            console.error(`❌ Failed to process chunk batch for ${searchType}: ${error}`);
+                            console.error(`❌ Failed to process chunk batch for ${searchType}:`, error);
+                            if (error instanceof Error) {
+                                console.error('Stack trace:', error.stack);
+                            }
                         } finally {
                             chunkBuffer = []; // Always clear buffer, even on failure
                         }
@@ -768,7 +771,10 @@ export class Context {
             try {
                 await this.processChunkBuffer(chunkBuffer);
             } catch (error) {
-                console.error(`❌ Failed to process final chunk batch for ${searchType}: ${error}`);
+                console.error(`❌ Failed to process final chunk batch for ${searchType}:`, error);
+                if (error instanceof Error) {
+                    console.error('Stack trace:', error.stack);
+                }
             }
         }
 
