@@ -43,6 +43,11 @@ export class GeminiEmbedding extends Embedding {
         }
     }
 
+    async detectDimension(): Promise<number> {
+        // Gemini doesn't need dynamic detection, return configured dimension
+        return this.dimension;
+    }
+
     async embed(text: string): Promise<EmbeddingVector> {
         const processedText = this.preprocessText(text);
         const model = this.config.model || 'gemini-embedding-001';
