@@ -1,5 +1,5 @@
 ![](assets/claude-context.png)
-### Bring your codebase as context to Claude Code
+### Your entire codebase as Claude's context
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
@@ -18,8 +18,9 @@
 
 ## ✨ Core Value
 
-- 🧠 **Your Entire Codebase as Context**: Unlike traditional keyword matching that can easily miss relevant code, it uses semantic search to retrieve all your care about from millions of lines of code, without going through multiple hops of discovery, and add to LLM context.
-- 💰 **Don’t go bankrupt working with large codebase**: Compared to simply stuffing a whole directory of files in LLM context for each call, efficient indexing and search in vector database avoids breaking your budget.
+🧠 **Your Entire Codebase as Context**: Claude Context uses semantic search to find all relevant code from millions of lines. No multi-round discovery needed. It brings results straight into the Claude's context.
+
+💰 **Cost-Effective for Large Codebases**: Instead of loading entire directories into Claude for every request, which can be very expensive, Claude Context efficiently stores your codebase in a vector database and only uses related code in context to keep your costs manageable.
 
 ---
 
@@ -52,13 +53,13 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 </details>
 
-### Configure MCP for your AI Assistant
+### Configure MCP for Claude Code
 
 **System Requirements:**
 - Node.js >= 20.0.0 and < 24.0.0
 > Claude Context is not compatible with Node.js 24.0.0, you need downgrade it first if your node version is greater or equal to 24.
 
-#### Claude Code Configuration
+#### Configuration
 
 Use the command line interface to add the Claude Context MCP server:
 
@@ -69,7 +70,11 @@ claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TO
 
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
-#### Gemini CLI
+
+### Other MCP Client Configurations (Gemini CLI, Cursor, Windsurf, etc.)
+
+<details>
+<summary><strong>Gemini CLI</strong></summary>
 
 Gemini CLI requires manual configuration through a JSON file:
 
@@ -92,9 +97,7 @@ Gemini CLI requires manual configuration through a JSON file:
 ```
 3. Save the file and restart Gemini CLI to apply the changes.
 
-### Other MCP Client Configurations (Cursor, Windsurf, etc.)
-
-
+</details>
 
 <details>
 <summary><strong>Qwen Code</strong></summary>
@@ -390,7 +393,15 @@ For more detailed MCP environment variable configuration, see our [Environment V
 📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
 
 ---
-## 🔧 Implementation Features
+
+
+---
+
+## 🏗️ Architecture
+![](assets/Architecture.png)
+
+
+### 🔧 Implementation Details
 
 - 🔍 **Semantic Code Search**: Ask questions like *"find functions that handle user authentication"* and get relevant, context-rich code instantly.
 - 🧠 **Context-Aware**: Discover large codebase, understand how different parts of your codebase relate, even across millions of lines of code.
@@ -399,14 +410,8 @@ For more detailed MCP environment variable configuration, see our [Environment V
 - 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is.
 - 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
 
----
-
-## 🏗️ Architecture
-![](assets/Architecture.png)
-
-Claude Context is a monorepo containing three main packages:
-
 ### Core Components
+Claude Context is a monorepo containing three main packages:
 
 - **`@zilliz/claude-context-core`**: Core indexing engine with embedding and vector database integration
 - **VSCode Extension**: Semantic Code Search extension for Visual Studio Code
