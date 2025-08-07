@@ -32,6 +32,13 @@ export abstract class Embedding {
     }
 
     /**
+     * Detect embedding dimension 
+     * @param testText Test text for dimension detection
+     * @returns Embedding dimension
+     */
+    abstract detectDimension(testText?: string): Promise<number>;
+
+    /**
      * Preprocess array of texts
      * @param texts Array of input texts
      * @returns Array of processed texts

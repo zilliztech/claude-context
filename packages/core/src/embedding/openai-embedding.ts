@@ -20,20 +20,36 @@ export class OpenAIEmbedding extends Embedding {
             apiKey: config.apiKey,
             baseURL: config.baseURL,
         });
-
-        // Set dimension based on model
-        this.updateDimensionForModel(config.model || 'text-embedding-3-small');
     }
 
-    private updateDimensionForModel(model: string): void {
-        if (model === 'text-embedding-3-small') {
-            this.dimension = 1536;
-        } else if (model === 'text-embedding-3-large') {
-            this.dimension = 3072;
-        } else if (model === 'text-embedding-ada-002') {
-            this.dimension = 1536;
-        } else {
-            this.dimension = 1536; // Default dimension
+    async detectDimension(testText: string = "test"): Promise<number> {
+        const model = this.config.model || 'text-embedding-3-small';
+        const knownModels = OpenAIEmbedding.getSupportedModels();
+
+        // Use known dimension for standard models
+        if (knownModels[model]) {
+            return knownModels[model].dimension;
+        }
+
+        // For custom models, make API call to detect dimension
+        try {
+            const processedText = this.preprocessText(testText);
+            const response = await this.client.embeddings.create({
+                model: model,
+                input: processedText,
+                encoding_format: 'float',
+            });
+            return response.data[0].embedding.length;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+            // Re-throw authentication errors
+            if (errorMessage.includes('API key') || errorMessage.includes('unauthorized') || errorMessage.includes('authentication')) {
+                throw new Error(`Failed to detect dimension for model ${model}: ${errorMessage}`);
+            }
+
+            // For other errors, throw exception instead of using fallback
+            throw new Error(`Failed to detect dimension for model ${model}: ${errorMessage}`);
         }
     }
 
@@ -41,32 +57,61 @@ export class OpenAIEmbedding extends Embedding {
         const processedText = this.preprocessText(text);
         const model = this.config.model || 'text-embedding-3-small';
 
-        const response = await this.client.embeddings.create({
-            model: model,
-            input: processedText,
-            encoding_format: 'float',
-        });
+        const knownModels = OpenAIEmbedding.getSupportedModels();
+        if (knownModels[model] && this.dimension !== knownModels[model].dimension) {
+            this.dimension = knownModels[model].dimension;
+        } else if (!knownModels[model]) {
+            this.dimension = await this.detectDimension();
+        }
 
-        return {
-            vector: response.data[0].embedding,
-            dimension: this.dimension
-        };
+        try {
+            const response = await this.client.embeddings.create({
+                model: model,
+                input: processedText,
+                encoding_format: 'float',
+            });
+
+            // Update dimension from actual response
+            this.dimension = response.data[0].embedding.length;
+
+            return {
+                vector: response.data[0].embedding,
+                dimension: this.dimension
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            throw new Error(`Failed to generate OpenAI embedding: ${errorMessage}`);
+        }
     }
 
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
         const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model || 'text-embedding-3-small';
 
-        const response = await this.client.embeddings.create({
-            model: model,
-            input: processedTexts,
-            encoding_format: 'float',
-        });
+        const knownModels = OpenAIEmbedding.getSupportedModels();
+        if (knownModels[model] && this.dimension !== knownModels[model].dimension) {
+            this.dimension = knownModels[model].dimension;
+        } else if (!knownModels[model]) {
+            this.dimension = await this.detectDimension();
+        }
 
-        return response.data.map((item) => ({
-            vector: item.embedding,
-            dimension: this.dimension
-        }));
+        try {
+            const response = await this.client.embeddings.create({
+                model: model,
+                input: processedTexts,
+                encoding_format: 'float',
+            });
+
+            this.dimension = response.data[0].embedding.length;
+
+            return response.data.map((item) => ({
+                vector: item.embedding,
+                dimension: this.dimension
+            }));
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            throw new Error(`Failed to generate OpenAI batch embeddings: ${errorMessage}`);
+        }
     }
 
     getDimension(): number {
@@ -81,9 +126,14 @@ export class OpenAIEmbedding extends Embedding {
      * Set model type
      * @param model Model name
      */
-    setModel(model: string): void {
+    async setModel(model: string): Promise<void> {
         this.config.model = model;
-        this.updateDimensionForModel(model);
+        const knownModels = OpenAIEmbedding.getSupportedModels();
+        if (knownModels[model]) {
+            this.dimension = knownModels[model].dimension;
+        } else {
+            this.dimension = await this.detectDimension();
+        }
     }
 
     /**

@@ -243,11 +243,13 @@ export class Context {
      * Index a codebase for semantic search
      * @param codebasePath Codebase root path
      * @param progressCallback Optional progress callback function
+     * @param forceReindex Whether to recreate the collection even if it exists
      * @returns Indexing statistics
      */
     async indexCodebase(
         codebasePath: string,
-        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
+        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
+        forceReindex: boolean = false
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
@@ -258,8 +260,8 @@ export class Context {
 
         // 2. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
-        console.log(`Debug2: Preparing vector collection for codebase`);
-        await this.prepareCollection(codebasePath);
+        console.log(`Debug2: Preparing vector collection for codebase${forceReindex ? ' (FORCE REINDEX)' : ''}`);
+        await this.prepareCollection(codebasePath, forceReindex);
 
         // 3. Recursively traverse codebase to get all supported files
         progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
@@ -619,25 +621,29 @@ export class Context {
     /**
      * Prepare vector collection
      */
-    private async prepareCollection(codebasePath: string): Promise<void> {
+    private async prepareCollection(codebasePath: string, forceReindex: boolean = false): Promise<void> {
         const isHybrid = this.getIsHybrid();
         const collectionType = isHybrid === true ? 'hybrid vector' : 'vector';
-        console.log(`🔧 Preparing ${collectionType} collection for codebase: ${codebasePath}`);
+        console.log(`🔧 Preparing ${collectionType} collection for codebase: ${codebasePath}${forceReindex ? ' (FORCE REINDEX)' : ''}`);
         const collectionName = this.getCollectionName(codebasePath);
 
         // Check if collection already exists
         const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
-        if (collectionExists) {
+
+        if (collectionExists && !forceReindex) {
             console.log(`📋 Collection ${collectionName} already exists, skipping creation`);
             return;
         }
 
-        // For Ollama embeddings, ensure dimension is detected before creating collection
-        if (this.embedding.getProvider() === 'Ollama' && typeof (this.embedding as any).initializeDimension === 'function') {
-            await (this.embedding as any).initializeDimension();
+        if (collectionExists && forceReindex) {
+            console.log(`🗑️  Dropping existing collection ${collectionName} for force reindex...`);
+            await this.vectorDatabase.dropCollection(collectionName);
+            console.log(`✅ Collection ${collectionName} dropped successfully`);
         }
 
-        const dimension = this.embedding.getDimension();
+        console.log(`🔍 Detecting embedding dimension for ${this.embedding.getProvider()} provider...`);
+        const dimension = await this.embedding.detectDimension();
+        console.log(`📏 Detected dimension: ${dimension} for ${this.embedding.getProvider()}`);
         const dirName = path.basename(codebasePath);
 
         if (isHybrid === true) {
