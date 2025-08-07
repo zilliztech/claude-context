@@ -54,6 +54,10 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 ### Configure MCP for your AI Assistant
 
+**System Requirements:**
+- Node.js >= 20.0.0 and < 24.0.0
+> Claude Context is not compatible with Node.js 24.0.0, you need downgrade it first if your node version is greater or equal to 24.
+
 #### Claude Code Configuration
 
 Use the command line interface to add the Claude Context MCP server:
@@ -545,7 +549,12 @@ Check the `/examples` directory for complete usage examples:
 
 ## ❓ FAQ
 
-For frequently asked questions and troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
+**Common Questions:**
+
+- **[What files does Claude Context decide to embed?](docs/troubleshooting/faq.md#q-what-files-does-claude-context-decide-to-embed)**
+- **[Can I use a fully local deployment setup?](docs/troubleshooting/faq.md#q-can-i-use-a-fully-local-deployment-setup)**
+
+For detailed answers and more troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
 
 ---
 
