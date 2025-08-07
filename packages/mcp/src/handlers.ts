@@ -199,6 +199,11 @@ export class ToolHandlers {
                 };
             }
 
+            //Check if the snapshot and cloud index are in sync
+            if (this.snapshotManager.getIndexedCodebases().includes(absolutePath) !== await this.context.hasIndex(absolutePath)) {
+                console.warn(`[INDEX-VALIDATION] ❌ Snapshot and cloud index mismatch: ${absolutePath}`);
+            }
+
             // Check if already indexed (unless force is true)
             if (!forceReindex && this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
                 return {
@@ -210,28 +215,31 @@ export class ToolHandlers {
                 };
             }
 
-            // If force reindex and codebase is already indexed, remove it from indexed list
-            if (forceReindex && this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
-                console.log(`[FORCE-REINDEX] 🔄 Removing '${absolutePath}' from indexed list for re-indexing`);
-                this.snapshotManager.removeIndexedCodebase(absolutePath);
+            // If force reindex and codebase is already indexed, remove it
+            if (forceReindex) {
+                if (this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
+                    console.log(`[FORCE-REINDEX] 🔄 Removing '${absolutePath}' from indexed list for re-indexing`);
+                    this.snapshotManager.removeIndexedCodebase(absolutePath);
+                }
+                if (await this.context.hasIndex(absolutePath)) {
+                    console.log(`[FORCE-REINDEX] 🔄 Clearing index for '${absolutePath}'`);
+                    await this.context.clearIndex(absolutePath);
+                }
             }
 
             // CRITICAL: Pre-index collection creation validation
             try {
                 console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation capability`);
-
-                // Check if collection can be created (this will be handled entirely by context.ts)
-                const hasExistingIndex = await this.context.hasIndex(absolutePath);
-                if (hasExistingIndex && forceReindex) {
-                    console.log(`[INDEX-VALIDATION] ℹ️  Force reindex enabled, existing index will be cleared`);
-                    await this.context.clearIndex(absolutePath);
-                    console.log(`[INDEX-VALIDATION] ✅ Existing index cleared for re-indexing`);
-                } else if (hasExistingIndex) {
-                    console.log(`[INDEX-VALIDATION] ℹ️  Index already exists for this codebase`);
+                //dummy collection name
+                const collectionName = `dummy_collection_${Date.now()}`;
+                await this.context.getVectorDatabase().createCollection(collectionName, 128);
+                if (await this.context.getVectorDatabase().hasCollection(collectionName)) {
+                    console.log(`[INDEX-VALIDATION] ℹ️  Dummy collection created successfully`);
+                    await this.context.getVectorDatabase().dropCollection(collectionName);
+                } else {
+                    console.log(`[INDEX-VALIDATION] ❌ Dummy collection creation failed`);
                 }
-
                 console.log(`[INDEX-VALIDATION] ✅  Collection creation validation completed`);
-
             } catch (validationError: any) {
                 const errorMessage = typeof validationError === 'string' ? validationError :
                     (validationError instanceof Error ? validationError.message : String(validationError));
