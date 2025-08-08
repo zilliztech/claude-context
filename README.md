@@ -26,7 +26,7 @@
 
 ## 🚀 Demo
 
-![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXd6_BiuJIYKr3SpSShPVXCYDBHIbhdD7488-Txm3jlocXx4wP6rjWxrc0YcFbgsuurVH-DmcTBojgOWfmCIP5czcM2oNFecVSTZeTuKUbJ-ZuC5qSWU3diHFXrl2Awieyoa29wYlQ?key=qYdFquJrLcfXCUndY-YRBQ)
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXf2uIf2c5zowp-iOMOqsefHbY_EwNGiutkxtNXcZVJ8RI6SN9DsCcsc3amXIhOZx9VcKFJQLSAqM-2pjU9zoGs1r8GCTUL3JIsLpLUGAm1VQd5F2o5vpEajx2qrc77iXhBu1zWj?key=qYdFquJrLcfXCUndY-YRBQ)
 
 Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
@@ -480,8 +480,7 @@ Integrates Claude Context directly into your IDE. Provides an intuitive interfac
     - Search for "Semantic Code Search"
     - Click Install
 
-![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdphYH31AdG2Z5FdtLYbedPTGXHvwtDbNwUduYRl7j7sR_WhtiUTdnUALNw-dsABnJkZxxnsRcDA1G37qsaXm9KAW4MiCXY_bStpaaeG-KCfEfmMG4kPFQmoO33yQ_6OlLyjIsPvQ?key=_L-CtW461S9w7NRqzdFOIg)
-
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdtCtT9Qi6o5mGVoxzX50r8Nb6zDFcjvTQR7WZ-xMbEsHEPPhSYAFVJ7q4-rETzxJ8wy1cyZmU8CmtpNhAU8PGOqVnE2kc2HCn1etDg97Qsh7m89kBjG4ZT7XBgO4Dp7BfFZx7eow?key=qYdFquJrLcfXCUndY-YRBQ)
 ---
 
 ## 🛠️ Development
