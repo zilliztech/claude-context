@@ -10,7 +10,7 @@ Model Context Protocol (MCP) integration for Claude Context - A powerful MCP ser
 
 ## 🚀 Use Claude Context as MCP in Claude Code and others
 
-![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeUgHZrQT1xNXvPLa5DuPQLpnK5yhHk6yJvLwcq5ZBAaUWo69tcyqalcChWFF4sjQ1mjUSBZgKqLKtD1edKnCPq2af6D_jGRNvwyTEc2UcGnJbsFw1mu_uSmdZHxTLdLO6dFAa8kg?key=_L-CtW461S9w7NRqzdFOIg)
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXd6_BiuJIYKr3SpSShPVXCYDBHIbhdD7488-Txm3jlocXx4wP6rjWxrc0YcFbgsuurVH-DmcTBojgOWfmCIP5czcM2oNFecVSTZeTuKUbJ-ZuC5qSWU3diHFXrl2Awieyoa29wYlQ?key=qYdFquJrLcfXCUndY-YRBQ)
 
 Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
