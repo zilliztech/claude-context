@@ -1,6 +1,6 @@
 {
     "name": "@zilliz/claude-context-core",
-    "version": "0.0.13",
+    "version": "0.1.0",
     "description": "Core indexing engine for Claude Context",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
