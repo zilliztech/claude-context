@@ -40,6 +40,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ### Advanced Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `HYBRID_MODE` | Enable hybrid search (BM25 + dense vector). Set to `false` for dense-only search | `true` |
 | `EMBEDDING_BATCH_SIZE` | Batch size for processing. Larger batch size means less indexing time | `100` |
 | `SPLITTER_TYPE` | Code splitter type: `ast`, `langchain` | `ast` |
 | `CUSTOM_EXTENSIONS` | Additional file extensions to include (comma-separated, e.g., `.vue,.svelte,.astro`) | None |

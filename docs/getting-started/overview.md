@@ -6,8 +6,8 @@ Claude Context is a powerful semantic code search tool that gives AI coding assi
 
 ## Key Features
 
-### 🔍 Semantic Code Search
-Ask natural language questions like "find functions that handle user authentication" and get relevant code snippets from across your entire codebase.
+### 🔍 Hybrid Code Search
+Ask natural language questions like "find functions that handle user authentication" and get relevant code snippets from across your entire codebase using advanced hybrid search (BM25 + dense vector).
 
 ### 🧠 Context-Aware Understanding
 Discover relationships between different parts of your code, even across millions of lines. The system understands code structure, patterns, and dependencies.
@@ -38,8 +38,8 @@ Each code chunk is converted into high-dimensional vectors using state-of-the-ar
 ### 4. Vector Storage
 Embeddings are stored in a vector database (Milvus/Zilliz Cloud) for efficient similarity search.
 
-### 5. Semantic Search
-Natural language queries are converted to vectors and matched against stored code embeddings.
+### 5. Hybrid Search
+Natural language queries are processed using both dense vector embeddings and BM25 sparse retrieval, then combined with RRF (Reciprocal Rank Fusion) for optimal results.
 
 ## Architecture Components
 

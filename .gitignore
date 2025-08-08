@@ -54,6 +54,9 @@ Thumbs.db
 *.crx
 *.pem
 
+__pycache__/
+*.log
+
 .claude/*
 CLAUDE.md
 
