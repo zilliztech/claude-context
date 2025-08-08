@@ -26,8 +26,7 @@
 
 ## 🚀 Demo
 
-![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXf2ik7bH8DTuBEH_TPts86EEcY9fiUG2TI_HsfVWdumvbXtpRQGUd3CUmN2zoeeQAmKxG9Yptgh6JbcoPW_dpVzwM7Q9Z6Rl6iBD51J9Isg2R--8CltpP3N8XrdNqvgBzpZ1ZRJ?key=_L-CtW461S9w7NRqzdFOIg)
-
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXd6_BiuJIYKr3SpSShPVXCYDBHIbhdD7488-Txm3jlocXx4wP6rjWxrc0YcFbgsuurVH-DmcTBojgOWfmCIP5czcM2oNFecVSTZeTuKUbJ-ZuC5qSWU3diHFXrl2Awieyoa29wYlQ?key=qYdFquJrLcfXCUndY-YRBQ)
 
 Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
