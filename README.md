@@ -14,10 +14,6 @@
 
 **Claude Context** is an MCP plugin that adds semantic code search to Claude Code and other AI coding agents, giving them deep context from your entire codebase.
 
----
-
-## ✨ Core Value
-
 🧠 **Your Entire Codebase as Context**: Claude Context uses semantic search to find all relevant code from millions of lines. No multi-round discovery needed. It brings results straight into the Claude's context.
 
 💰 **Cost-Effective for Large Codebases**: Instead of loading entire directories into Claude for every request, which can be very expensive, Claude Context efficiently stores your codebase in a vector database and only uses related code in context to keep your costs manageable.
@@ -430,7 +426,7 @@ Claude Context is a monorepo containing three main packages:
 
 While MCP is the recommended way to use Claude Context with AI assistants, you can also use it directly or through the VSCode extension.
 
-### Core Package Usage
+### Build Applications with Core Package
 
 The `@zilliz/claude-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
