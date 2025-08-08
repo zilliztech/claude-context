@@ -553,6 +553,7 @@ Check the `/examples` directory for complete usage examples:
 
 - **[What files does Claude Context decide to embed?](docs/troubleshooting/faq.md#q-what-files-does-claude-context-decide-to-embed)**
 - **[Can I use a fully local deployment setup?](docs/troubleshooting/faq.md#q-can-i-use-a-fully-local-deployment-setup)**
+- **[Does it support multiple projects / codebases?](docs/troubleshooting/faq.md#q-does-it-support-multiple-projects--codebases)**
 
 For detailed answers and more troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
 

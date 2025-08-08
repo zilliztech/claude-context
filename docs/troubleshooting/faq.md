@@ -65,3 +65,17 @@ Supported extensions include common programming languages (.ts, .js, .py, .java,
 
 This setup gives you complete control over your data while maintaining full functionality. See our [environment variables guide](../getting-started/environment-variables.md) for detailed configuration options.
 
+## Q: Does it support multiple projects / codebases?
+
+**A:** Yes, Claude Context fully supports multiple projects and codebases. In MCP mode, it automatically leverages the MCP client's AI Agent to detect and obtain the current codebase path where you're working.
+
+You can seamlessly use queries like `index this codebase` or `search the main function` without specifying explicit paths. When you switch between different codebase working directories, Claude Context automatically discovers the change and adapts accordingly - no need to manually input specific codebase paths.
+
+**Key features for multi-project support:**
+- **Automatic Path Detection**: Leverages MCP client's workspace awareness to identify current working directory
+- **Seamless Project Switching**: Automatically detects when you switch between different codebases
+- **Background Code Synchronization**: Continuously monitors for changes and automatically re-indexes modified parts
+- **Context-Aware Operations**: All indexing and search operations are scoped to the current project context
+
+This makes it effortless to work across multiple projects while maintaining isolated, up-to-date indexes for each codebase.
+
