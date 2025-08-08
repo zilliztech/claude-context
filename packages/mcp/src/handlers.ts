@@ -410,7 +410,7 @@ export class ToolHandlers {
     }
 
     public async handleSearchCode(args: any) {
-        const { path: codebasePath, query, limit = 10 } = args;
+        const { path: codebasePath, query, limit = 10, extensionFilter } = args;
         const resultLimit = limit || 10;
 
         try {
@@ -474,12 +474,31 @@ export class ToolHandlers {
             console.log(`[SEARCH] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} for search`);
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
+            // Build filter expression from extensionFilter list
+            let filterExpr: string | undefined = undefined;
+            if (Array.isArray(extensionFilter) && extensionFilter.length > 0) {
+                const cleaned = extensionFilter
+                    .filter((v: any) => typeof v === 'string')
+                    .map((v: string) => v.trim())
+                    .filter((v: string) => v.length > 0);
+                const invalid = cleaned.filter((e: string) => !(e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
+                if (invalid.length > 0) {
+                    return {
+                        content: [{ type: 'text', text: `Error: Invalid file extensions in extensionFilter: ${JSON.stringify(invalid)}. Use proper extensions like '.ts', '.py'.` }],
+                        isError: true
+                    };
+                }
+                const quoted = cleaned.map((e: string) => `'${e}'`).join(', ');
+                filterExpr = `fileExtension in [${quoted}]`;
+            }
+
             // Search in the specified codebase
             const searchResults = await this.context.semanticSearch(
                 absolutePath,
                 query,
                 Math.min(resultLimit, 50),
-                0.3
+                0.3,
+                filterExpr
             );
 
             console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);

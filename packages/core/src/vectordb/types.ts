@@ -14,6 +14,7 @@ export interface SearchOptions {
     topK?: number;
     filter?: Record<string, any>;
     threshold?: number;
+    filterExpr?: string;
 }
 
 // New interfaces for hybrid search
@@ -27,6 +28,7 @@ export interface HybridSearchRequest {
 export interface HybridSearchOptions {
     rerank?: RerankStrategy;
     limit?: number;
+    filterExpr?: string;
 }
 
 export interface RerankStrategy {

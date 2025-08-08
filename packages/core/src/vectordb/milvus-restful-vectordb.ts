@@ -364,7 +364,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
             // Build search request according to Milvus REST API specification
-            const searchRequest = {
+            const searchRequest: any = {
                 collectionName,
                 dbName: restfulConfig.database,
                 data: [queryVector], // Array of query vectors
@@ -383,6 +383,11 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                     params: {}
                 }
             };
+
+            // Apply boolean expression filter if provided (e.g., fileExtension in ['.ts','.py']) 
+            if (options?.filterExpr && options.filterExpr.trim().length > 0) {
+                searchRequest.filter = options.filterExpr;
+            }
 
             const response = await this.makeRequest('/entities/search', 'POST', searchRequest);
 
@@ -651,7 +656,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
             // Prepare search requests according to Milvus REST API hybrid search specification
             // For dense vector search - data must be array of vectors: [[0.1, 0.2, 0.3, ...]]
-            const search_param_1 = {
+            const search_param_1: any = {
                 data: Array.isArray(searchRequests[0].data) ? [searchRequests[0].data] : [[searchRequests[0].data]],
                 annsField: searchRequests[0].anns_field, // "vector"
                 limit: searchRequests[0].limit,
@@ -663,7 +668,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             };
 
             // For sparse vector search - data must be array of queries: ["query text"]
-            const search_param_2 = {
+            const search_param_2: any = {
                 data: Array.isArray(searchRequests[1].data) ? searchRequests[1].data : [searchRequests[1].data],
                 annsField: searchRequests[1].anns_field, // "sparse_vector"
                 limit: searchRequests[1].limit,
@@ -673,6 +678,12 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                     params: searchRequests[1].param || { "drop_ratio_search": 0.2 }
                 }
             };
+
+            // Apply filter to both search parameters if provided
+            if (options?.filterExpr && options.filterExpr.trim().length > 0) {
+                search_param_1.filter = options.filterExpr;
+                search_param_2.filter = options.filterExpr;
+            }
 
             const rerank_strategy = {
                 strategy: "rrf",
@@ -694,7 +705,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 searchParams: search_param_2.searchParams
             }, null, 2));
 
-            const hybridSearchRequest = {
+            const hybridSearchRequest: any = {
                 collectionName,
                 dbName: restfulConfig.database,
                 search: [search_param_1, search_param_2],
@@ -702,15 +713,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 limit: options?.limit || searchRequests[0]?.limit || 10,
                 outputFields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
             };
-
-            console.log(`🔍 Complete REST API request:`, JSON.stringify({
-                collectionName: hybridSearchRequest.collectionName,
-                dbName: hybridSearchRequest.dbName,
-                search_count: hybridSearchRequest.search.length,
-                rerank: hybridSearchRequest.rerank,
-                limit: hybridSearchRequest.limit,
-                outputFields: hybridSearchRequest.outputFields
-            }, null, 2));
 
             console.log(`🔍 Executing REST API hybrid search...`);
             const response = await this.makeRequest('/entities/hybrid_search', 'POST', hybridSearchRequest);

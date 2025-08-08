@@ -406,7 +406,7 @@ export class Context {
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
-    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5): Promise<SemanticSearchResult[]> {
+    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
@@ -465,7 +465,8 @@ export class Context {
                         strategy: 'rrf',
                         params: { k: 100 }
                     },
-                    limit: topK
+                    limit: topK,
+                    filterExpr
                 }
             );
 
@@ -496,7 +497,7 @@ export class Context {
             const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
                 collectionName,
                 queryEmbedding.vector,
-                { topK, threshold }
+                { topK, threshold, filterExpr }
             );
 
             // 3. Convert to semantic search result format

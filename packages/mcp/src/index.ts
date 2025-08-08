@@ -170,6 +170,14 @@ Search the indexed codebase using natural language queries within a specified ab
                                     description: "Maximum number of results to return",
                                     default: 10,
                                     maximum: 50
+                                },
+                                extensionFilter: {
+                                    type: "array",
+                                    items: {
+                                        type: "string"
+                                    },
+                                    description: "Optional: List of file extensions to filter results. (e.g., ['.ts','.py']).",
+                                    default: []
                                 }
                             },
                             required: ["path", "query"]

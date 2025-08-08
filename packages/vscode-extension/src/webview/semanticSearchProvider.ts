@@ -79,7 +79,8 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                             // Use search command
                             const searchResults = await this.searchCommand.executeForWebview(
                                 message.text,
-                                50
+                                50,
+                                Array.isArray(message.fileExtensions) ? message.fileExtensions : []
                             );
 
                             // Convert SemanticSearchResult[] to webview format
