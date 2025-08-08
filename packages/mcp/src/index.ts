@@ -101,6 +101,16 @@ Search the indexed codebase using natural language queries within a specified ab
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path.
 
+🎯 **When to Use**:
+This tool is versatile and can be used before completing various tasks to retrieve relevant context:
+- **Code search**: Find specific functions, classes, or implementations
+- **Context-aware assistance**: Gather relevant code context before making changes
+- **Issue identification**: Locate problematic code sections or bugs
+- **Code review**: Understand existing implementations and patterns
+- **Refactoring**: Find all related code pieces that need to be updated
+- **Feature development**: Understand existing architecture and similar implementations
+- **Duplicate detection**: Identify redundant or duplicated code patterns across the codebase
+
 ✨ **Usage Guidance**:
 - If the codebase is not indexed, this tool will return a clear error message indicating that indexing is required first.
 - You can then use the index_codebase tool to index the codebase before searching again.
