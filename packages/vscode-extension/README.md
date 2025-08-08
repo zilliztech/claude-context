@@ -7,7 +7,7 @@ A code indexing and semantic search VSCode extension powered by [Claude Context]
 > 📖 **New to Claude Context?** Check out the [main project README](https://github.com/zilliztech/claude-context/blob/master/README.md) for an overview and setup instructions.
 
 
-![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdphYH31AdG2Z5FdtLYbedPTGXHvwtDbNwUduYRl7j7sR_WhtiUTdnUALNw-dsABnJkZxxnsRcDA1G37qsaXm9KAW4MiCXY_bStpaaeG-KCfEfmMG4kPFQmoO33yQ_6OlLyjIsPvQ?key=_L-CtW461S9w7NRqzdFOIg)
+![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdtCtT9Qi6o5mGVoxzX50r8Nb6zDFcjvTQR7WZ-xMbEsHEPPhSYAFVJ7q4-rETzxJ8wy1cyZmU8CmtpNhAU8PGOqVnE2kc2HCn1etDg97Qsh7m89kBjG4ZT7XBgO4Dp7BfFZx7eow?key=qYdFquJrLcfXCUndY-YRBQ)
 
 ## Features
 
