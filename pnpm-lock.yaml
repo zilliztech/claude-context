@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@tree-sitter-grammars/tree-sitter-zig':
+        specifier: ^1.1.2
+        version: 1.1.2(tree-sitter@0.21.1)
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -163,6 +167,9 @@ importers:
       '@google/genai':
         specifier: ^1.9.0
         version: 1.9.0(@modelcontextprotocol/sdk@1.12.1)
+      '@tree-sitter-grammars/tree-sitter-zig':
+        specifier: ^1.1.2
+        version: 1.1.2(tree-sitter@0.21.1)
       '@zilliz/milvus2-sdk-node':
         specifier: ^2.5.10
         version: 2.5.10
@@ -1046,6 +1053,14 @@ packages:
 
   '@textlint/types@14.8.4':
     resolution: {integrity: sha512-9nyY8vVXlr8hHKxa6+37omJhXWCwovMQcgMteuldYd4dOxGm14AK2nXdkgtKEUQnzLGaXy46xwLCfhQy7V7/YA==}
+
+  '@tree-sitter-grammars/tree-sitter-zig@1.1.2':
+    resolution: {integrity: sha512-J0L31HZ2isy3F5zb2g5QWQOv2r/pbruQNL9ADhuQv2pn5BQOzxt80WcEJaYXBeuJ8GHxVT42slpCna8k1c8LOw==}
+    peerDependencies:
+      tree-sitter: ^0.22.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
 
   '@tybys/wasm-util@0.9.0':
     resolution: {integrity: sha512-6+7nlbMVX/PVDCwaIQ8nTOPveOcFLSt8GcXdx8hD0bt39uWxYT88uXzqTd4fTvqta7oeUJqudepapKNt2DYJFw==}
@@ -5313,6 +5328,13 @@ snapshots:
   '@textlint/types@14.8.4':
     dependencies:
       '@textlint/ast-node-types': 14.8.4
+
+  '@tree-sitter-grammars/tree-sitter-zig@1.1.2(tree-sitter@0.21.1)':
+    dependencies:
+      node-addon-api: 8.4.0
+      node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
   '@tybys/wasm-util@0.9.0':
     dependencies:

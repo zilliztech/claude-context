@@ -94,7 +94,7 @@ results.forEach(result => {
 
 ## Features
 
-- **Multi-language Support**: Index TypeScript, JavaScript, Python, Java, C++, and many other programming languages
+- **Multi-language Support**: Index TypeScript, JavaScript, Python, Java, C++, Zig, and many other programming languages
 - **Semantic Search**: Find code using natural language queries powered by AI embeddings
 - **Flexible Architecture**: Pluggable embedding providers and vector databases
 - **Smart Chunking**: Intelligent code splitting that preserves context and structure
@@ -136,7 +136,7 @@ interface ContextConfig {
 [
   // Programming languages
   '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
-  '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
+  '.cs', '.go', '.rs', '.zig', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
   // Text and markup files  
   '.md', '.markdown'
 ]

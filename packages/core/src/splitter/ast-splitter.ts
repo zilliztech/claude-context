@@ -9,6 +9,7 @@ const Java = require('tree-sitter-java');
 const Cpp = require('tree-sitter-cpp');
 const Go = require('tree-sitter-go');
 const Rust = require('tree-sitter-rust');
+const Zig = require('@tree-sitter-grammars/tree-sitter-zig');
 
 // Node types that represent logical code units
 const SPLITTABLE_NODE_TYPES = {
@@ -18,7 +19,8 @@ const SPLITTABLE_NODE_TYPES = {
     java: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration'],
     cpp: ['function_definition', 'class_specifier', 'namespace_definition', 'declaration'],
     go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
-    rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item']
+    rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
+    zig: ['function_declaration', 'variable_declaration', 'test_declaration', 'comptime_declaration', 'using_namespace_declaration']
 };
 
 export class AstCodeSplitter implements Splitter {
@@ -93,7 +95,8 @@ export class AstCodeSplitter implements Splitter {
             'c': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
             'go': { parser: Go, nodeTypes: SPLITTABLE_NODE_TYPES.go },
             'rust': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
-            'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust }
+            'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
+            'zig': { parser: Zig, nodeTypes: SPLITTABLE_NODE_TYPES.zig }
         };
 
         return langMap[language.toLowerCase()] || null;
@@ -109,9 +112,18 @@ export class AstCodeSplitter implements Splitter {
         const chunks: CodeChunk[] = [];
         const codeLines = code.split('\n');
 
-        const traverse = (currentNode: Parser.SyntaxNode) => {
+        // For Zig and similar languages, only extract top-level declarations
+        // to avoid duplicating nested functions/types
+        const shouldOnlyExtractTopLevel = ['zig', 'rust', 'go'].includes(language);
+
+        const traverse = (currentNode: Parser.SyntaxNode, depth: number = 0) => {
             // Check if this node type should be split into a chunk
             if (splittableTypes.includes(currentNode.type)) {
+                // For certain languages, skip nested declarations
+                if (shouldOnlyExtractTopLevel && depth > 1) {
+                    return;
+                }
+
                 const startLine = currentNode.startPosition.row + 1;
                 const endLine = currentNode.endPosition.row + 1;
                 const nodeText = code.slice(currentNode.startIndex, currentNode.endIndex);
@@ -132,7 +144,7 @@ export class AstCodeSplitter implements Splitter {
 
             // Continue traversing child nodes
             for (const child of currentNode.children) {
-                traverse(child);
+                traverse(child, depth + 1);
             }
         };
 
@@ -256,7 +268,7 @@ export class AstCodeSplitter implements Splitter {
     static isLanguageSupported(language: string): boolean {
         const supportedLanguages = [
             'javascript', 'js', 'typescript', 'ts', 'python', 'py',
-            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs'
+            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'zig'
         ];
         return supportedLanguages.includes(language.toLowerCase());
     }

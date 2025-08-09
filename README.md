@@ -417,7 +417,7 @@ Claude Context is a monorepo containing three main packages:
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
 - **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
-- **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
+- **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, Zig, PHP, Ruby, Swift, Kotlin, Scala, Markdown
 - **Development Tools**: VSCode, Model Context Protocol
 
 ---
