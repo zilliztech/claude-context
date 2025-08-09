@@ -180,6 +180,14 @@ This tool is versatile and can be used before completing various tasks to retrie
                                     description: "Maximum number of results to return",
                                     default: 10,
                                     maximum: 50
+                                },
+                                extensionFilter: {
+                                    type: "array",
+                                    items: {
+                                        type: "string"
+                                    },
+                                    description: "Optional: List of file extensions to filter results. (e.g., ['.ts','.py']).",
+                                    default: []
                                 }
                             },
                             required: ["path", "query"]

@@ -234,12 +234,17 @@ export class MilvusVectorDatabase implements VectorDatabase {
     async search(collectionName: string, queryVector: number[], options?: SearchOptions): Promise<VectorSearchResult[]> {
         await this.ensureInitialized();
 
-        const searchParams = {
+        const searchParams: any = {
             collection_name: collectionName,
             data: [queryVector],
             limit: options?.topK || 10,
             output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
         };
+
+        // Apply boolean expression filter if provided (e.g., fileExtension in [".ts",".py"]) 
+        if (options?.filterExpr && options.filterExpr.trim().length > 0) {
+            searchParams.expr = options.filterExpr;
+        }
 
         const searchResult = await this.client!.search(searchParams);
 
@@ -480,7 +485,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             console.log(`🔍 Rerank strategy:`, JSON.stringify(rerank_strategy, null, 2));
 
             // Execute hybrid search using the correct client.search format
-            const searchParams = {
+            const searchParams: any = {
                 collection_name: collectionName,
                 data: [search_param_1, search_param_2],
                 limit: options?.limit || searchRequests[0]?.limit || 10,
@@ -488,12 +493,17 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
             };
 
+            if (options?.filterExpr && options.filterExpr.trim().length > 0) {
+                searchParams.expr = options.filterExpr;
+            }
+
             console.log(`🔍 Complete search request:`, JSON.stringify({
                 collection_name: searchParams.collection_name,
                 data_count: searchParams.data.length,
                 limit: searchParams.limit,
                 rerank: searchParams.rerank,
-                output_fields: searchParams.output_fields
+                output_fields: searchParams.output_fields,
+                expr: searchParams.expr
             }, null, 2));
 
             const searchResult = await this.client!.search(searchParams);

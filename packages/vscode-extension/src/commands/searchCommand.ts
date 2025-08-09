@@ -61,6 +61,31 @@ export class SearchCommand {
                     return;
                 }
 
+                // Optionally prompt for file extension filters
+                const extensionInput = await vscode.window.showInputBox({
+                    placeHolder: 'Optional: filter by file extensions (e.g. .ts,.py,.java) – leave empty for all',
+                    prompt: 'Enter a comma-separated list of file extensions to include',
+                    value: ''
+                });
+
+                const fileExtensions = (extensionInput || '')
+                    .split(',')
+                    .map(e => e.trim())
+                    .filter(Boolean);
+
+                // Validate extensions strictly and build filter expression
+                let filterExpr: string | undefined = undefined;
+                if (fileExtensions.length > 0) {
+                    const invalid = fileExtensions.filter(e => !(e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
+                    if (invalid.length > 0) {
+                        vscode.window.showErrorMessage(`Invalid extensions: ${invalid.join(', ')}. Use proper extensions like '.ts', '.py'.`);
+                        return;
+                    }
+                    const quoted = fileExtensions.map(e => `'${e}'`).join(',');
+
+                    filterExpr = `fileExtension in [${quoted}]`;
+                }
+
                 // Use semantic search
                 const query: SearchQuery = {
                     term: searchTerm,
@@ -71,12 +96,14 @@ export class SearchCommand {
                 console.log('🔍 Using semantic search...');
                 progress.report({ increment: 50, message: 'Executing semantic search...' });
 
-                const results = await this.context.semanticSearch(
+                let results = await this.context.semanticSearch(
                     codebasePath,
                     query.term,
                     query.limit || 20,
-                    0.3 // similarity threshold
+                    0.3, // similarity threshold
+                    filterExpr
                 );
+                // No client-side filtering; filter pushed down via filter expression
 
                 progress.report({ increment: 100, message: 'Search complete!' });
 
@@ -139,7 +166,7 @@ export class SearchCommand {
     /**
      * Execute search for webview (without UI prompts)
      */
-    async executeForWebview(searchTerm: string, limit: number = 50): Promise<SemanticSearchResult[]> {
+    async executeForWebview(searchTerm: string, limit: number = 50, fileExtensions: string[] = []): Promise<SemanticSearchResult[]> {
         // Get workspace root for codebase path
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -154,12 +181,26 @@ export class SearchCommand {
         }
 
         console.log('🔍 Using semantic search for webview...');
-        return await this.context.semanticSearch(
+
+        // Validate extensions strictly and build filter expression
+        let filterExpr: string | undefined = undefined;
+        if (fileExtensions && fileExtensions.length > 0) {
+            const invalid = fileExtensions.filter(e => !(typeof e === 'string' && e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
+            if (invalid.length > 0) {
+                throw new Error(`Invalid extensions: ${invalid.join(', ')}. Use proper extensions like '.ts', '.py'.`);
+            }
+            const quoted = fileExtensions.map(e => `'${e}'`).join(',');
+            filterExpr = `fileExtension in [${quoted}]`;
+        }
+
+        let results = await this.context.semanticSearch(
             codebasePath,
             searchTerm,
             limit,
-            0.3 // similarity threshold
+            0.3, // similarity threshold
+            filterExpr
         );
+        return results;
     }
 
     /**

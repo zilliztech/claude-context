@@ -22,6 +22,7 @@ class SemanticSearchController {
     initializeElements() {
         // Search view elements
         this.searchInput = document.getElementById('searchInput');
+        this.extFilterInput = document.getElementById('extFilterInput');
         this.searchButton = document.getElementById('searchButton');
         this.indexButton = document.getElementById('indexButton');
         this.settingsButton = document.getElementById('settingsButton');
@@ -90,10 +91,15 @@ class SemanticSearchController {
      */
     performSearch() {
         const text = this.searchInput.value.trim();
+        const extFilterRaw = (this.extFilterInput?.value || '').trim();
+        const extensions = extFilterRaw
+            ? extFilterRaw.split(',').map(e => e.trim()).filter(Boolean)
+            : [];
         if (text && !this.searchButton.disabled) {
             this.vscode.postMessage({
                 command: 'search',
-                text: text
+                text: text,
+                fileExtensions: extensions
             });
         }
     }

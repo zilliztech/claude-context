@@ -29,8 +29,13 @@
                     </svg>
                 </button>
             </div>
+            <label for="searchInput" class="input-label">Semantic search query</label>
             <input type="text" id="searchInput" class="search-input"
-                placeholder="Enter your semantic search query..." />
+                placeholder="e.g. 'The main function of the codebase'" />
+            <label for="extFilterInput" class="input-label" style="margin-top: 10px; display: block;">Extension filter
+                (optional)</label>
+            <input type="text" id="extFilterInput" class="search-input" style="margin-top: 6px;"
+                placeholder="e.g. .ts,.py,.java" />
             <button id="searchButton" class="search-button">Search</button>
             <button id="indexButton" class="search-button"
                 style="margin-top: 4px; background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">
