@@ -263,7 +263,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     /**
      * Load collection to memory for searching
      */
-    private async loadCollection(collectionName: string): Promise<void> {
+    async loadCollection(collectionName: string): Promise<void> {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
             await this.makeRequest('/collections/load', 'POST', {

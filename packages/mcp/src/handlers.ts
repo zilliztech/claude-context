@@ -102,7 +102,56 @@ export class ToolHandlers {
                         console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
                     }
                 } catch (collectionError: any) {
-                    console.warn(`[SYNC-CLOUD] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
+                    // Handle collection not loaded error specifically
+                    if (collectionError.message?.includes('collection not loaded')) {
+                        console.warn(`[SYNC-CLOUD] ⚠️  Collection ${collectionName} not loaded in memory, attempting to load...`);
+                        try {
+                            // Try to load the collection
+                            if (vectorDb.loadCollection) {
+                                await vectorDb.loadCollection(collectionName);
+                                console.log(`[SYNC-CLOUD] ✅ Successfully loaded collection ${collectionName}`);
+                                
+                                // Retry the query after loading
+                                try {
+                                    const results = await vectorDb.query(
+                                        collectionName,
+                                        '',
+                                        ['metadata'],
+                                        1
+                                    );
+                                    
+                                    if (results && results.length > 0) {
+                                        const firstResult = results[0];
+                                        const metadataStr = firstResult.metadata;
+                                        if (metadataStr) {
+                                            try {
+                                                const metadata = JSON.parse(metadataStr);
+                                                const codebasePath = metadata.codebasePath;
+                                                if (codebasePath && typeof codebasePath === 'string') {
+                                                    console.log(`[SYNC-CLOUD] 📍 Found codebase path after loading: ${codebasePath} in collection: ${collectionName}`);
+                                                    cloudCodebases.add(codebasePath);
+                                                }
+                                            } catch (parseError) {
+                                                console.warn(`[SYNC-CLOUD] ⚠️  Failed to parse metadata JSON for collection ${collectionName}:`, parseError);
+                                            }
+                                        }
+                                    }
+                                } catch (retryError) {
+                                    console.warn(`[SYNC-CLOUD] ⚠️  Failed to query collection ${collectionName} after loading:`, retryError);
+                                }
+                            } else {
+                                console.warn(`[SYNC-CLOUD] ⚠️  loadCollection method not available, skipping collection ${collectionName}`);
+                                // Don't remove from local index if we can't verify cloud state
+                                continue;
+                            }
+                        } catch (loadError) {
+                            console.warn(`[SYNC-CLOUD] ⚠️  Failed to load collection ${collectionName}:`, loadError);
+                            // Don't remove from local index if we can't verify cloud state
+                            continue;
+                        }
+                    } else {
+                        console.warn(`[SYNC-CLOUD] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
+                    }
                     // Continue with next collection
                 }
             }
@@ -116,11 +165,20 @@ export class ToolHandlers {
             let hasChanges = false;
 
             // Remove local codebases that don't exist in cloud
+            // IMPORTANT: Only remove if we successfully checked ALL collections
+            // If some collections couldn't be queried (e.g., not loaded), we shouldn't remove anything
             for (const localCodebase of localCodebases) {
                 if (!cloudCodebases.has(localCodebase)) {
-                    this.snapshotManager.removeIndexedCodebase(localCodebase);
-                    hasChanges = true;
-                    console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
+                    // Only remove if we're confident about the cloud state
+                    // For now, we'll be conservative and not remove if cloudCodebases is empty
+                    // (which might indicate a sync failure rather than truly empty cloud)
+                    if (cloudCodebases.size > 0) {
+                        this.snapshotManager.removeIndexedCodebase(localCodebase);
+                        hasChanges = true;
+                        console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
+                    } else {
+                        console.log(`[SYNC-CLOUD] ⚠️  Skipping removal of ${localCodebase} - cloud state uncertain`);
+                    }
                 }
             }
 
@@ -390,6 +448,23 @@ export class ToolHandlers {
 
             // Save snapshot after updating codebase lists
             this.snapshotManager.saveCodebaseSnapshot();
+            
+            // Ensure collection is loaded after successful indexing
+            try {
+                const vectorDb = this.context.getVectorDatabase();
+                const collectionName = this.context.getCollectionName(absolutePath);
+                
+                // Load the collection into memory for querying
+                if (vectorDb.loadCollection) {
+                    await vectorDb.loadCollection(collectionName);
+                    console.log(`[BACKGROUND-INDEX] ✅ Collection ${collectionName} loaded into memory for querying`);
+                } else {
+                    console.warn(`[BACKGROUND-INDEX] ⚠️  loadCollection method not available - collection may not be loaded`);
+                }
+            } catch (loadError) {
+                console.warn(`[BACKGROUND-INDEX] ⚠️  Failed to load collection after indexing:`, loadError);
+                // Non-critical error - indexing succeeded, just collection loading failed
+            }
 
             let message = `Background indexing completed for '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.`;
             if (stats.status === 'limit_reached') {

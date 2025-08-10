@@ -538,4 +538,18 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw error;
         }
     }
+
+    async loadCollection(collectionName: string): Promise<void> {
+        await this.ensureInitialized();
+
+        try {
+            await this.client!.loadCollection({
+                collection_name: collectionName,
+            });
+            console.log(`✅ Collection '${collectionName}' loaded into memory`);
+        } catch (error) {
+            console.error(`❌ Failed to load collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
 }

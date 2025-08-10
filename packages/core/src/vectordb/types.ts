@@ -125,6 +125,12 @@ export interface VectorDatabase {
      * @param limit Maximum number of results
      */
     query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
+
+    /**
+     * Load collection into memory for querying
+     * @param collectionName Collection name
+     */
+    loadCollection?(collectionName: string): Promise<void>;
 }
 
 /**
