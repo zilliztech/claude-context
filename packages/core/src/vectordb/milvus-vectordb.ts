@@ -1,4 +1,4 @@
-import { MilvusClient, DataType, MetricType, FunctionType } from '@zilliz/milvus2-sdk-node';
+import { MilvusClient, DataType, MetricType, FunctionType, LoadState } from '@zilliz/milvus2-sdk-node';
 import {
     VectorDocument,
     SearchOptions,
@@ -96,6 +96,28 @@ export class MilvusVectorDatabase implements VectorDatabase {
         await this.initializationPromise;
         if (!this.client) {
             throw new Error('Client not initialized');
+        }
+    }
+
+    /**
+     * Ensure collection is loaded before search/query operations
+     */
+    protected async ensureLoaded(collectionName: string): Promise<void> {
+        try {
+            // Check if collection is loaded
+            const result = await this.client!.getLoadState({
+                collection_name: collectionName
+            });
+
+            if (result.state !== LoadState.LoadStateLoaded) {
+                console.log(`🔄 Loading collection '${collectionName}' to memory...`);
+                await this.client!.loadCollection({
+                    collection_name: collectionName,
+                });
+            }
+        } catch (error) {
+            console.error(`❌ Failed to ensure collection '${collectionName}' is loaded:`, error);
+            throw error;
         }
     }
 
@@ -212,6 +234,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         console.log('Inserting documents into collection:', collectionName);
         const data = documents.map(doc => ({
@@ -233,6 +256,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     async search(collectionName: string, queryVector: number[], options?: SearchOptions): Promise<VectorSearchResult[]> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         const searchParams: any = {
             collection_name: collectionName,
@@ -269,6 +293,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     async delete(collectionName: string, ids: string[]): Promise<void> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         await this.client!.delete({
             collection_name: collectionName,
@@ -278,6 +303,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     async query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             const queryParams: any = {
@@ -422,6 +448,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         const data = documents.map(doc => ({
             id: doc.id,
@@ -442,6 +469,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     async hybridSearch(collectionName: string, searchRequests: HybridSearchRequest[], options?: HybridSearchOptions): Promise<HybridSearchResult[]> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             // Generate OpenAI embedding for the first search request (dense)
