@@ -104,6 +104,29 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     /**
+     * Ensure collection is loaded before search/query operations
+     */
+    protected async ensureLoaded(collectionName: string): Promise<void> {
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+            // Check if collection is loaded
+            const response = await this.makeRequest('/collections/get_load_state', 'POST', {
+                collectionName,
+                dbName: restfulConfig.database
+            });
+
+            const loadState = response.data?.loadState;
+            if (loadState !== 'LoadStateLoaded') {
+                console.log(`🔄 Loading collection '${collectionName}' to memory...`);
+                await this.loadCollection(collectionName);
+            }
+        } catch (error) {
+            console.error(`❌ Failed to ensure collection '${collectionName}' is loaded:`, error);
+            throw error;
+        }
+    }
+
+    /**
      * Make HTTP request to Milvus REST API
      */
     private async makeRequest(endpoint: string, method: 'GET' | 'POST' = 'POST', data?: any): Promise<any> {
@@ -327,6 +350,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
@@ -358,6 +382,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     async search(collectionName: string, queryVector: number[], options?: SearchOptions): Promise<VectorSearchResult[]> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         const topK = options?.topK || 10;
 
@@ -427,6 +452,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     async delete(collectionName: string, ids: string[]): Promise<void> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
@@ -450,6 +476,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     async query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
@@ -613,6 +640,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
@@ -648,6 +676,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     async hybridSearch(collectionName: string, searchRequests: HybridSearchRequest[], options?: HybridSearchOptions): Promise<HybridSearchResult[]> {
         await this.ensureInitialized();
+        await this.ensureLoaded(collectionName);
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
