@@ -9,6 +9,7 @@ const Java = require('tree-sitter-java');
 const Cpp = require('tree-sitter-cpp');
 const Go = require('tree-sitter-go');
 const Rust = require('tree-sitter-rust');
+const CSharp = require('tree-sitter-c-sharp');
 
 // Node types that represent logical code units
 const SPLITTABLE_NODE_TYPES = {
@@ -18,7 +19,8 @@ const SPLITTABLE_NODE_TYPES = {
     java: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration'],
     cpp: ['function_definition', 'class_specifier', 'namespace_definition', 'declaration'],
     go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
-    rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item']
+    rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
+    csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration']
 };
 
 export class AstCodeSplitter implements Splitter {
@@ -93,7 +95,8 @@ export class AstCodeSplitter implements Splitter {
             'c': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
             'go': { parser: Go, nodeTypes: SPLITTABLE_NODE_TYPES.go },
             'rust': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
-            'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust }
+            'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
+            'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp }
         };
 
         return langMap[language.toLowerCase()] || null;
@@ -256,7 +259,7 @@ export class AstCodeSplitter implements Splitter {
     static isLanguageSupported(language: string): boolean {
         const supportedLanguages = [
             'javascript', 'js', 'typescript', 'ts', 'python', 'py',
-            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs'
+            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs'
         ];
         return supportedLanguages.includes(language.toLowerCase());
     }

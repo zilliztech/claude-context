@@ -32,13 +32,6 @@
         "os-browserify": "^0.3.0",
         "stream-http": "^3.2.0",
         "tree-sitter-cli": "^0.25.6",
-        "tree-sitter-cpp": "^0.23.4",
-        "tree-sitter-go": "^0.23.4",
-        "tree-sitter-java": "^0.21.0",
-        "tree-sitter-javascript": "^0.23.1",
-        "tree-sitter-python": "^0.21.0",
-        "tree-sitter-rust": "^0.21.0",
-        "tree-sitter-typescript": "^0.23.2",
         "typescript": "^5.8.3",
         "url": "^0.11.4",
         "vm-browserify": "^1.1.2"
