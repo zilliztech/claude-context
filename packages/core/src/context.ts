@@ -219,6 +219,28 @@ export class Context {
     }
 
     /**
+     * Parse boolean value from string with support for multiple formats
+     * @param value String value to parse
+     * @returns Boolean value or null if parsing fails
+     */
+    private parseBoolean(value: string): boolean | null {
+        const normalizedValue = value.toLowerCase().trim();
+        
+        // True values
+        if (['true', '1', 'yes', 'on'].includes(normalizedValue)) {
+            return true;
+        }
+        
+        // False values
+        if (['false', '0', 'no', 'off'].includes(normalizedValue)) {
+            return false;
+        }
+        
+        // Invalid value
+        return null;
+    }
+
+    /**
      * Get isHybrid setting from environment variables with proper precedence
      * Priority: DISABLE_SPARSE_VECTOR > USE_HYBRID_SEARCH > HYBRID_MODE > default false
      * Result is cached after first call since environment variables don't change during runtime
@@ -235,33 +257,43 @@ export class Context {
         // Check DISABLE_SPARSE_VECTOR first (highest priority) - if true, disable hybrid
         const disableSparseVector = envManager.get('DISABLE_SPARSE_VECTOR');
         if (disableSparseVector !== undefined && disableSparseVector !== null) {
-            const isDisabled = disableSparseVector.toLowerCase() === 'true';
-            if (isDisabled) {
+            const isDisabled = this.parseBoolean(disableSparseVector);
+            if (isDisabled === true) {
                 console.log('🚫 Hybrid search disabled by DISABLE_SPARSE_VECTOR=true');
                 result = false;
                 this.cachedIsHybrid = result;
                 return result;
+            } else if (isDisabled === null) {
+                console.warn(`⚠️  Invalid DISABLE_SPARSE_VECTOR value: '${disableSparseVector}'. Use true/false, 1/0, yes/no, or on/off.`);
             }
         }
 
         // Check USE_HYBRID_SEARCH second (medium priority)
         const useHybridSearch = envManager.get('USE_HYBRID_SEARCH');
         if (useHybridSearch !== undefined && useHybridSearch !== null) {
-            const isEnabled = useHybridSearch.toLowerCase() === 'true';
-            console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by USE_HYBRID_SEARCH=${useHybridSearch}`);
-            result = isEnabled;
-            this.cachedIsHybrid = result;
-            return result;
+            const isEnabled = this.parseBoolean(useHybridSearch);
+            if (isEnabled !== null) {
+                console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by USE_HYBRID_SEARCH=${useHybridSearch}`);
+                result = isEnabled;
+                this.cachedIsHybrid = result;
+                return result;
+            } else {
+                console.warn(`⚠️  Invalid USE_HYBRID_SEARCH value: '${useHybridSearch}'. Use true/false, 1/0, yes/no, or on/off.`);
+            }
         }
 
         // Check HYBRID_MODE third (legacy, lowest priority)
         const hybridMode = envManager.get('HYBRID_MODE');
         if (hybridMode !== undefined && hybridMode !== null) {
-            const isEnabled = hybridMode.toLowerCase() === 'true';
-            console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by HYBRID_MODE=${hybridMode} (legacy)`);
-            result = isEnabled;
-            this.cachedIsHybrid = result;
-            return result;
+            const isEnabled = this.parseBoolean(hybridMode);
+            if (isEnabled !== null) {
+                console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by HYBRID_MODE=${hybridMode} (legacy)`);
+                result = isEnabled;
+                this.cachedIsHybrid = result;
+                return result;
+            } else {
+                console.warn(`⚠️  Invalid HYBRID_MODE value: '${hybridMode}'. Use true/false, 1/0, yes/no, or on/off.`);
+            }
         }
 
         // Default to false (safer default to avoid sparse vector index issues)

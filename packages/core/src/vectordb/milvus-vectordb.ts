@@ -20,6 +20,23 @@ export interface MilvusConfig {
 }
 
 /**
+ * Custom error classes for better error handling
+ */
+class IndexCreationFailedError extends Error {
+    constructor(fieldName: string, collectionName: string) {
+        super(`Index creation failed for field '${fieldName}' in collection '${collectionName}'`);
+        this.name = 'IndexCreationFailedError';
+    }
+}
+
+class CollectionNotExistError extends Error {
+    constructor(collectionName: string) {
+        super(`Collection '${collectionName}' does not exist`);
+        this.name = 'CollectionNotExistError';
+    }
+}
+
+/**
  * Wrapper function to handle collection creation with limit detection for gRPC client
  * This is the single point where collection limit errors are detected and handled
  */
@@ -114,20 +131,21 @@ export class MilvusVectorDatabase implements VectorDatabase {
             });
 
             if (result.state !== LoadState.LoadStateLoaded) {
-                console.log(`🔄 Loading collection '${collectionName}' to memory...`);
-                await this.client.loadCollection({
-                    collection_name: collectionName,
-                });
+                console.log(`🔄 Collection '${collectionName}' is not loaded (state: ${result.state}), loading with retry...`);
+                await this.loadCollectionWithRetry(collectionName);
+            } else {
+                console.log(`✅ Collection '${collectionName}' is already loaded`);
             }
         } catch (error) {
-            console.error(`❌ Failed to ensure collection '${collectionName}' is loaded:`, error);
-            throw error;
+            // If we can't check the load state, assume it's not loaded and try loading
+            console.warn(`⚠️  Failed to check load state for collection '${collectionName}', attempting to load:`, error);
+            await this.loadCollectionWithRetry(collectionName);
         }
     }
 
     /**
      * Wait for an index to be ready before proceeding
-     * Polls index status with exponential backoff up to 30 seconds
+     * Polls index status with exponential backoff up to 60 seconds
      */
     protected async waitForIndexReady(collectionName: string, fieldName: string): Promise<void> {
         if (!this.client) {
@@ -165,26 +183,105 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     return;
                 }
                 
+                // Only abort on explicit failure state - this is a permanent failure
                 if (indexStateResult.state === IndexState.Failed) {
-                    throw new Error(`Index creation failed for field '${fieldName}' in collection '${collectionName}'`);
+                    throw new IndexCreationFailedError(fieldName, collectionName);
                 }
                 
-                // Wait with exponential backoff
-                await new Promise(resolve => setTimeout(resolve, interval));
-                interval = Math.min(interval * backoffMultiplier, maxInterval);
+                // Index is still in progress (building, pending, etc.), continue waiting
+                console.log(`🔄 Index on field '${fieldName}' is still building, waiting ${interval}ms...`);
                 
             } catch (error) {
-                console.error(`❌ Error checking index state for field '${fieldName}':`, error);
-                throw error;
+                // Check if this is a definitive IndexCreationFailedError that we just threw
+                if (error instanceof IndexCreationFailedError) {
+                    // This is our IndexState.Failed error, re-throw immediately
+                    throw error;
+                }
+                
+                // Log the error but continue retrying for transient errors
+                console.warn(`⚠️  Transient error checking index state for field '${fieldName}':`, error);
+                
+                // For other errors (network issues, temporary failures), continue retrying
+                console.log(`🔄 Continuing to retry index check after transient error...`);
             }
+            
+            // Wait with exponential backoff before next attempt
+            await new Promise(resolve => setTimeout(resolve, interval));
+            interval = Math.min(interval * backoffMultiplier, maxInterval);
         }
         
         throw new Error(`Timeout waiting for index on field '${fieldName}' in collection '${collectionName}' to be ready after ${maxWaitTime}ms`);
     }
 
     /**
+     * Wait for collection to reach LoadStateLoaded state
+     * Polls load state with exponential backoff up to 60 seconds
+     */
+    protected async waitForCollectionLoaded(collectionName: string): Promise<void> {
+        if (!this.client) {
+            throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
+        }
+
+        const maxWaitTime = 60000; // 60 seconds
+        const initialInterval = 500; // 500ms
+        const maxInterval = 5000; // 5 seconds
+        const backoffMultiplier = 1.5;
+        
+        let interval = initialInterval;
+        const startTime = Date.now();
+        
+        console.log(`⏳ Waiting for collection '${collectionName}' to reach LoadStateLoaded state...`);
+        
+        while (Date.now() - startTime < maxWaitTime) {
+            try {
+                const result = await this.client.getLoadState({
+                    collection_name: collectionName
+                });
+                
+                // Debug logging to understand the state value
+                console.log(`📊 Load state for '${collectionName}': ${result.state}`);
+                
+                // Check if collection is fully loaded
+                if (result.state === LoadState.LoadStateLoaded) {
+                    console.log(`✅ Collection '${collectionName}' is fully loaded!`);
+                    return;
+                }
+                
+                // Handle explicit failure states - these are permanent failures
+                if (result.state === LoadState.LoadStateNotExist) {
+                    throw new CollectionNotExistError(collectionName);
+                }
+                
+                // LoadStateNotLoad or LoadStateLoading are transient states, continue waiting
+                
+                // Collection is still loading, continue waiting
+                console.log(`🔄 Collection '${collectionName}' is still loading, waiting ${interval}ms...`);
+                
+            } catch (error) {
+                // Check if this is a definitive CollectionNotExistError that we just threw
+                if (error instanceof CollectionNotExistError) {
+                    // This is our LoadStateNotExist error, re-throw immediately
+                    throw error;
+                }
+                
+                // Log the error but continue retrying for transient errors
+                console.warn(`⚠️  Transient error checking load state for collection '${collectionName}':`, error);
+                
+                // For other errors (network issues, temporary failures), continue retrying
+                console.log(`🔄 Continuing to retry load state check after transient error...`);
+            }
+            
+            // Wait with exponential backoff before next attempt
+            await new Promise(resolve => setTimeout(resolve, interval));
+            interval = Math.min(interval * backoffMultiplier, maxInterval);
+        }
+        
+        throw new Error(`Timeout waiting for collection '${collectionName}' to reach LoadStateLoaded after ${maxWaitTime}ms`);
+    }
+
+    /**
      * Load collection with retry logic and exponential backoff
-     * Retries up to 5 times with exponential backoff
+     * Retries up to 5 times with exponential backoff and waits for LoadStateLoaded
      */
     protected async loadCollectionWithRetry(collectionName: string): Promise<void> {
         if (!this.client) {
@@ -205,6 +302,9 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 await this.client.loadCollection({
                     collection_name: collectionName,
                 });
+                
+                // Wait for collection to actually reach LoadStateLoaded state
+                await this.waitForCollectionLoaded(collectionName);
                 
                 console.log(`✅ Collection '${collectionName}' loaded successfully!`);
                 return;
