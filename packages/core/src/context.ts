@@ -146,12 +146,12 @@ export class Context {
         // Remove duplicates
         this.ignorePatterns = [...new Set(allIgnorePatterns)];
 
-        console.log(`🔧 Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
+        console.log(`[Context] Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
         if (envCustomExtensions.length > 0) {
-            console.log(`📎 Loaded ${envCustomExtensions.length} custom extensions from environment: ${envCustomExtensions.join(', ')}`);
+            console.log(`[Context] Loaded ${envCustomExtensions.length} custom extensions from environment: ${envCustomExtensions.join(', ')}`);
         }
         if (envCustomIgnorePatterns.length > 0) {
-            console.log(`🚫 Loaded ${envCustomIgnorePatterns.length} custom ignore patterns from environment: ${envCustomIgnorePatterns.join(', ')}`);
+            console.log(`[Context] Loaded ${envCustomIgnorePatterns.length} custom ignore patterns from environment: ${envCustomIgnorePatterns.join(', ')}`);
         }
     }
 
@@ -259,12 +259,12 @@ export class Context {
         if (disableSparseVector !== undefined && disableSparseVector !== null) {
             const isDisabled = this.parseBoolean(disableSparseVector);
             if (isDisabled === true) {
-                console.log('🚫 Hybrid search disabled by DISABLE_SPARSE_VECTOR=true');
+                console.log('[Hybrid] Disabled by DISABLE_SPARSE_VECTOR=true');
                 result = false;
                 this.cachedIsHybrid = result;
                 return result;
             } else if (isDisabled === null) {
-                console.warn(`⚠️  Invalid DISABLE_SPARSE_VECTOR value: '${disableSparseVector}'. Use true/false, 1/0, yes/no, or on/off.`);
+                console.warn(`[Hybrid] Warning: Invalid boolean value '${disableSparseVector}' for DISABLE_SPARSE_VECTOR. Use true/false, 1/0, yes/no, or on/off.`);
             }
         }
 
@@ -273,12 +273,12 @@ export class Context {
         if (useHybridSearch !== undefined && useHybridSearch !== null) {
             const isEnabled = this.parseBoolean(useHybridSearch);
             if (isEnabled !== null) {
-                console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by USE_HYBRID_SEARCH=${useHybridSearch}`);
+                console.log(`[Hybrid] ${isEnabled ? 'Enabled' : 'Disabled'} by USE_HYBRID_SEARCH=${useHybridSearch}`);
                 result = isEnabled;
                 this.cachedIsHybrid = result;
                 return result;
             } else {
-                console.warn(`⚠️  Invalid USE_HYBRID_SEARCH value: '${useHybridSearch}'. Use true/false, 1/0, yes/no, or on/off.`);
+                console.warn(`[Hybrid] Warning: Invalid boolean value '${useHybridSearch}' for USE_HYBRID_SEARCH. Use true/false, 1/0, yes/no, or on/off.`);
             }
         }
 
@@ -287,17 +287,17 @@ export class Context {
         if (hybridMode !== undefined && hybridMode !== null) {
             const isEnabled = this.parseBoolean(hybridMode);
             if (isEnabled !== null) {
-                console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by HYBRID_MODE=${hybridMode} (legacy)`);
+                console.log(`[Hybrid] ${isEnabled ? 'Enabled' : 'Disabled'} by HYBRID_MODE=${hybridMode} (legacy)`);
                 result = isEnabled;
                 this.cachedIsHybrid = result;
                 return result;
             } else {
-                console.warn(`⚠️  Invalid HYBRID_MODE value: '${hybridMode}'. Use true/false, 1/0, yes/no, or on/off.`);
+                console.warn(`[Hybrid] Warning: Invalid boolean value '${hybridMode}' for HYBRID_MODE. Use true/false, 1/0, yes/no, or on/off.`);
             }
         }
 
         // Default to false (safer default to avoid sparse vector index issues)
-        console.log('🔍 No hybrid search environment variables set, defaulting to false (semantic search only)');
+        console.log('[Hybrid] No environment variables set, defaulting to semantic search only');
         result = false;
         this.cachedIsHybrid = result;
         return result;
@@ -328,20 +328,20 @@ export class Context {
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
-        console.log(`🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
+        console.log(`[Index] Starting codebase indexing with ${searchType}: ${codebasePath}`);
 
         // 1. Load ignore patterns from various ignore files
         await this.loadIgnorePatterns(codebasePath);
 
         // 2. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
-        console.log(`Debug2: Preparing vector collection for codebase${forceReindex ? ' (FORCE REINDEX)' : ''}`);
+        console.log(`[Index] Preparing vector collection for codebase${forceReindex ? ' (FORCE REINDEX)' : ''}`);
         await this.prepareCollection(codebasePath, forceReindex);
 
         // 3. Recursively traverse codebase to get all supported files
         progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
         const codeFiles = await this.getCodeFiles(codebasePath);
-        console.log(`📁 Found ${codeFiles.length} code files`);
+        console.log(`[Index] Found ${codeFiles.length} code files`);
 
         if (codeFiles.length === 0) {
             progressCallback?.({ phase: 'No files to index', current: 100, total: 100, percentage: 100 });
@@ -361,7 +361,7 @@ export class Context {
                 // Calculate progress percentage
                 const progressPercentage = indexingStartPercentage + (fileIndex / totalFiles) * indexingRange;
 
-                console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
+                console.debug(`[Index] Processed ${fileIndex}/${totalFiles} files`);
                 progressCallback?.({
                     phase: `Processing files (${fileIndex}/${totalFiles})...`,
                     current: fileIndex,
@@ -371,7 +371,7 @@ export class Context {
             }
         );
 
-        console.log(`✅ Codebase indexing completed! Processed ${result.processedFiles} files in total, generated ${result.totalChunks} code chunks`);
+        console.log(`[Index] Completed! Processed ${result.processedFiles} files, generated ${result.totalChunks} chunks`);
 
         progressCallback?.({
             phase: 'Indexing complete!',
@@ -412,11 +412,11 @@ export class Context {
 
         if (totalChanges === 0) {
             progressCallback?.({ phase: 'No changes detected', current: 100, total: 100, percentage: 100 });
-            console.log('✅ No file changes detected.');
+            console.log('[Index] No file changes detected');
             return { added: 0, removed: 0, modified: 0 };
         }
 
-        console.log(`🔄 Found changes: ${added.length} added, ${removed.length} removed, ${modified.length} modified.`);
+        console.log(`[Index] Found changes: ${added.length} added, ${removed.length} removed, ${modified.length} modified`);
 
         let processedChanges = 0;
         const updateProgress = (phase: string) => {
@@ -450,7 +450,7 @@ export class Context {
             );
         }
 
-        console.log(`✅ Re-indexing complete. Added: ${added.length}, Removed: ${removed.length}, Modified: ${modified.length}`);
+        console.log(`[Index] Re-indexing complete. Added: ${added.length}, Removed: ${removed.length}, Modified: ${modified.length}`);
         progressCallback?.({ phase: 'Re-indexing complete!', current: totalChanges, total: totalChanges, percentage: 100 });
 
         return { added: added.length, removed: removed.length, modified: modified.length };
@@ -484,15 +484,15 @@ export class Context {
     async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
-        console.log(`🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
+        console.log(`[Search] Executing ${searchType}: "${query}" in ${codebasePath}`);
 
         const collectionName = this.getCollectionName(codebasePath);
-        console.log(`🔍 Using collection: ${collectionName}`);
+        console.log(`[Search] Using collection: ${collectionName}`);
 
         // Check if collection exists and has data
         const hasCollection = await this.vectorDatabase.hasCollection(collectionName);
         if (!hasCollection) {
-            console.log(`⚠️  Collection '${collectionName}' does not exist. Please index the codebase first.`);
+            console.log(`[Search] Collection '${collectionName}' does not exist. Please index the codebase first.`);
             return [];
         }
 
@@ -500,16 +500,16 @@ export class Context {
             try {
                 // Check collection stats to see if it has data
                 const stats = await this.vectorDatabase.query(collectionName, '', ['id'], 1);
-                console.log(`🔍 Collection '${collectionName}' exists and appears to have data`);
+                console.log(`[Search] Collection '${collectionName}' exists and appears to have data`);
             } catch (error) {
-                console.log(`⚠️  Collection '${collectionName}' exists but may be empty or not properly indexed:`, error);
+                console.log(`[Search] Collection '${collectionName}' exists but may be empty or not properly indexed:`, error);
             }
 
             // 1. Generate query vector
-            console.log(`🔍 Generating embeddings for query: "${query}"`);
+            console.log(`[Search] Generating embeddings for query: "${query}"`);
             const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
-            console.log(`✅ Generated embedding vector with dimension: ${queryEmbedding.vector.length}`);
-            console.log(`🔍 First 5 embedding values: [${queryEmbedding.vector.slice(0, 5).join(', ')}]`);
+            console.log(`[Search] Generated embedding vector with dimension: ${queryEmbedding.vector.length}`);
+            console.debug(`[Search] First 5 embedding values: [${queryEmbedding.vector.slice(0, 5).join(', ')}]`);
 
             // 2. Prepare hybrid search requests
             const searchRequests: HybridSearchRequest[] = [
@@ -527,11 +527,11 @@ export class Context {
                 }
             ];
 
-            console.log(`🔍 Search request 1 (dense): anns_field="${searchRequests[0].anns_field}", vector_dim=${queryEmbedding.vector.length}, limit=${searchRequests[0].limit}`);
-            console.log(`🔍 Search request 2 (sparse): anns_field="${searchRequests[1].anns_field}", query_text="${query}", limit=${searchRequests[1].limit}`);
+            console.debug(`[Search] Dense request: anns_field="${searchRequests[0].anns_field}", vector_dim=${queryEmbedding.vector.length}, limit=${searchRequests[0].limit}`);
+            console.debug(`[Search] Sparse request: anns_field="${searchRequests[1].anns_field}", query_text="${query}", limit=${searchRequests[1].limit}`);
 
             // 3. Execute hybrid search
-            console.log(`🔍 Executing hybrid search with RRF reranking...`);
+            console.log(`[Search] Executing hybrid search with RRF reranking...`);
             const searchResults: HybridSearchResult[] = await this.vectorDatabase.hybridSearch(
                 collectionName,
                 searchRequests,
@@ -545,7 +545,7 @@ export class Context {
                 }
             );
 
-            console.log(`🔍 Raw search results count: ${searchResults.length}`);
+            console.debug(`[Search] Raw search results count: ${searchResults.length}`);
 
             // 4. Convert to semantic search result format
             const results: SemanticSearchResult[] = searchResults.map(result => ({
@@ -557,9 +557,9 @@ export class Context {
                 score: result.score
             }));
 
-            console.log(`✅ Found ${results.length} relevant hybrid results`);
+            console.log(`[Search] Found ${results.length} relevant hybrid results`);
             if (results.length > 0) {
-                console.log(`🔍 Top result score: ${results[0].score}, path: ${results[0].relativePath}`);
+                console.debug(`[Search] Top result score: ${results[0].score}, path: ${results[0].relativePath}`);
             }
 
             return results;
@@ -585,7 +585,7 @@ export class Context {
                 score: result.score
             }));
 
-            console.log(`✅ Found ${results.length} relevant results`);
+            console.log(`[Search] Found ${results.length} relevant results`);
             return results;
         }
     }
@@ -609,7 +609,7 @@ export class Context {
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
     ): Promise<void> {
-        console.log(`🧹 Cleaning index data for ${codebasePath}...`);
+        console.log(`[Index] Cleaning index data for ${codebasePath}...`);
 
         progressCallback?.({ phase: 'Checking existing index...', current: 0, total: 100, percentage: 0 });
 
@@ -626,7 +626,7 @@ export class Context {
         await FileSynchronizer.deleteSnapshot(codebasePath);
 
         progressCallback?.({ phase: 'Index cleared', current: 100, total: 100, percentage: 100 });
-        console.log('✅ Index data cleaned');
+        console.log('[Index] Index data cleaned');
     }
 
     /**
@@ -640,7 +640,7 @@ export class Context {
         const patternSet = new Set(mergedPatterns);
         patternSet.forEach(pattern => uniquePatterns.push(pattern));
         this.ignorePatterns = uniquePatterns;
-        console.log(`🚫 Updated ignore patterns: ${ignorePatterns.length} new + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total patterns`);
+        console.log(`[Context] Updated ignore patterns: ${ignorePatterns.length} new + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total`);
     }
 
     /**
@@ -656,7 +656,7 @@ export class Context {
         const patternSet = new Set(mergedPatterns);
         patternSet.forEach(pattern => uniquePatterns.push(pattern));
         this.ignorePatterns = uniquePatterns;
-        console.log(`🚫 Added ${customPatterns.length} custom ignore patterns. Total: ${this.ignorePatterns.length} patterns`);
+        console.log(`[Context] Added ${customPatterns.length} custom ignore patterns. Total: ${this.ignorePatterns.length}`);
     }
 
     /**
@@ -664,7 +664,7 @@ export class Context {
      */
     resetIgnorePatternsToDefaults(): void {
         this.ignorePatterns = [...DEFAULT_IGNORE_PATTERNS];
-        console.log(`🔄 Reset ignore patterns to defaults: ${this.ignorePatterns.length} patterns`);
+        console.log(`[Context] Reset ignore patterns to defaults: ${this.ignorePatterns.length}`);
     }
 
     /**
@@ -673,7 +673,7 @@ export class Context {
      */
     updateEmbedding(embedding: Embedding): void {
         this.embedding = embedding;
-        console.log(`🔄 Updated embedding provider: ${embedding.getProvider()}`);
+        console.log(`[Context] Updated embedding provider: ${embedding.getProvider()}`);
     }
 
     /**
@@ -682,7 +682,7 @@ export class Context {
      */
     updateVectorDatabase(vectorDatabase: VectorDatabase): void {
         this.vectorDatabase = vectorDatabase;
-        console.log(`🔄 Updated vector database`);
+        console.log(`[Context] Updated vector database`);
     }
 
     /**
@@ -691,7 +691,7 @@ export class Context {
      */
     updateSplitter(splitter: Splitter): void {
         this.codeSplitter = splitter;
-        console.log(`🔄 Updated splitter instance`);
+        console.log(`[Context] Updated splitter instance`);
     }
 
     /**
@@ -700,26 +700,26 @@ export class Context {
     private async prepareCollection(codebasePath: string, forceReindex: boolean = false): Promise<void> {
         const isHybrid = this.getIsHybrid();
         const collectionType = isHybrid === true ? 'hybrid vector' : 'vector';
-        console.log(`🔧 Preparing ${collectionType} collection for codebase: ${codebasePath}${forceReindex ? ' (FORCE REINDEX)' : ''}`);
+        console.log(`[Index] Preparing ${collectionType} collection for codebase: ${codebasePath}${forceReindex ? ' (FORCE REINDEX)' : ''}`);
         const collectionName = this.getCollectionName(codebasePath);
 
         // Check if collection already exists
         const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
 
         if (collectionExists && !forceReindex) {
-            console.log(`📋 Collection ${collectionName} already exists, skipping creation`);
+            console.log(`[Index] Collection ${collectionName} already exists, skipping creation`);
             return;
         }
 
         if (collectionExists && forceReindex) {
-            console.log(`🗑️  Dropping existing collection ${collectionName} for force reindex...`);
+            console.log(`[Index] Dropping existing collection ${collectionName} for force reindex...`);
             await this.vectorDatabase.dropCollection(collectionName);
-            console.log(`✅ Collection ${collectionName} dropped successfully`);
+            console.log(`[Index] Collection ${collectionName} dropped successfully`);
         }
 
-        console.log(`🔍 Detecting embedding dimension for ${this.embedding.getProvider()} provider...`);
+        console.log(`[Index] Detecting embedding dimension for ${this.embedding.getProvider()} provider...`);
         const dimension = await this.embedding.detectDimension();
-        console.log(`📏 Detected dimension: ${dimension} for ${this.embedding.getProvider()}`);
+        console.log(`[Index] Detected dimension: ${dimension} for ${this.embedding.getProvider()}`);
         const dirName = path.basename(codebasePath);
 
         if (isHybrid === true) {
@@ -728,7 +728,7 @@ export class Context {
             await this.vectorDatabase.createCollection(collectionName, dimension, `Index for ${dirName}`);
         }
 
-        console.log(`✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
+        console.log(`[Index] Collection ${collectionName} created successfully (dimension: ${dimension})`);
     }
 
     /**
@@ -778,7 +778,7 @@ export class Context {
         const isHybrid = this.getIsHybrid();
         const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(envManager.get('EMBEDDING_BATCH_SIZE') || '100', 10));
         const CHUNK_LIMIT = 450000;
-        console.log(`🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
+        console.log(`[Index] Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
 
         let chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
         let processedFiles = 0;
@@ -795,9 +795,9 @@ export class Context {
 
                 // Log files with many chunks or large content
                 if (chunks.length > 50) {
-                    console.warn(`⚠️  File ${filePath} generated ${chunks.length} chunks (${Math.round(content.length / 1024)}KB)`);
+                    console.warn(`[Index] File ${filePath} generated ${chunks.length} chunks (${Math.round(content.length / 1024)}KB)`);
                 } else if (content.length > 100000) {
-                    console.log(`📄 Large file ${filePath}: ${Math.round(content.length / 1024)}KB -> ${chunks.length} chunks`);
+                    console.log(`[Index] Large file ${filePath}: ${Math.round(content.length / 1024)}KB -> ${chunks.length} chunks`);
                 }
 
                 // Add chunks to buffer
@@ -811,7 +811,7 @@ export class Context {
                             await this.processChunkBuffer(chunkBuffer);
                         } catch (error) {
                             const searchType = isHybrid === true ? 'hybrid' : 'regular';
-                            console.error(`❌ Failed to process chunk batch for ${searchType}:`, error);
+                            console.error(`[Index] Failed to process chunk batch for ${searchType}:`, error);
                             if (error instanceof Error) {
                                 console.error('Stack trace:', error.stack);
                             }
@@ -822,7 +822,7 @@ export class Context {
 
                     // Check if chunk limit is reached
                     if (totalChunks >= CHUNK_LIMIT) {
-                        console.warn(`⚠️  Chunk limit of ${CHUNK_LIMIT} reached. Stopping indexing.`);
+                        console.warn(`[Index] Chunk limit of ${CHUNK_LIMIT} reached. Stopping indexing.`);
                         limitReached = true;
                         break; // Exit the inner loop (over chunks)
                     }
@@ -836,18 +836,18 @@ export class Context {
                 }
 
             } catch (error) {
-                console.warn(`⚠️  Skipping file ${filePath}: ${error}`);
+                console.warn(`[Index] Skipping file ${filePath}: ${error}`);
             }
         }
 
         // Process any remaining chunks in the buffer
         if (chunkBuffer.length > 0) {
             const searchType = isHybrid === true ? 'hybrid' : 'regular';
-            console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks for ${searchType}`);
+            console.log(`[Index] Processing final batch of ${chunkBuffer.length} chunks for ${searchType}`);
             try {
                 await this.processChunkBuffer(chunkBuffer);
             } catch (error) {
-                console.error(`❌ Failed to process final chunk batch for ${searchType}:`, error);
+                console.error(`[Index] Failed to process final chunk batch for ${searchType}:`, error);
                 if (error instanceof Error) {
                     console.error('Stack trace:', error.stack);
                 }
@@ -876,7 +876,7 @@ export class Context {
 
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid' : 'regular';
-        console.log(`🔄 Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens) for ${searchType}`);
+        console.log(`[Index] Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens) for ${searchType}`);
         await this.processChunkBatch(chunks, codebasePath);
     }
 
@@ -1010,7 +1010,7 @@ export class Context {
                 .map(line => line.trim())
                 .filter(line => line && !line.startsWith('#')); // Filter out empty lines and comments
         } catch (error) {
-            console.warn(`⚠️  Could not read ignore file ${filePath}: ${error}`);
+            console.warn(`[Context] Could not read ignore file ${filePath}: ${error}`);
             return [];
         }
     }
@@ -1038,12 +1038,12 @@ export class Context {
             // Merge file-based patterns with existing patterns (which may include custom MCP patterns)
             if (fileBasedPatterns.length > 0) {
                 this.addCustomIgnorePatterns(fileBasedPatterns);
-                console.log(`🚫 Loaded total ${fileBasedPatterns.length} ignore patterns from all ignore files`);
+                console.log(`[Context] Loaded total ${fileBasedPatterns.length} ignore patterns from all ignore files`);
             } else {
-                console.log('📄 No ignore files found, keeping existing patterns');
+                console.log('[Context] No ignore files found, keeping existing patterns');
             }
         } catch (error) {
-            console.warn(`⚠️ Failed to load ignore patterns: ${error}`);
+            console.warn(`[Context] Failed to load ignore patterns: ${error}`);
             // Continue with existing patterns on error - don't reset them
         }
     }
@@ -1067,12 +1067,12 @@ export class Context {
             }
 
             if (ignoreFiles.length > 0) {
-                console.log(`📄 Found ignore files: ${ignoreFiles.map(f => path.basename(f)).join(', ')}`);
+                console.log(`[Context] Found ignore files: ${ignoreFiles.map(f => path.basename(f)).join(', ')}`);
             }
 
             return ignoreFiles;
         } catch (error) {
-            console.warn(`⚠️ Failed to scan for ignore files: ${error}`);
+            console.warn(`[Context] Failed to scan for ignore files: ${error}`);
             return [];
         }
     }
@@ -1101,20 +1101,20 @@ export class Context {
     private async loadIgnoreFile(filePath: string, fileName: string): Promise<string[]> {
         try {
             await fs.promises.access(filePath);
-            console.log(`📄 Found ${fileName} file at: ${filePath}`);
+            console.log(`[Context] Found ${fileName} file at: ${filePath}`);
 
             const ignorePatterns = await Context.getIgnorePatternsFromFile(filePath);
 
             if (ignorePatterns.length > 0) {
-                console.log(`🚫 Loaded ${ignorePatterns.length} ignore patterns from ${fileName}`);
+                console.log(`[Context] Loaded ${ignorePatterns.length} ignore patterns from ${fileName}`);
                 return ignorePatterns;
             } else {
-                console.log(`📄 ${fileName} file found but no valid patterns detected`);
+                console.log(`[Context] ${fileName} file found but no valid patterns detected`);
                 return [];
             }
         } catch (error) {
             if (fileName.includes('global')) {
-                console.log(`📄 No ${fileName} file found`);
+                console.log(`[Context] No ${fileName} file found`);
             }
             return [];
         }
@@ -1204,7 +1204,7 @@ export class Context {
 
             return extensions;
         } catch (error) {
-            console.warn(`⚠️  Failed to parse CUSTOM_EXTENSIONS: ${error}`);
+            console.warn(`[Context] Failed to parse CUSTOM_EXTENSIONS: ${error}`);
             return [];
         }
     }
@@ -1228,7 +1228,7 @@ export class Context {
 
             return patterns;
         } catch (error) {
-            console.warn(`⚠️  Failed to parse CUSTOM_IGNORE_PATTERNS: ${error}`);
+            console.warn(`[Context] Failed to parse CUSTOM_IGNORE_PATTERNS: ${error}`);
             return [];
         }
     }
@@ -1249,7 +1249,7 @@ export class Context {
         const mergedExtensions = [...this.supportedExtensions, ...normalizedExtensions];
         const uniqueExtensions: string[] = [...new Set(mergedExtensions)];
         this.supportedExtensions = uniqueExtensions;
-        console.log(`📎 Added ${customExtensions.length} custom extensions. Total: ${this.supportedExtensions.length} extensions`);
+        console.log(`[Context] Added ${customExtensions.length} custom extensions. Total: ${this.supportedExtensions.length} extensions`);
     }
 
     /**

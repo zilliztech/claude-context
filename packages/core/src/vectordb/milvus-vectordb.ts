@@ -77,7 +77,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     private async initializeClient(address: string): Promise<void> {
         const milvusConfig = this.config as MilvusConfig;
-        console.log('🔌 Connecting to vector database at: ', address);
+        console.log(`[Milvus] Connecting to vector database at: ${address}`);
         this.client = new MilvusClient({
             address: address,
             username: milvusConfig.username,
@@ -131,14 +131,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
             });
 
             if (result.state !== LoadState.LoadStateLoaded) {
-                console.log(`🔄 Collection '${collectionName}' is not loaded (state: ${result.state}), loading with retry...`);
+                console.log(`[Milvus] Collection '${collectionName}' is not loaded (state: ${result.state}), loading with retry...`);
                 await this.loadCollectionWithRetry(collectionName);
             } else {
-                console.log(`✅ Collection '${collectionName}' is already loaded`);
+                console.log(`[Milvus] Collection '${collectionName}' is already loaded`);
             }
         } catch (error) {
             // If we can't check the load state, assume it's not loaded and try loading
-            console.warn(`⚠️  Failed to check load state for collection '${collectionName}', attempting to load:`, error);
+            console.warn(`[Milvus] Failed to check load state for collection '${collectionName}', attempting to load:`, error);
             await this.loadCollectionWithRetry(collectionName);
         }
     }
@@ -160,7 +160,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
         let interval = initialInterval;
         const startTime = Date.now();
         
-        console.log(`⏳ Waiting for index on field '${fieldName}' in collection '${collectionName}' to be ready...`);
+        console.log(`[Milvus] Waiting for index on field '${fieldName}' in collection '${collectionName}' to be ready...`);
         
         while (Date.now() - startTime < maxWaitTime) {
             try {
@@ -170,8 +170,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 });
                 
                 // Debug logging to understand the state value
-                console.log(`📊 Index state for '${fieldName}': raw=${indexStateResult.state}, type=${typeof indexStateResult.state}, IndexState.Finished=${IndexState.Finished}`);
-                console.log(`📊 Full response:`, JSON.stringify(indexStateResult));
+                console.debug(`[Milvus] Index state for '${fieldName}': raw=${indexStateResult.state}, type=${typeof indexStateResult.state}, IndexState.Finished=${IndexState.Finished}`);
+                console.debug('[Milvus] Full response:', JSON.stringify(indexStateResult));
                 
                 // Check both numeric and potential string values
                 // Cast to any to bypass TypeScript checks while debugging
@@ -179,7 +179,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 if (stateValue === IndexState.Finished || 
                     stateValue === 3 || 
                     stateValue === 'Finished') {
-                    console.log(`✅ Index on field '${fieldName}' is ready!`);
+                    console.log(`[Milvus] Index on field '${fieldName}' is ready!`);
                     return;
                 }
                 
@@ -189,7 +189,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 }
                 
                 // Index is still in progress (building, pending, etc.), continue waiting
-                console.log(`🔄 Index on field '${fieldName}' is still building, waiting ${interval}ms...`);
+                console.debug(`[Milvus] Index on field '${fieldName}' is still building, waiting ${interval}ms...`);
                 
             } catch (error) {
                 // Check if this is a definitive IndexCreationFailedError that we just threw
@@ -199,10 +199,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 }
                 
                 // Log the error but continue retrying for transient errors
-                console.warn(`⚠️  Transient error checking index state for field '${fieldName}':`, error);
+                console.warn(`[Milvus] Transient error checking index state for field '${fieldName}':`, error);
                 
                 // For other errors (network issues, temporary failures), continue retrying
-                console.log(`🔄 Continuing to retry index check after transient error...`);
+                console.debug(`[Milvus] Continuing to retry index check after transient error...`);
             }
             
             // Wait with exponential backoff before next attempt
@@ -230,7 +230,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
         let interval = initialInterval;
         const startTime = Date.now();
         
-        console.log(`⏳ Waiting for collection '${collectionName}' to reach LoadStateLoaded state...`);
+        console.log(`[Milvus] Waiting for collection '${collectionName}' to reach LoadStateLoaded state...`);
         
         while (Date.now() - startTime < maxWaitTime) {
             try {
@@ -239,11 +239,11 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 });
                 
                 // Debug logging to understand the state value
-                console.log(`📊 Load state for '${collectionName}': ${result.state}`);
+                console.debug(`[Milvus] Load state for '${collectionName}': ${result.state}`);
                 
                 // Check if collection is fully loaded
                 if (result.state === LoadState.LoadStateLoaded) {
-                    console.log(`✅ Collection '${collectionName}' is fully loaded!`);
+                    console.log(`[Milvus] Collection '${collectionName}' is fully loaded!`);
                     return;
                 }
                 
@@ -255,7 +255,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 // LoadStateNotLoad or LoadStateLoading are transient states, continue waiting
                 
                 // Collection is still loading, continue waiting
-                console.log(`🔄 Collection '${collectionName}' is still loading, waiting ${interval}ms...`);
+                console.debug(`[Milvus] Collection '${collectionName}' is still loading, waiting ${interval}ms...`);
                 
             } catch (error) {
                 // Check if this is a definitive CollectionNotExistError that we just threw
@@ -265,10 +265,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 }
                 
                 // Log the error but continue retrying for transient errors
-                console.warn(`⚠️  Transient error checking load state for collection '${collectionName}':`, error);
+                console.warn(`[Milvus] Transient error checking load state for collection '${collectionName}':`, error);
                 
                 // For other errors (network issues, temporary failures), continue retrying
-                console.log(`🔄 Continuing to retry load state check after transient error...`);
+                console.debug(`[Milvus] Continuing to retry load state check after transient error...`);
             }
             
             // Wait with exponential backoff before next attempt
@@ -297,7 +297,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
         
         while (attempt <= maxRetries) {
             try {
-                console.log(`🔄 Loading collection '${collectionName}' to memory (attempt ${attempt}/${maxRetries})...`);
+                console.log(`[Milvus] Loading collection '${collectionName}' to memory (attempt ${attempt}/${maxRetries})...`);
                 
                 await this.client.loadCollection({
                     collection_name: collectionName,
@@ -306,18 +306,18 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 // Wait for collection to actually reach LoadStateLoaded state
                 await this.waitForCollectionLoaded(collectionName);
                 
-                console.log(`✅ Collection '${collectionName}' loaded successfully!`);
+                console.log(`[Milvus] Collection '${collectionName}' loaded successfully!`);
                 return;
                 
             } catch (error) {
-                console.error(`❌ Failed to load collection '${collectionName}' on attempt ${attempt}:`, error);
+                console.error(`[Milvus] Failed to load collection '${collectionName}' on attempt ${attempt}:`, error);
                 
                 if (attempt === maxRetries) {
                     throw new Error(`Failed to load collection '${collectionName}' after ${maxRetries} attempts: ${error}`);
                 }
                 
                 // Wait with exponential backoff before retry
-                console.log(`⏳ Retrying collection load in ${interval}ms...`);
+                console.debug(`[Milvus] Retrying collection load in ${interval}ms...`);
                 await new Promise(resolve => setTimeout(resolve, interval));
                 interval *= backoffMultiplier;
                 attempt++;
@@ -328,8 +328,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
     async createCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
         await this.ensureInitialized();
 
-        console.log('Beginning collection creation:', collectionName);
-        console.log('Collection dimension:', dimension);
+        console.log(`[Milvus] Creating collection: ${collectionName}`);
+        console.log(`[Milvus] Collection dimension: ${dimension}`);
         const schema = [
             {
                 name: 'id',
@@ -400,7 +400,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             metric_type: MetricType.COSINE,
         };
 
-        console.log(`🔧 Creating index for field 'vector' in collection '${collectionName}'...`);
+        console.log(`[Milvus] Creating index for field 'vector' in collection '${collectionName}'...`);
         await this.client.createIndex(indexParams);
 
         // Wait for index to be ready before loading collection
@@ -462,7 +462,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw new Error('MilvusClient is not initialized after ensureInitialized().');
         }
 
-        console.log('Inserting documents into collection:', collectionName);
+        console.log(`[Milvus] Inserting documents into collection: ${collectionName}`);
         const data = documents.map(doc => ({
             id: doc.id,
             vector: doc.vector,
@@ -566,7 +566,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
             return result.data || [];
         } catch (error) {
-            console.error(`❌ Failed to query collection '${collectionName}':`, error);
+            console.error(`[Milvus] Failed to query collection '${collectionName}':`, error);
             throw error;
         }
     }
@@ -574,8 +574,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
     async createHybridCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
         await this.ensureInitialized();
 
-        console.log('Beginning hybrid collection creation:', collectionName);
-        console.log('Collection dimension:', dimension);
+        console.log(`[Milvus] Creating hybrid collection: ${collectionName}`);
+        console.log(`[Milvus] Hybrid collection dimension: ${dimension}`);
 
         const schema = [
             {
@@ -666,7 +666,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             index_type: 'AUTOINDEX',
             metric_type: MetricType.COSINE,
         };
-        console.log(`🔧 Creating dense vector index for field 'vector' in collection '${collectionName}'...`);
+        console.log(`[Milvus] Creating dense vector index for field 'vector' in collection '${collectionName}'...`);
         await this.client.createIndex(denseIndexParams);
 
         // Wait for dense vector index to be ready
@@ -679,7 +679,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             index_type: 'SPARSE_INVERTED_INDEX',
             metric_type: MetricType.BM25,
         };
-        console.log(`🔧 Creating sparse vector index for field 'sparse_vector' in collection '${collectionName}'...`);
+        console.log(`[Milvus] Creating sparse vector index for field 'sparse_vector' in collection '${collectionName}'...`);
         await this.client.createIndex(sparseIndexParams);
 
         // Wait for sparse vector index to be ready
@@ -729,7 +729,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         try {
             // Generate OpenAI embedding for the first search request (dense)
-            console.log(`🔍 Preparing hybrid search for collection: ${collectionName}`);
+            console.log(`[Milvus] Preparing hybrid search for collection: ${collectionName}`);
 
             // Prepare search requests in the correct Milvus format
             const search_param_1 = {
@@ -754,19 +754,19 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 }
             };
 
-            console.log(`🔍 Dense search params:`, JSON.stringify({
+            console.debug('[Milvus] Dense search params:', JSON.stringify({
                 anns_field: search_param_1.anns_field,
                 param: search_param_1.param,
                 limit: search_param_1.limit,
                 data_length: Array.isArray(search_param_1.data[0]) ? search_param_1.data[0].length : 'N/A'
-            }, null, 2));
-            console.log(`🔍 Sparse search params:`, JSON.stringify({
+            }));
+            console.debug('[Milvus] Sparse search params:', JSON.stringify({
                 anns_field: search_param_2.anns_field,
                 param: search_param_2.param,
                 limit: search_param_2.limit,
                 query_text: typeof search_param_2.data === 'string' ? search_param_2.data.substring(0, 50) + '...' : 'N/A'
-            }, null, 2));
-            console.log(`🔍 Rerank strategy:`, JSON.stringify(rerank_strategy, null, 2));
+            }));
+            console.debug('[Milvus] Rerank strategy:', JSON.stringify(rerank_strategy));
 
             // Execute hybrid search using the correct client.search format
             const searchParams: any = {
@@ -781,25 +781,25 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 searchParams.expr = options.filterExpr;
             }
 
-            console.log(`🔍 Complete search request:`, JSON.stringify({
+            console.debug('[Milvus] Complete search request:', JSON.stringify({
                 collection_name: searchParams.collection_name,
                 data_count: searchParams.data.length,
                 limit: searchParams.limit,
                 rerank: searchParams.rerank,
                 output_fields: searchParams.output_fields,
                 expr: searchParams.expr
-            }, null, 2));
+            }));
 
             const searchResult = await this.client.search(searchParams);
 
-            console.log(`🔍 Search executed, processing results...`);
+            console.log(`[Milvus] Search executed, processing results...`);
 
             if (!searchResult.results || searchResult.results.length === 0) {
-                console.log(`⚠️  No results returned from Milvus search`);
+                console.log(`[Milvus] No results returned from Milvus search`);
                 return [];
             }
 
-            console.log(`✅ Found ${searchResult.results.length} results from hybrid search`);
+            console.log(`[Milvus] Found ${searchResult.results.length} results from hybrid search`);
 
             // Transform results to HybridSearchResult format
             return searchResult.results.map((result: any) => ({
@@ -818,7 +818,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             }));
 
         } catch (error) {
-            console.error(`❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
+            console.error(`[Milvus] Failed to perform hybrid search on collection '${collectionName}':`, error);
             throw error;
         }
     }
