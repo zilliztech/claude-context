@@ -232,7 +232,20 @@ export class ToolHandlers {
                 console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation capability`);
                 //dummy collection name
                 const collectionName = `dummy_collection_${Date.now()}`;
-                await this.context.getVectorDatabase().createCollection(collectionName, 128);
+                // Get actual embedding dimension instead of hardcoded 128
+                const embeddingProvider = this.context.getEmbedding();
+                // For custom models, we need to detect dimension first
+                if ((embeddingProvider as any).detectDimension) {
+                    try {
+                        const detectedDim = await (embeddingProvider as any).detectDimension();
+                        console.log(`[INDEX-VALIDATION] Detected embedding dimension: ${detectedDim}`);
+                    } catch (e: any) {
+                        console.warn(`[INDEX-VALIDATION] Could not detect dimension: ${e.message}`);
+                    }
+                }
+                const actualDimension = embeddingProvider.getDimension();
+                console.log(`[INDEX-VALIDATION] Using actual embedding dimension: ${actualDimension}`);
+                await this.context.getVectorDatabase().createCollection(collectionName, actualDimension);
                 if (await this.context.getVectorDatabase().hasCollection(collectionName)) {
                     console.log(`[INDEX-VALIDATION] ℹ️  Dummy collection created successfully`);
                     await this.context.getVectorDatabase().dropCollection(collectionName);

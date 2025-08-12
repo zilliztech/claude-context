@@ -103,6 +103,7 @@ export class Context {
     private supportedExtensions: string[];
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
+    private cachedIsHybrid: boolean | null = null;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -218,14 +219,56 @@ export class Context {
     }
 
     /**
-     * Get isHybrid setting from environment variable with default true
+     * Get isHybrid setting from environment variables with proper precedence
+     * Priority: DISABLE_SPARSE_VECTOR > USE_HYBRID_SEARCH > HYBRID_MODE > default false
+     * Result is cached after first call since environment variables don't change during runtime
      */
     private getIsHybrid(): boolean {
-        const isHybridEnv = envManager.get('HYBRID_MODE');
-        if (isHybridEnv === undefined || isHybridEnv === null) {
-            return true; // Default to true
+        // Return cached value if already computed
+        if (this.cachedIsHybrid !== null) {
+            return this.cachedIsHybrid;
         }
-        return isHybridEnv.toLowerCase() === 'true';
+
+        // Compute and cache the result
+        let result: boolean;
+
+        // Check DISABLE_SPARSE_VECTOR first (highest priority) - if true, disable hybrid
+        const disableSparseVector = envManager.get('DISABLE_SPARSE_VECTOR');
+        if (disableSparseVector !== undefined && disableSparseVector !== null) {
+            const isDisabled = disableSparseVector.toLowerCase() === 'true';
+            if (isDisabled) {
+                console.log('🚫 Hybrid search disabled by DISABLE_SPARSE_VECTOR=true');
+                result = false;
+                this.cachedIsHybrid = result;
+                return result;
+            }
+        }
+
+        // Check USE_HYBRID_SEARCH second (medium priority)
+        const useHybridSearch = envManager.get('USE_HYBRID_SEARCH');
+        if (useHybridSearch !== undefined && useHybridSearch !== null) {
+            const isEnabled = useHybridSearch.toLowerCase() === 'true';
+            console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by USE_HYBRID_SEARCH=${useHybridSearch}`);
+            result = isEnabled;
+            this.cachedIsHybrid = result;
+            return result;
+        }
+
+        // Check HYBRID_MODE third (legacy, lowest priority)
+        const hybridMode = envManager.get('HYBRID_MODE');
+        if (hybridMode !== undefined && hybridMode !== null) {
+            const isEnabled = hybridMode.toLowerCase() === 'true';
+            console.log(`🔍 Hybrid search ${isEnabled ? 'enabled' : 'disabled'} by HYBRID_MODE=${hybridMode} (legacy)`);
+            result = isEnabled;
+            this.cachedIsHybrid = result;
+            return result;
+        }
+
+        // Default to false (safer default to avoid sparse vector index issues)
+        console.log('🔍 No hybrid search environment variables set, defaulting to false (semantic search only)');
+        result = false;
+        this.cachedIsHybrid = result;
+        return result;
     }
 
     /**
