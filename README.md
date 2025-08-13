@@ -372,6 +372,33 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 
 </details>
 
+<details>
+<summary><strong>Zencoder</strong></summary>
+
+Zencoder offers support for MCP tools and servers in both its JetBrains and VS Code plugin versions.
+
+1. Go to the Zencoder menu (...)
+2. From the dropdown menu, select `Tools`
+3. Click on the `Add Custom MCP`
+4. Add the name (i.e. `Claude Context` and server configuration from below, and make sure to hit the `Install` button
+
+```json
+{
+    "command": "npx",
+    "args": ["@zilliz/claude-context-mcp@latest"],
+    "env": {
+      "OPENAI_API_KEY": "your-openai-api-key",
+      "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+      "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+    }
+}
+
+```
+
+5. Save the server by hitting the `Install` button.
+
+</details>
+
 
 <details>
 <summary><strong>Other MCP Clients</strong></summary>
