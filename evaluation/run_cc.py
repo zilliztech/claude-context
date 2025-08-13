@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from typing import List, Optional
 
 from retrieval.cc import CCRetrieval
-from utils.constant import evaluation_path
+from utils.constant import evaluation_path, project_path
 
 import logging
 
@@ -38,7 +38,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name_or_path",
         type=str,
-        default="SWE-bench/SWE-bench_Lite",
+        # default="SWE-bench/SWE-bench_Lite",
+        default="swe_verified_multifile_instances.json",
         help="Dataset name or path",
     )
     parser.add_argument(

@@ -41,8 +41,30 @@ Use the available tools step by step to accomplish this goal. The primary object
 
     def _prepare_instances(self) -> List[Dict]:
         if Path(self.dataset_name_or_path).exists():
-            dataset = load_from_disk(self.dataset_name_or_path)
-            dataset_name = os.path.basename(self.dataset_name_or_path)
+            # Check if it's a JSON file
+            if self.dataset_name_or_path.endswith(".json"):
+                with open(self.dataset_name_or_path, "r") as f:
+                    data = json.load(f)
+                    # If it's our custom JSON format with instances data
+                    if "instances" in data:
+                        logger.info(
+                            f"Loaded {len(data['instances'])} instances from JSON file"
+                        )
+                        if "metadata" in data and "statistics" in data["metadata"]:
+                            logger.info(f"Statistics: {data['metadata']['statistics']}")
+                        # Create a simple dict that mimics HuggingFace dataset structure
+                        dataset = {"test": data["instances"]}
+                    elif "test" in data:
+                        dataset = {"test": data["test"]}
+                    else:
+                        # Assume the JSON file itself contains the instances
+                        dataset = {"test": data if isinstance(data, list) else [data]}
+                dataset_name = os.path.basename(self.dataset_name_or_path).replace(
+                    ".json", ""
+                )
+            else:
+                dataset = load_from_disk(self.dataset_name_or_path)
+                dataset_name = os.path.basename(self.dataset_name_or_path)
         else:
             dataset = load_dataset(self.dataset_name_or_path)
             dataset_name = self.dataset_name_or_path.replace("/", "__")
@@ -62,6 +84,9 @@ Use the available tools step by step to accomplish this goal. The primary object
 
             if isinstance(dataset, (DatasetDict, IterableDatasetDict)):
                 split_instances = list(dataset[split])
+            elif isinstance(dataset, dict) and split in dataset:
+                # Handle our custom JSON format
+                split_instances = dataset[split]
             else:
                 split_instances = list(dataset)
             instances.extend(split_instances)

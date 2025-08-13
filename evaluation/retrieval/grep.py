@@ -11,7 +11,7 @@ import time
 from client import Evaluator
 from utils.llm_factory import llm_factory
 from utils.constant import project_path, evaluation_path
-from utils.format import extract_oracle_files_from_patch
+from utils.format import extract_oracle_files_from_patch, create_edit_subdirectories
 import json
 import sys
 import traceback
@@ -171,6 +171,15 @@ class GrepRetrieval(BaseRetrieval):
                 log_file = os.path.join(instance_dir, "conversation.log")
                 with open(log_file, "w") as f:
                     f.write(conversation_summary)
+
+                # Create edit subdirectories from conversation log
+                try:
+                    create_edit_subdirectories(instance_dir, conversation_summary)
+                    logger.info(f"Created edit subdirectories for {instance_id}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create edit subdirectories for {instance_id}: {e}"
+                    )
 
                 logger.info(
                     f"Retrieval completed for {instance_id}. Results saved to {instance_dir}"

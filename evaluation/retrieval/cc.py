@@ -12,7 +12,7 @@ import time
 from client import Evaluator
 from utils.llm_factory import llm_factory
 from utils.constant import project_path, evaluation_path
-from utils.format import extract_oracle_files_from_patch
+from utils.format import extract_oracle_files_from_patch, create_edit_subdirectories
 import json
 import os
 import traceback
@@ -178,19 +178,26 @@ class CCRetrieval(BaseRetrieval):
             search_tools = tools["search_tools"]
             evaluator = Evaluator(self.llm_model, search_tools)
             query = self.prompt.format(repo_path=repo_path, issue=issue)
-            conversation_summary, token_usage, file_paths, tool_stats = (
-                await evaluator.async_run(query, repo_path)
-            )
-            # Clear index to avoid sync in the background
-            clear_index_tool = tools["clear_index_tool"]
-            await clear_index_tool.ainvoke(
-                {
-                    "path": repo_path,
-                }
-            )
-            # For strong consistency, wait for a while before searching
-            time.sleep(3)
-            logger.info(f"Cleared index for {repo_path}")
+            
+            try:
+                conversation_summary, token_usage, file_paths, tool_stats = (
+                    await evaluator.async_run(query, repo_path)
+                )
+            finally:
+                # Always clear index to avoid sync in the background, even if search fails
+                clear_index_tool = tools["clear_index_tool"]
+                try:
+                    await clear_index_tool.ainvoke(
+                        {
+                            "path": repo_path,
+                        }
+                    )
+                    # For strong consistency, wait for a while before searching
+                    time.sleep(3)
+                    logger.info(f"Cleared index for {repo_path}")
+                except Exception as clear_error:
+                    logger.warning(f"Failed to clear index for {repo_path}: {clear_error}")
+            
             return file_paths, token_usage, conversation_summary, tool_stats
 
     def run(self, root_dir: str, token: str = "git") -> None:
@@ -240,6 +247,15 @@ class CCRetrieval(BaseRetrieval):
                 log_file = os.path.join(instance_dir, "conversation.log")
                 with open(log_file, "w") as f:
                     f.write(conversation_summary)
+
+                # Create edit subdirectories from conversation log
+                try:
+                    create_edit_subdirectories(instance_dir, conversation_summary)
+                    logger.info(f"Created edit subdirectories for {instance_id}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create edit subdirectories for {instance_id}: {e}"
+                    )
 
                 logger.info(
                     f"Retrieval completed for {instance_id}. Results saved to {instance_dir}"

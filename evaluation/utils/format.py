@@ -105,6 +105,109 @@ def extract_oracle_files_from_patch(patch):
     return oracle_files
 
 
+def extract_edit_calls_from_conversation_log(log_content: str):
+    """Extract all edit tool calls from conversation log content"""
+    import re
+    import hashlib
+
+    edit_calls = []
+
+    # Split content into lines for processing
+    lines = log_content.split("\n")
+    i = 0
+    edit_counter = 1
+
+    while i < len(lines):
+        line = lines[i]
+
+        # Look for Arguments: line with edit tool
+        if line.strip().startswith("Arguments:") and "'file_path'" in line:
+            # Collect the full arguments block (might span multiple lines)
+            args_block = line
+
+            # Check if the line contains complete arguments
+            if "}" in line:
+                # Arguments are on a single line
+                args_text = line
+            else:
+                # Arguments span multiple lines
+                j = i + 1
+                while j < len(lines) and "}" not in lines[j]:
+                    args_block += " " + lines[j].strip()
+                    j += 1
+                if j < len(lines):
+                    args_block += " " + lines[j].strip()
+                args_text = args_block
+
+            # Extract file_path, old_string, new_string using regex
+            file_path_match = re.search(r"'file_path':\s*'([^']*)'", args_text)
+            old_string_match = re.search(
+                r"'old_string':\s*'(.*?)'(?=,\s*'new_string')", args_text, re.DOTALL
+            )
+            new_string_match = re.search(
+                r"'new_string':\s*'(.*?)'(?=\s*})", args_text, re.DOTALL
+            )
+
+            if file_path_match and old_string_match and new_string_match:
+                file_path = file_path_match.group(1)
+                old_string = old_string_match.group(1)
+                new_string = new_string_match.group(1)
+
+                # Unescape newlines and clean up strings
+                old_string = old_string.replace("\\n", "\n").replace("\\'", "'")
+                new_string = new_string.replace("\\n", "\n").replace("\\'", "'")
+
+                # Generate unique ID
+                edit_id = f"edit_{edit_counter:03d}_{hashlib.md5(f'{file_path}{old_string}'.encode()).hexdigest()[:8]}"
+
+                edit_calls.append(
+                    {
+                        "id": edit_id,
+                        "file_path": file_path,
+                        "old_string": old_string,
+                        "new_string": new_string,
+                    }
+                )
+
+                edit_counter += 1
+
+        i += 1
+
+    return edit_calls
+
+
+def create_edit_subdirectories(instance_dir: str, conversation_summary: str) -> None:
+    """Create edit subdirectories from conversation log content"""
+    import json
+
+    edit_calls = extract_edit_calls_from_conversation_log(conversation_summary)
+
+    for edit_call in edit_calls:
+        edit_subdir = os.path.join(instance_dir, edit_call["id"])
+        os.makedirs(edit_subdir, exist_ok=True)
+
+        # Write old_string.txt
+        old_string_file = os.path.join(edit_subdir, "old_string.txt")
+        with open(old_string_file, "w", encoding="utf-8") as f:
+            f.write(edit_call["old_string"])
+
+        # Write new_string.txt
+        new_string_file = os.path.join(edit_subdir, "new_string.txt")
+        with open(new_string_file, "w", encoding="utf-8") as f:
+            f.write(edit_call["new_string"])
+
+        # Write metadata.json with file_path and other info
+        metadata_file = os.path.join(edit_subdir, "metadata.json")
+        metadata = {
+            "edit_id": edit_call["id"],
+            "file_path": edit_call["file_path"],
+            "old_string_length": len(edit_call["old_string"]),
+            "new_string_length": len(edit_call["new_string"]),
+        }
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
+
+
 def calculate_total_tokens(response):
     """Calculate total token usage from the response"""
     total_input_tokens = 0
