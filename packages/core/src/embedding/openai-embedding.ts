@@ -8,6 +8,10 @@ export interface OpenAIEmbeddingConfig {
     useOllamaModel?: boolean; // Whether this is actually an Ollama model via OAPI forwarding
 }
 
+// Constants
+const DEFAULT_OLLAMA_DIMENSION = 768;
+const OPENAI_API_DOMAIN = 'api.openai.com';
+
 export class OpenAIEmbedding extends Embedding {
     private client: OpenAI;
     private config: OpenAIEmbeddingConfig;
@@ -38,7 +42,7 @@ export class OpenAIEmbedding extends Embedding {
         if (this.isOllamaViaOAPI) {
             console.log(`[OpenAI] Configured for Ollama model ${config.model} via OAPI forwarding`);
             // Reset dimension since Ollama models have different dimensions
-            this.dimension = 768; // Common Ollama embedding dimension
+            this.dimension = DEFAULT_OLLAMA_DIMENSION; // Common Ollama embedding dimension
         } else {
             // Set dimension detection flag for known models
             const knownModels = OpenAIEmbedding.getSupportedModels();
@@ -56,7 +60,7 @@ export class OpenAIEmbedding extends Embedding {
         if (!baseURL) return baseURL;
         
         // If it's the official OpenAI API, don't modify
-        if (baseURL.includes('api.openai.com')) {
+        if (baseURL.includes(OPENAI_API_DOMAIN)) {
             return baseURL;
         }
         
@@ -96,7 +100,7 @@ export class OpenAIEmbedding extends Embedding {
             });
             
             if (!response.data || response.data.length === 0) {
-                throw new Error(`API returned empty response. This might indicate: 1) Incorrect baseURL (missing /v1?), 2) Invalid API key, 3) Model not available, or 4) Input text was filtered out`);
+                throw new Error(OpenAIEmbedding.getEmptyResponseError());
             }
             
             return response.data[0].embedding.length;
@@ -128,7 +132,7 @@ export class OpenAIEmbedding extends Embedding {
             });
             
             if (!response.data || response.data.length === 0) {
-                throw new Error(`OAPI forwarding returned empty response for Ollama model ${model}. Check: 1) OAPI service is running, 2) Ollama model is available, 3) API key is valid for OAPI service`);
+                throw new Error(OpenAIEmbedding.getOllamaEmptyResponseError(model));
             }
             
             const dimension = response.data[0].embedding.length;
@@ -167,7 +171,7 @@ export class OpenAIEmbedding extends Embedding {
 
             // Validate response before accessing data
             if (!response.data || response.data.length === 0) {
-                throw new Error(`API returned empty response. This might indicate: 1) Incorrect baseURL (missing /v1?), 2) Invalid API key, 3) Model not available, or 4) Input text was filtered out`);
+                throw new Error(OpenAIEmbedding.getEmptyResponseError());
             }
             
             return {
@@ -240,7 +244,7 @@ export class OpenAIEmbedding extends Embedding {
 
             // Validate response array length matches input
             if (!response.data || response.data.length !== processedTexts.length) {
-                throw new Error(`API returned ${response.data?.length || 0} embeddings but expected ${processedTexts.length}. This might indicate: 1) Some texts were filtered/rejected, 2) API rate limiting, 3) Invalid API key, or 4) OAPI forwarding issues`);
+                throw new Error(OpenAIEmbedding.getBatchMismatchError(response.data?.length || 0, processedTexts.length));
             }
 
             return response.data.map((item) => ({
@@ -276,7 +280,7 @@ export class OpenAIEmbedding extends Embedding {
             
             // Critical validation for OAPI forwarding to Ollama
             if (!response.data || response.data.length !== processedTexts.length) {
-                throw new Error(`OAPI forwarding returned ${response.data?.length || 0} embeddings but expected ${processedTexts.length} for Ollama model ${model}. This indicates: 1) Some texts were rejected by Ollama, 2) OAPI service issues, 3) Ollama model capacity limits. Check OAPI logs and Ollama status.`);
+                throw new Error(OpenAIEmbedding.getOllamaBatchMismatchError(response.data?.length || 0, processedTexts.length, model));
             }
             
             return response.data.map((item) => ({
@@ -363,6 +367,25 @@ export class OpenAIEmbedding extends Embedding {
                 description: 'Legacy model (use text-embedding-3-small instead)'
             }
         };
+    }
+
+    /**
+     * Error message generators for consistent error reporting
+     */
+    private static getEmptyResponseError(): string {
+        return `API returned empty response. This might indicate: 1) Incorrect baseURL (missing /v1?), 2) Invalid API key, 3) Model not available, or 4) Input text was filtered out`;
+    }
+
+    private static getOllamaEmptyResponseError(model: string): string {
+        return `OAPI forwarding returned empty response for Ollama model ${model}. Check: 1) OAPI service is running, 2) Ollama model is available, 3) API key is valid for OAPI service`;
+    }
+
+    private static getBatchMismatchError(actual: number, expected: number): string {
+        return `API returned ${actual} embeddings but expected ${expected}. This might indicate: 1) Some texts were filtered/rejected, 2) API rate limiting, 3) Invalid API key, or 4) OAPI forwarding issues`;
+    }
+
+    private static getOllamaBatchMismatchError(actual: number, expected: number, model: string): string {
+        return `OAPI forwarding returned ${actual} embeddings but expected ${expected} for Ollama model ${model}. This indicates: 1) Some texts were rejected by Ollama, 2) OAPI service issues, 3) Ollama model capacity limits. Check OAPI logs and Ollama status.`;
     }
 
     /**

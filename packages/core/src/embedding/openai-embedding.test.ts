@@ -146,7 +146,7 @@ describe('OpenAIEmbedding OAPI Forwarding', () => {
       mockEmbeddingsCreate.mockResolvedValue({ data: [{ embedding: [1,2,3] }] });
 
       await expect(embedding.embedBatch(['text1', 'text2'])).rejects.toThrow(
-        'OAPI forwarding returned 1 embeddings but expected 2 for Ollama model nomic-embed-text. This indicates: 1) Some texts were rejected by Ollama, 2) OAPI service issues, 3) Ollama model capacity limits. Check OAPI logs and Ollama status.'
+        'OAPI forwarding returned 1 embeddings but expected 2 for Ollama model nomic-embed-text.'
       );
     });
   });
@@ -190,7 +190,7 @@ describe('OpenAIEmbedding OAPI Forwarding', () => {
       mockEmbeddingsCreate.mockResolvedValue({ data: [] });
 
       await expect(embedding.embed('test')).rejects.toThrow(
-        'API returned empty response. This might indicate: 1) Incorrect baseURL (missing /v1?), 2) Invalid API key, 3) Model not available, or 4) Input text was filtered out'
+        'API returned empty response.'
       );
     });
 
