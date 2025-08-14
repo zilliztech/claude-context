@@ -103,7 +103,7 @@ export class GeminiEmbedding extends Embedding {
         operation: () => Promise<T>,
         context: string
     ): Promise<T> {
-        let lastError: any;
+        let lastError: Error = new Error("No embedding attempts were made.");
         
         for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
             try {
@@ -195,11 +195,8 @@ export class GeminiEmbedding extends Embedding {
                 // If batch processing fails, fall back to individual processing
                 console.log(`[Gemini] Batch processing failed, falling back to individual processing: ${error instanceof Error ? error.message : String(error)}`);
                 
-                const results: EmbeddingVector[] = [];
-                for (const text of processedTexts) {
-                    const result = await this.embed(text);
-                    results.push(result);
-                }
+                // Use parallel processing for better performance
+                const results = await Promise.all(processedTexts.map(text => this.embed(text)));
                 return results;
             }
         }, 'batch embedding');
