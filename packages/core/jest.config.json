@@ -1,0 +1,19 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>/src"],
+  "testMatch": ["**/*.test.ts", "**/*.spec.ts"],
+  "collectCoverageFrom": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.d.ts",
+    "!src/**/*.test.{ts,tsx}",
+    "!src/**/*.spec.{ts,tsx}"
+  ],
+  "coverageReporters": ["text", "lcov", "html"],
+  "setupFilesAfterEnv": [],
+  "transform": {
+    "^.+\\.(ts|tsx)$": "ts-jest"
+  },
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"],
+  "testTimeout": 10000
+}
