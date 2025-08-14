@@ -1,4 +1,4 @@
-import { OpenAI } from 'openai';
+import OpenAI from 'openai';
 import { OpenAIEmbedding } from './openai-embedding';
 import type { EmbeddingVector } from './base-embedding';
 
@@ -12,7 +12,7 @@ jest.mock('openai', () => {
   }));
 });
 
-const MockOpenAI = OpenAI as jest.Mock;
+const MockOpenAI = OpenAI as unknown as jest.Mock;
 
 describe('OpenAIEmbedding OAPI Forwarding', () => {
   const originalEnv = process.env;
