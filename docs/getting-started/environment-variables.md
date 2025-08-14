@@ -37,6 +37,11 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `OLLAMA_HOST` | Ollama server URL | `http://127.0.0.1:11434` |
 | `OLLAMA_MODEL` | Model name | `nomic-embed-text` |
 
+### OpenAI Custom Base (Ollama Forwarding)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_CUSTOM_BASE_USING_OLLAMA_MODEL` | Enable OAPI forwarding for Ollama models via OpenAI provider. Set to `true` when using OpenAI-compatible API endpoints that forward to Ollama | `false` |
+
 ### Advanced Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|

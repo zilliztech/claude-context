@@ -137,7 +137,7 @@ describe('OpenAIEmbedding OAPI Forwarding', () => {
       mockEmbeddingsCreate.mockResolvedValue({ data: [] });
 
       await expect(embedding.embed('test')).rejects.toThrow(
-        'OAPI forwarding returned empty response for Ollama model nomic-embed-text. Check OAPI service and Ollama model availability.'
+        'Failed to detect Ollama dimension via OAPI for nomic-embed-text'
       );
     });
 
