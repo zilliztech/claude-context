@@ -16,12 +16,10 @@ export class OpenAIEmbedding extends Embedding {
     private client: OpenAI;
     private config: OpenAIEmbeddingConfig;
     private dimension: number = 1536; // Default dimension for text-embedding-3-small
-    private dimensionDetected: boolean = false; // Track if dimension has been detected
-    private dimensionDetectionPromise: Promise<number> | null = null; // Track detection process
+    private isDimensionDetected: boolean = false; // Track if dimension has been detected for any provider type
+    private dimensionDetectionPromise: Promise<number> | null = null; // Track detection process (unified for all providers)
     protected maxTokens: number = 8192; // Maximum tokens for OpenAI embedding models
     private isOllamaViaOAPI: boolean = false; // Whether using Ollama model via OAPI
-    private isOllamaDimensionDetected: boolean = false; // Track if OAPI dimension has been detected
-    private ollamaDimensionDetectionPromise: Promise<number> | null = null; // Track OAPI detection process
 
     constructor(config: OpenAIEmbeddingConfig) {
         super();
@@ -40,7 +38,7 @@ export class OpenAIEmbedding extends Embedding {
         });
         
         if (this.isOllamaViaOAPI) {
-            console.log(`[OpenAI] Configured for Ollama model ${config.model} via OAPI forwarding`);
+            this.log(`Configured for Ollama model ${config.model} via OAPI forwarding`);
             // Reset dimension since Ollama models have different dimensions
             this.dimension = DEFAULT_OLLAMA_DIMENSION; // Common Ollama embedding dimension
         } else {
@@ -48,8 +46,19 @@ export class OpenAIEmbedding extends Embedding {
             const knownModels = OpenAIEmbedding.getSupportedModels();
             if (knownModels[config.model]) {
                 this.dimension = knownModels[config.model].dimension;
-                this.dimensionDetected = true;
+                this.isDimensionDetected = true;
             }
+        }
+    }
+
+    /**
+     * Internal logging method that can be easily controlled
+     */
+    private log(message: string): void {
+        // In production, this could be replaced with proper logging library
+        // For now, only log if debugging is enabled
+        if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_EMBEDDINGS) {
+            console.log(`[OpenAI] ${message}`);
         }
     }
 
@@ -67,7 +76,7 @@ export class OpenAIEmbedding extends Embedding {
         // For custom endpoints, ensure /v1 path is present
         if (!baseURL.endsWith('/v1') && !baseURL.includes('/v1/')) {
             const normalizedURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
-            console.log(`[OpenAI] Auto-correcting baseURL: ${baseURL} → ${normalizedURL}/v1`);
+            this.log(`Auto-correcting baseURL: ${baseURL} → ${normalizedURL}/v1`);
             return `${normalizedURL}/v1`;
         }
         
@@ -121,7 +130,7 @@ export class OpenAIEmbedding extends Embedding {
      * Detect dimension for Ollama models accessed via OAPI
      */
     private async detectOllamaDimensionViaOAPI(testText: string, model: string): Promise<number> {
-        console.log(`[OpenAI] Detecting Ollama model dimension via OAPI for ${model}...`);
+        this.log(`Detecting Ollama model dimension via OAPI for ${model}...`);
         
         try {
             const processedText = this.preprocessText(testText);
@@ -136,7 +145,7 @@ export class OpenAIEmbedding extends Embedding {
             }
             
             const dimension = response.data[0].embedding.length;
-            console.log(`[OpenAI] Detected Ollama dimension via OAPI: ${dimension}`);
+            this.log(`Detected Ollama dimension via OAPI: ${dimension}`);
             return dimension;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -157,8 +166,8 @@ export class OpenAIEmbedding extends Embedding {
         const knownModels = OpenAIEmbedding.getSupportedModels();
         if (knownModels[model] && this.dimension !== knownModels[model].dimension) {
             this.dimension = knownModels[model].dimension;
-            this.dimensionDetected = true;
-        } else if (!knownModels[model] && !this.dimensionDetected) {
+            this.isDimensionDetected = true;
+        } else if (!knownModels[model] && !this.isDimensionDetected) {
             await this.ensureDimensionDetected(model);
         }
 
@@ -192,7 +201,7 @@ export class OpenAIEmbedding extends Embedding {
         const model = this.config.model;
         
         // Detect dimension if not already detected for Ollama
-        if (!this.isOllamaDimensionDetected) {
+        if (!this.isDimensionDetected) {
             await this.ensureOllamaDimensionDetected(model);
         }
         
@@ -230,8 +239,8 @@ export class OpenAIEmbedding extends Embedding {
         const knownModels = OpenAIEmbedding.getSupportedModels();
         if (knownModels[model] && this.dimension !== knownModels[model].dimension) {
             this.dimension = knownModels[model].dimension;
-            this.dimensionDetected = true;
-        } else if (!knownModels[model] && !this.dimensionDetected) {
+            this.isDimensionDetected = true;
+        } else if (!knownModels[model] && !this.isDimensionDetected) {
             await this.ensureDimensionDetected(model);
         }
 
@@ -261,13 +270,13 @@ export class OpenAIEmbedding extends Embedding {
      * Batch embed using Ollama model via OAPI forwarding
      */
     private async embedBatchOllamaViaOAPI(texts: string[]): Promise<EmbeddingVector[]> {
-        console.log(`[OpenAI] Batch embedding ${texts.length} texts with Ollama model ${this.config.model} via OAPI...`);
+        this.log(`Batch embedding ${texts.length} texts with Ollama model ${this.config.model} via OAPI...`);
         
         const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model;
         
         // Detect dimension if not already detected for Ollama
-        if (!this.isOllamaDimensionDetected) {
+        if (!this.isDimensionDetected) {
             await this.ensureOllamaDimensionDetected(model);
         }
         
@@ -321,17 +330,15 @@ export class OpenAIEmbedding extends Embedding {
         this.config.model = model;
         
         // Reset all detection states
-        this.dimensionDetected = false;
-        this.isOllamaDimensionDetected = false;
+        this.isDimensionDetected = false;
         this.dimensionDetectionPromise = null;
-        this.ollamaDimensionDetectionPromise = null;
 
         const knownModels = OpenAIEmbedding.getSupportedModels();
 
         if (knownModels[model] && !this.isOllamaViaOAPI) {
             // Known OpenAI model
             this.dimension = knownModels[model].dimension;
-            this.dimensionDetected = true;
+            this.isDimensionDetected = true;
         } else {
             // Unknown model or OAPI model - detect dimension
             if (this.isOllamaViaOAPI) {
@@ -392,7 +399,7 @@ export class OpenAIEmbedding extends Embedding {
      * Ensure dimension is detected for standard OpenAI models (race condition safe)
      */
     private async ensureDimensionDetected(model: string): Promise<void> {
-        if (this.dimensionDetected) {
+        if (this.isDimensionDetected) {
             return;
         }
 
@@ -404,7 +411,7 @@ export class OpenAIEmbedding extends Embedding {
         this.dimensionDetectionPromise = this.detectDimension();
         try {
             this.dimension = await this.dimensionDetectionPromise;
-            this.dimensionDetected = true;
+            this.isDimensionDetected = true;
         } finally {
             this.dimensionDetectionPromise = null;
         }
@@ -414,21 +421,21 @@ export class OpenAIEmbedding extends Embedding {
      * Ensure OAPI dimension is detected for Ollama models (race condition safe)
      */
     private async ensureOllamaDimensionDetected(model: string): Promise<void> {
-        if (this.isOllamaDimensionDetected) {
+        if (this.isDimensionDetected) {
             return;
         }
 
-        if (this.ollamaDimensionDetectionPromise) {
-            await this.ollamaDimensionDetectionPromise;
+        if (this.dimensionDetectionPromise) {
+            await this.dimensionDetectionPromise;
             return;
         }
 
-        this.ollamaDimensionDetectionPromise = this.detectOllamaDimensionViaOAPI('test', model);
+        this.dimensionDetectionPromise = this.detectOllamaDimensionViaOAPI('test', model);
         try {
-            this.dimension = await this.ollamaDimensionDetectionPromise;
-            this.isOllamaDimensionDetected = true;
+            this.dimension = await this.dimensionDetectionPromise;
+            this.isDimensionDetected = true;
         } finally {
-            this.ollamaDimensionDetectionPromise = null;
+            this.dimensionDetectionPromise = null;
         }
     }
 } 
