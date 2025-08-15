@@ -109,7 +109,8 @@ export class GeminiEmbedding extends Embedding {
             try {
                 return await operation();
             } catch (error) {
-                lastError = error;
+                // Type-safe error handling: ensure error is properly typed as Error
+                lastError = error instanceof Error ? error : new Error(String(error));
                 
                 // Don't retry on last attempt
                 if (attempt === this.maxRetries) {
