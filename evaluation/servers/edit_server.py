@@ -29,6 +29,7 @@ def edit(file_path: str, old_string: str, new_string: str) -> str:
     Returns:
         A string indicating the file has been successfully modified.
     """
+    # Mock the edit operation
     return f"Successfully modified file: {file_path}"
 
 

@@ -108,20 +108,18 @@ def extract_oracle_files_from_patch(patch):
 def extract_edit_calls_from_conversation_log(log_content: str):
     """Extract all edit tool calls from conversation log content"""
     import re
-    import hashlib
 
     edit_calls = []
 
     # Split content into lines for processing
     lines = log_content.split("\n")
     i = 0
-    edit_counter = 1
 
     while i < len(lines):
         line = lines[i]
 
-        # Look for Arguments: line with edit tool
-        if line.strip().startswith("Arguments:") and "'file_path'" in line:
+        # Look for Arguments: line with edit tool (may have leading whitespace)
+        if "Arguments:" in line and "'file_path'" in line:
             # Collect the full arguments block (might span multiple lines)
             args_block = line
 
@@ -133,19 +131,25 @@ def extract_edit_calls_from_conversation_log(log_content: str):
                 # Arguments span multiple lines
                 j = i + 1
                 while j < len(lines) and "}" not in lines[j]:
-                    args_block += " " + lines[j].strip()
+                    args_block += (
+                        "\n" + lines[j]
+                    )  # Keep original formatting including newlines
                     j += 1
                 if j < len(lines):
-                    args_block += " " + lines[j].strip()
+                    args_block += "\n" + lines[j]
                 args_text = args_block
 
             # Extract file_path, old_string, new_string using regex
             file_path_match = re.search(r"'file_path':\s*'([^']*)'", args_text)
+            # old_string can be either single-quoted or double-quoted
             old_string_match = re.search(
-                r"'old_string':\s*'(.*?)'(?=,\s*'new_string')", args_text, re.DOTALL
+                r"'old_string':\s*[\"'](.*?)[\"'](?=,\s*'new_string')",
+                args_text,
+                re.DOTALL,
             )
+            # new_string can be either single-quoted or double-quoted
             new_string_match = re.search(
-                r"'new_string':\s*'(.*?)'(?=\s*})", args_text, re.DOTALL
+                r"'new_string':\s*[\"'](.*?)[\"'](?=\s*})", args_text, re.DOTALL
             )
 
             if file_path_match and old_string_match and new_string_match:
@@ -157,55 +161,102 @@ def extract_edit_calls_from_conversation_log(log_content: str):
                 old_string = old_string.replace("\\n", "\n").replace("\\'", "'")
                 new_string = new_string.replace("\\n", "\n").replace("\\'", "'")
 
-                # Generate unique ID
-                edit_id = f"edit_{edit_counter:03d}_{hashlib.md5(f'{file_path}{old_string}'.encode()).hexdigest()[:8]}"
-
                 edit_calls.append(
                     {
-                        "id": edit_id,
                         "file_path": file_path,
                         "old_string": old_string,
                         "new_string": new_string,
                     }
                 )
 
-                edit_counter += 1
-
         i += 1
 
     return edit_calls
 
 
-def create_edit_subdirectories(instance_dir: str, conversation_summary: str) -> None:
-    """Create edit subdirectories from conversation log content"""
-    import json
+def find_line_number_for_old_string(file_path: str, old_string: str):
+    """Find the line number where old_string starts in the file"""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
+        # Find the position of old_string in the content
+        pos = content.find(old_string)
+        if pos == -1:
+            return None
+
+        # Count lines up to that position
+        line_num = content[:pos].count("\n") + 1
+        return line_num
+    except Exception:
+        return None
+
+
+def generate_unified_diff(file_path: str, old_string: str, new_string: str):
+    """Generate unified diff format for a single edit"""
+    import difflib
+    import os
+
+    # Get the relative file path for cleaner display
+    rel_path = os.path.relpath(file_path) if os.path.exists(file_path) else file_path
+
+    # Find line number where change occurs
+    start_line = find_line_number_for_old_string(file_path, old_string)
+
+    # Split strings into lines for difflib
+    old_lines = old_string.splitlines(keepends=True)
+    new_lines = new_string.splitlines(keepends=True)
+
+    # Generate diff with context
+    diff_lines = list(
+        difflib.unified_diff(
+            old_lines,
+            new_lines,
+            fromfile=f"a/{rel_path}",
+            tofile=f"b/{rel_path}",
+            lineterm="",
+            n=3,  # 3 lines of context
+        )
+    )
+
+    # If we found the line number, add it as a comment
+    result = []
+    if start_line is not None:
+        result.append(f"# Edit starting at line {start_line}")
+
+    result.extend(diff_lines)
+    return "\n".join(result)
+
+
+def create_unified_diff_file(instance_dir: str, conversation_summary: str) -> None:
+    """Create a unified diff file from conversation log content"""
     edit_calls = extract_edit_calls_from_conversation_log(conversation_summary)
 
-    for edit_call in edit_calls:
-        edit_subdir = os.path.join(instance_dir, edit_call["id"])
-        os.makedirs(edit_subdir, exist_ok=True)
+    if not edit_calls:
+        return
 
-        # Write old_string.txt
-        old_string_file = os.path.join(edit_subdir, "old_string.txt")
-        with open(old_string_file, "w", encoding="utf-8") as f:
-            f.write(edit_call["old_string"])
+    diff_content = []
+    diff_content.append("# Unified diff of all edits made during retrieval")
+    diff_content.append("# Generated from conversation log")
+    diff_content.append("")
 
-        # Write new_string.txt
-        new_string_file = os.path.join(edit_subdir, "new_string.txt")
-        with open(new_string_file, "w", encoding="utf-8") as f:
-            f.write(edit_call["new_string"])
+    for i, edit_call in enumerate(edit_calls, 1):
+        diff_content.append(f"# Edit {i}: {edit_call['file_path']}")
+        diff_content.append("")
 
-        # Write metadata.json with file_path and other info
-        metadata_file = os.path.join(edit_subdir, "metadata.json")
-        metadata = {
-            "edit_id": edit_call["id"],
-            "file_path": edit_call["file_path"],
-            "old_string_length": len(edit_call["old_string"]),
-            "new_string_length": len(edit_call["new_string"]),
-        }
-        with open(metadata_file, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2)
+        unified_diff = generate_unified_diff(
+            edit_call["file_path"], edit_call["old_string"], edit_call["new_string"]
+        )
+
+        diff_content.append(unified_diff)
+        diff_content.append("")
+        diff_content.append("=" * 80)
+        diff_content.append("")
+
+    # Write to changes.diff file
+    diff_file = os.path.join(instance_dir, "changes.diff")
+    with open(diff_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(diff_content))
 
 
 def calculate_total_tokens(response):
@@ -213,17 +264,25 @@ def calculate_total_tokens(response):
     total_input_tokens = 0
     total_output_tokens = 0
     total_tokens = 0
+    max_single_turn_tokens = 0
 
     if "messages" in response:
         messages = response["messages"]
 
         for message in messages:
+            current_turn_tokens = 0
+
             # Check for usage metadata in AI messages
             if hasattr(message, "usage_metadata"):
                 usage = message.usage_metadata
-                total_input_tokens += usage.get("input_tokens", 0)
-                total_output_tokens += usage.get("output_tokens", 0)
-                total_tokens += usage.get("total_tokens", 0)
+                input_tokens = usage.get("input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+                turn_total = usage.get("total_tokens", input_tokens + output_tokens)
+
+                total_input_tokens += input_tokens
+                total_output_tokens += output_tokens
+                total_tokens += turn_total
+                current_turn_tokens = turn_total
 
             # Also check response_metadata for additional usage info
             elif (
@@ -231,15 +290,25 @@ def calculate_total_tokens(response):
                 and "usage" in message.response_metadata
             ):
                 usage = message.response_metadata["usage"]
-                total_input_tokens += usage.get("input_tokens", 0)
-                total_output_tokens += usage.get("output_tokens", 0)
+                input_tokens = usage.get("input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+
+                total_input_tokens += input_tokens
+                total_output_tokens += output_tokens
+
                 # Calculate total if not provided
                 if "total_tokens" in usage:
-                    total_tokens += usage["total_tokens"]
+                    turn_total = usage["total_tokens"]
+                    total_tokens += turn_total
                 else:
-                    total_tokens += usage.get("input_tokens", 0) + usage.get(
-                        "output_tokens", 0
-                    )
+                    turn_total = input_tokens + output_tokens
+                    total_tokens += turn_total
+
+                current_turn_tokens = turn_total
+
+            # Track maximum single turn tokens
+            if current_turn_tokens > max_single_turn_tokens:
+                max_single_turn_tokens = current_turn_tokens
 
     return {
         "input_tokens": total_input_tokens,
@@ -249,6 +318,7 @@ def calculate_total_tokens(response):
             if total_tokens > 0
             else total_input_tokens + total_output_tokens
         ),
+        "max_single_turn_tokens": max_single_turn_tokens,
     }
 
 
@@ -259,6 +329,7 @@ def print_token_usage(response):
     print(f"📥 Input Tokens:  {usage['input_tokens']:,}")
     print(f"📤 Output Tokens: {usage['output_tokens']:,}")
     print(f"🔢 Total Tokens:  {usage['total_tokens']:,}")
+    print(f"🎯 Max Single Turn: {usage['max_single_turn_tokens']:,}")
 
 
 def truncate_long_content(content, max_lines=30):

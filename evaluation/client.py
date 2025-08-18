@@ -33,7 +33,7 @@ class Evaluator:
         """Internal async method to run the query"""
         response = await self.agent.ainvoke(
             {"messages": [{"role": "user", "content": query}]},
-            config={"recursion_limit": 75},
+            config={"recursion_limit": 150},
         )
 
         # Extract data without printing

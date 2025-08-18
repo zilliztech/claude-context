@@ -2,6 +2,10 @@
 """
 A grep server using MCP (Model Context Protocol).
 This server provides grep functionality to search for regular expression patterns within files.
+
+Implementation logic inspired by Gemini CLI's grep.ts:
+https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/grep.ts
+Adapted from TypeScript to Python implementation with similar fallback strategy.
 """
 
 import os
@@ -11,6 +15,21 @@ from mcp.server.fastmcp import FastMCP
 
 # Create the MCP server
 mcp = FastMCP("Grep Server")
+
+
+def is_git_repository(path: str) -> bool:
+    """Check if the given path is inside a git repository."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return False
 
 
 @mcp.tool()
@@ -35,7 +54,79 @@ def search_text(
         return {"error": f"Path does not exist: {search_path}", "matches": []}
 
     try:
-        # Build grep command
+        # Check if we're in a git repository and try git grep first
+        if is_git_repository(search_path):
+            try:
+                # Build git grep command
+                git_cmd = ["git", "grep", "-n", "-E"]
+
+                # Add include pattern if specified (git grep uses different syntax)
+                if include:
+                    git_cmd.extend(["--", include])
+                else:
+                    git_cmd.append("--")
+
+                # Add pattern
+                git_cmd.insert(-1, pattern)  # Insert pattern before the "--" separator
+
+                # Execute git grep command
+                result = subprocess.run(
+                    git_cmd,
+                    cwd=search_path,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                    timeout=30,
+                )
+
+                # If git grep succeeds, use its output
+                if result.returncode == 0:
+                    # Parse git grep output and return results
+                    matches = []
+                    if result.stdout:
+                        for line in result.stdout.strip().split("\n"):
+                            if ":" in line:
+                                # Parse git grep output format: filepath:line_number:content
+                                parts = line.split(":", 2)
+                                if len(parts) >= 3:
+                                    file_path = parts[0]
+                                    try:
+                                        line_number = int(parts[1])
+                                        line_content = parts[2]
+                                        matches.append(
+                                            {
+                                                "file": os.path.join(
+                                                    search_path, file_path
+                                                )
+                                                if not os.path.isabs(file_path)
+                                                else file_path,
+                                                "line_number": line_number,
+                                                "line_content": line_content,
+                                                "match": pattern,
+                                            }
+                                        )
+                                    except ValueError:
+                                        continue
+
+                    return {
+                        "pattern": pattern,
+                        "search_path": search_path,
+                        "total_matches": len(matches),
+                        "matches": matches,
+                        "command": " ".join(git_cmd),
+                        "method": "git grep",
+                    }
+
+            except (
+                subprocess.SubprocessError,
+                subprocess.TimeoutExpired,
+                FileNotFoundError,
+            ):
+                # Git grep failed, fall back to regular grep
+                pass
+
+        # Fallback: Build regular grep command
         cmd = [
             "grep",
             "-n",
@@ -112,6 +203,7 @@ def search_text(
             "total_matches": len(matches),
             "matches": matches,
             "command": " ".join(cmd),  # Include the actual command for debugging
+            "method": "system grep",
         }
 
     except subprocess.SubprocessError as e:

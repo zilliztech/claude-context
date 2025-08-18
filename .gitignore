@@ -64,3 +64,5 @@ CLAUDE.md
 
 evaluation/repos
 repos
+
+evaluation/retrieval_results*
