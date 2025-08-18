@@ -574,6 +574,16 @@ Check the `/examples` directory for complete usage examples:
 
 ---
 
+## 📊 Evaluation
+
+Our controlled evaluation demonstrates that Claude Context MCP achieves ~40% token reduction under the condition of equivalent retrieval quality. This translates to significant cost and time savings in production environments. This also means that, under the constraint of limited token context length, using Claude Context yields better retrieval and answer results.
+
+![MCP Efficiency Analysis](assets/mcp_efficiency_analysis_chart.png)
+
+For detailed evaluation methodology and results, see the [evaluation directory](evaluation/).
+
+---
+
 ## ❓ FAQ
 
 **Common Questions:**

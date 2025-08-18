@@ -61,3 +61,8 @@ __pycache__/
 CLAUDE.md
 
 .cursor/*
+
+evaluation/repos
+repos
+
+evaluation/retrieval_results*
