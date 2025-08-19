@@ -1,4 +1,5 @@
 import { MilvusClient, DataType, MetricType, FunctionType, LoadState, IndexState } from '@zilliz/milvus2-sdk-node';
+import { envManager } from '../utils/env-manager';
 import {
     VectorDocument,
     SearchOptions,
@@ -145,14 +146,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     /**
      * Wait for an index to be ready before proceeding
-     * Polls index status with exponential backoff up to 60 seconds
+     * Polls index status with exponential backoff (configurable timeout)
      */
     protected async waitForIndexReady(collectionName: string, fieldName: string): Promise<void> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        const maxWaitTime = 60000; // 60 seconds
+        const maxWaitTime = parseInt(envManager.get('INDEX_READY_TIMEOUT_MS') || '60000', 10);
         const initialInterval = 500; // 500ms
         const maxInterval = 5000; // 5 seconds
         const backoffMultiplier = 1.5;
@@ -169,16 +170,13 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     field_name: fieldName
                 });
                 
-                // Debug logging to understand the state value
-                console.debug(`[Milvus] Index state for '${fieldName}': raw=${indexStateResult.state}, type=${typeof indexStateResult.state}, IndexState.Finished=${IndexState.Finished}`);
-                console.debug('[Milvus] Full response:', JSON.stringify(indexStateResult));
+                // Minimal, safe debug logging
+                console.debug(`[Milvus] Index state for '${fieldName}': ${indexStateResult.state} (Finished=${IndexState.Finished})`);
                 
                 // Check both numeric and potential string values
                 // Cast to any to bypass TypeScript checks while debugging
                 const stateValue = indexStateResult.state as any;
-                if (stateValue === IndexState.Finished || 
-                    stateValue === 3 || 
-                    stateValue === 'Finished') {
+                if (stateValue === IndexState.Finished) {
                     console.log(`[Milvus] Index on field '${fieldName}' is ready!`);
                     return;
                 }
@@ -205,8 +203,9 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 console.debug(`[Milvus] Continuing to retry index check after transient error...`);
             }
             
-            // Wait with exponential backoff before next attempt
-            await new Promise(resolve => setTimeout(resolve, interval));
+            // Wait with exponential backoff + jitter before next attempt
+            const jitter = Math.floor(Math.random() * (interval * 0.3));
+            await new Promise(resolve => setTimeout(resolve, interval + jitter));
             interval = Math.min(interval * backoffMultiplier, maxInterval);
         }
         
@@ -215,14 +214,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     /**
      * Wait for collection to reach LoadStateLoaded state
-     * Polls load state with exponential backoff up to 60 seconds
+     * Polls load state with exponential backoff (configurable timeout)
      */
     protected async waitForCollectionLoaded(collectionName: string): Promise<void> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        const maxWaitTime = 60000; // 60 seconds
+        const maxWaitTime = parseInt(envManager.get('LOAD_READY_TIMEOUT_MS') || '60000', 10);
         const initialInterval = 500; // 500ms
         const maxInterval = 5000; // 5 seconds
         const backoffMultiplier = 1.5;
@@ -238,8 +237,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     collection_name: collectionName
                 });
                 
-                // Debug logging to understand the state value
-                console.debug(`[Milvus] Load state for '${collectionName}': ${result.state}`);
+                // Minimal, safe debug logging
+                console.debug(`[Milvus] Load state for '${collectionName}': ${result.state} (Loaded=${LoadState.LoadStateLoaded})`);
                 
                 // Check if collection is fully loaded
                 if (result.state === LoadState.LoadStateLoaded) {
@@ -271,8 +270,9 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 console.debug(`[Milvus] Continuing to retry load state check after transient error...`);
             }
             
-            // Wait with exponential backoff before next attempt
-            await new Promise(resolve => setTimeout(resolve, interval));
+            // Wait with exponential backoff + jitter before next attempt
+            const jitter = Math.floor(Math.random() * (interval * 0.3));
+            await new Promise(resolve => setTimeout(resolve, interval + jitter));
             interval = Math.min(interval * backoffMultiplier, maxInterval);
         }
         
@@ -281,14 +281,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     /**
      * Load collection with retry logic and exponential backoff
-     * Retries up to 5 times with exponential backoff and waits for LoadStateLoaded
+     * Retries with exponential backoff and waits for LoadStateLoaded
      */
     protected async loadCollectionWithRetry(collectionName: string): Promise<void> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        const maxRetries = 5;
+        const maxRetries = parseInt(envManager.get('LOAD_MAX_RETRIES') || '5', 10);
         const initialInterval = 1000; // 1 second
         const backoffMultiplier = 2;
         
@@ -316,9 +316,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     throw new Error(`Failed to load collection '${collectionName}' after ${maxRetries} attempts: ${error}`);
                 }
                 
-                // Wait with exponential backoff before retry
-                console.debug(`[Milvus] Retrying collection load in ${interval}ms...`);
-                await new Promise(resolve => setTimeout(resolve, interval));
+                // Wait with exponential backoff + jitter before retry
+                const jitter = Math.floor(Math.random() * (interval * 0.3));
+                console.debug(`[Milvus] Retrying collection load in ${interval + jitter}ms...`);
+                await new Promise(resolve => setTimeout(resolve, interval + jitter));
                 interval *= backoffMultiplier;
                 attempt++;
             }
@@ -812,7 +813,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     startLine: result.startLine,
                     endLine: result.endLine,
                     fileExtension: result.fileExtension,
-                    metadata: JSON.parse(result.metadata || '{}'),
+                    metadata: (() => { try { return JSON.parse(result.metadata || '{}'); } catch { return {}; } })(),
                 },
                 score: result.score,
             }));

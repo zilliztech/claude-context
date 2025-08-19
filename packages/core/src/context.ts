@@ -104,6 +104,8 @@ export class Context {
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
     private cachedIsHybrid: boolean | null = null;
+    private deprecationWarnedUseHybrid: boolean = false;
+    private deprecationWarnedDisableSparse: boolean = false;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -241,9 +243,11 @@ export class Context {
     }
 
     /**
-     * Get isHybrid setting from environment variables with proper precedence
-     * Priority: DISABLE_SPARSE_VECTOR > USE_HYBRID_SEARCH > HYBRID_MODE > default false
-     * Result is cached after first call since environment variables don't change during runtime
+     * Resolve hybrid mode with simple, documented behavior.
+     * Canonical flag: HYBRID_MODE (default true).
+     * Deprecated aliases supported with one-time warnings:
+     *  - USE_HYBRID_SEARCH=true/false maps to HYBRID_MODE
+     *  - DISABLE_SPARSE_VECTOR=true forces HYBRID_MODE=false
      */
     private getIsHybrid(): boolean {
         // Return cached value if already computed
@@ -251,56 +255,54 @@ export class Context {
             return this.cachedIsHybrid;
         }
 
-        // Compute and cache the result
-        let result: boolean;
-
-        // Check DISABLE_SPARSE_VECTOR first (highest priority) - if true, disable hybrid
-        const disableSparseVector = envManager.get('DISABLE_SPARSE_VECTOR');
-        if (disableSparseVector !== undefined && disableSparseVector !== null) {
-            const isDisabled = this.parseBoolean(disableSparseVector);
-            if (isDisabled === true) {
-                console.log('[Hybrid] Disabled by DISABLE_SPARSE_VECTOR=true');
-                result = false;
-                this.cachedIsHybrid = result;
-                return result;
-            } else if (isDisabled === null) {
-                console.warn(`[Hybrid] Warning: Invalid boolean value '${disableSparseVector}' for DISABLE_SPARSE_VECTOR. Use true/false, 1/0, yes/no, or on/off.`);
-            }
-        }
-
-        // Check USE_HYBRID_SEARCH second (medium priority)
-        const useHybridSearch = envManager.get('USE_HYBRID_SEARCH');
-        if (useHybridSearch !== undefined && useHybridSearch !== null) {
-            const isEnabled = this.parseBoolean(useHybridSearch);
-            if (isEnabled !== null) {
-                console.log(`[Hybrid] ${isEnabled ? 'Enabled' : 'Disabled'} by USE_HYBRID_SEARCH=${useHybridSearch}`);
-                result = isEnabled;
-                this.cachedIsHybrid = result;
-                return result;
-            } else {
-                console.warn(`[Hybrid] Warning: Invalid boolean value '${useHybridSearch}' for USE_HYBRID_SEARCH. Use true/false, 1/0, yes/no, or on/off.`);
-            }
-        }
-
-        // Check HYBRID_MODE third (legacy, lowest priority)
+        // Canonical flag
         const hybridMode = envManager.get('HYBRID_MODE');
         if (hybridMode !== undefined && hybridMode !== null) {
-            const isEnabled = this.parseBoolean(hybridMode);
-            if (isEnabled !== null) {
-                console.log(`[Hybrid] ${isEnabled ? 'Enabled' : 'Disabled'} by HYBRID_MODE=${hybridMode} (legacy)`);
-                result = isEnabled;
-                this.cachedIsHybrid = result;
-                return result;
-            } else {
-                console.warn(`[Hybrid] Warning: Invalid boolean value '${hybridMode}' for HYBRID_MODE. Use true/false, 1/0, yes/no, or on/off.`);
+            const parsed = this.parseBoolean(hybridMode);
+            if (parsed !== null) {
+                this.cachedIsHybrid = parsed;
+                console.log(`[Hybrid] HYBRID_MODE=${hybridMode} -> ${parsed ? 'enabled' : 'disabled'}`);
+                return parsed;
             }
+            console.warn(`[Hybrid] Warning: Invalid boolean value '${hybridMode}' for HYBRID_MODE. Use true/false, 1/0, yes/no, or on/off.`);
         }
 
-        // Default to false (safer default to avoid sparse vector index issues)
-        console.log('[Hybrid] No environment variables set, defaulting to semantic search only');
-        result = false;
-        this.cachedIsHybrid = result;
-        return result;
+        // Deprecated aliases
+        const useHybridSearch = envManager.get('USE_HYBRID_SEARCH');
+        if (useHybridSearch !== undefined && useHybridSearch !== null) {
+            const parsed = this.parseBoolean(useHybridSearch);
+            if (parsed !== null) {
+                if (!this.deprecationWarnedUseHybrid) {
+                    console.warn('[Hybrid] USE_HYBRID_SEARCH is deprecated; use HYBRID_MODE instead.');
+                    this.deprecationWarnedUseHybrid = true;
+                }
+                this.cachedIsHybrid = parsed;
+                console.log(`[Hybrid] ${parsed ? 'Enabled' : 'Disabled'} by deprecated USE_HYBRID_SEARCH=${useHybridSearch}`);
+                return parsed;
+            }
+            console.warn(`[Hybrid] Warning: Invalid boolean value '${useHybridSearch}' for USE_HYBRID_SEARCH. Use true/false, 1/0, yes/no, or on/off.`);
+        }
+
+        const disableSparseVector = envManager.get('DISABLE_SPARSE_VECTOR');
+        if (disableSparseVector !== undefined && disableSparseVector !== null) {
+            const parsed = this.parseBoolean(disableSparseVector);
+            if (parsed !== null) {
+                if (!this.deprecationWarnedDisableSparse) {
+                    console.warn('[Hybrid] DISABLE_SPARSE_VECTOR is deprecated; use HYBRID_MODE=false instead.');
+                    this.deprecationWarnedDisableSparse = true;
+                }
+                const value = parsed ? false : true;
+                this.cachedIsHybrid = value;
+                console.log(`[Hybrid] ${value ? 'Enabled' : 'Disabled'} via deprecated DISABLE_SPARSE_VECTOR=${disableSparseVector}`);
+                return value;
+            }
+            console.warn(`[Hybrid] Warning: Invalid boolean value '${disableSparseVector}' for DISABLE_SPARSE_VECTOR. Use true/false, 1/0, yes/no, or on/off.`);
+        }
+
+        // Default to hybrid enabled (matches docs and upstream behavior)
+        console.log('[Hybrid] Using default: HYBRID_MODE=true');
+        this.cachedIsHybrid = true;
+        return true;
     }
 
     /**
@@ -312,6 +314,30 @@ export class Context {
         const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
         const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
         return `${prefix}_${hash.substring(0, 8)}`;
+    }
+
+    /**
+     * Resolve an existing collection name for a path, preferring the current mode.
+     * Falls back to the other mode if preferred collection is absent.
+     */
+    private async resolveCollectionName(codebasePath: string): Promise<{ name: string; mode: 'hybrid' | 'dense' } | null> {
+        const preferredHybrid = this.getIsHybrid() === true;
+        const normalizedPath = path.resolve(codebasePath);
+        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
+        const hybridName = `hybrid_code_chunks_${hash}`;
+        const denseName = `code_chunks_${hash}`;
+
+        const preferredName = preferredHybrid ? hybridName : denseName;
+        const fallbackName = preferredHybrid ? denseName : hybridName;
+
+        if (await this.vectorDatabase.hasCollection(preferredName)) {
+            return { name: preferredName, mode: preferredHybrid ? 'hybrid' : 'dense' };
+        }
+        if (await this.vectorDatabase.hasCollection(fallbackName)) {
+            console.log(`[Index] Using fallback collection '${fallbackName}' (preferred '${preferredName}' not found)`);
+            return { name: fallbackName, mode: preferredHybrid ? 'dense' : 'hybrid' };
+        }
+        return null;
     }
 
     /**
@@ -486,15 +512,16 @@ export class Context {
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Search] Executing ${searchType}: "${query}" in ${codebasePath}`);
 
-        const collectionName = this.getCollectionName(codebasePath);
+        const resolved = await this.resolveCollectionName(codebasePath);
+        if (!resolved) {
+            console.log(`[Search] No collection exists for codebase. Please index the codebase first.`);
+            return [];
+        }
+        const collectionName = resolved.name;
         console.log(`[Search] Using collection: ${collectionName}`);
 
         // Check if collection exists and has data
-        const hasCollection = await this.vectorDatabase.hasCollection(collectionName);
-        if (!hasCollection) {
-            console.log(`[Search] Collection '${collectionName}' does not exist. Please index the codebase first.`);
-            return [];
-        }
+        // hasCollection ensured by resolver
 
         if (isHybrid === true) {
             try {
@@ -596,8 +623,11 @@ export class Context {
      * @returns Whether index exists
      */
     async hasIndex(codebasePath: string): Promise<boolean> {
-        const collectionName = this.getCollectionName(codebasePath);
-        return await this.vectorDatabase.hasCollection(collectionName);
+        const normalizedPath = path.resolve(codebasePath);
+        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
+        const hybridName = `hybrid_code_chunks_${hash}`;
+        const denseName = `code_chunks_${hash}`;
+        return (await this.vectorDatabase.hasCollection(hybridName)) || (await this.vectorDatabase.hasCollection(denseName));
     }
 
     /**
@@ -613,13 +643,22 @@ export class Context {
 
         progressCallback?.({ phase: 'Checking existing index...', current: 0, total: 100, percentage: 0 });
 
-        const collectionName = this.getCollectionName(codebasePath);
-        const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
+        const normalizedPath = path.resolve(codebasePath);
+        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
+        const hybridName = `hybrid_code_chunks_${hash}`;
+        const denseName = `code_chunks_${hash}`;
+        const hybridExists = await this.vectorDatabase.hasCollection(hybridName);
+        const denseExists = await this.vectorDatabase.hasCollection(denseName);
 
         progressCallback?.({ phase: 'Removing index data...', current: 50, total: 100, percentage: 50 });
 
-        if (collectionExists) {
-            await this.vectorDatabase.dropCollection(collectionName);
+        if (hybridExists) {
+            await this.vectorDatabase.dropCollection(hybridName);
+            console.log(`[Index] Dropped collection ${hybridName}`);
+        }
+        if (denseExists) {
+            await this.vectorDatabase.dropCollection(denseName);
+            console.log(`[Index] Dropped collection ${denseName}`);
         }
 
         // Delete snapshot file

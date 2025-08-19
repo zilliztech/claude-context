@@ -45,6 +45,13 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `SPLITTER_TYPE` | Code splitter type: `ast`, `langchain` | `ast` |
 | `CUSTOM_EXTENSIONS` | Additional file extensions to include (comma-separated, e.g., `.vue,.svelte,.astro`) | None |
 | `CUSTOM_IGNORE_PATTERNS` | Additional ignore patterns (comma-separated, e.g., `temp/**,*.backup,private/**`) | None |
+| `INDEX_READY_TIMEOUT_MS` | Max time to wait for Milvus index build completion | `60000` |
+| `LOAD_READY_TIMEOUT_MS` | Max time to wait for Milvus collection to reach Loaded state | `60000` |
+| `LOAD_MAX_RETRIES` | Max retries when loading a collection | `5` |
+| `ENABLE_DUMMY_CREATE_VALIDATION` | If `true`, MCP preflight will create/drop a dummy collection to validate permissions/quota | `false` |
+
+> Deprecated: `USE_HYBRID_SEARCH` and `DISABLE_SPARSE_VECTOR` are deprecated in favor of `HYBRID_MODE`.
+> They are still accepted for backward compatibility but will log deprecation warnings.
 
 ## 🚀 Quick Setup
 

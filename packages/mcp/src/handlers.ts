@@ -227,32 +227,49 @@ export class ToolHandlers {
                 }
             }
 
-            // CRITICAL: Pre-index collection creation validation
+            // CRITICAL: Pre-index collection creation validation (optional)
             try {
-                console.log(`[INDEX-VALIDATION] Validating collection creation capability`);
-                //dummy collection name
-                const collectionName = `dummy_collection_${Date.now()}`;
-                // Get actual embedding dimension instead of hardcoded 128
-                const embeddingProvider = this.context.getEmbedding();
-                // For custom models, we need to detect dimension first
-                if ((embeddingProvider as any).detectDimension) {
-                    try {
-                        const detectedDim = await (embeddingProvider as any).detectDimension();
-                        console.debug(`[INDEX-VALIDATION] Detected embedding dimension: ${detectedDim}`);
-                    } catch (e: any) {
-                        console.warn(`[INDEX-VALIDATION] Could not detect dimension: ${e.message}`);
-                    }
-                }
-                const actualDimension = embeddingProvider.getDimension();
-                console.debug(`[INDEX-VALIDATION] Using actual embedding dimension: ${actualDimension}`);
-                await this.context.getVectorDatabase().createCollection(collectionName, actualDimension);
-                if (await this.context.getVectorDatabase().hasCollection(collectionName)) {
-                    console.debug(`[INDEX-VALIDATION] Dummy collection created successfully`);
-                    await this.context.getVectorDatabase().dropCollection(collectionName);
+                const enableDummyValidation = String(process.env.ENABLE_DUMMY_CREATE_VALIDATION || '').toLowerCase();
+                const doValidate = enableDummyValidation === 'true' || enableDummyValidation === '1' || enableDummyValidation === 'yes' || enableDummyValidation === 'on';
+                if (!doValidate) {
+                    console.log('[INDEX-VALIDATION] Skipping dummy collection creation validation (disabled)');
                 } else {
-                    console.debug(`[INDEX-VALIDATION] Dummy collection creation failed`);
+                    console.log(`[INDEX-VALIDATION] Validating collection creation capability`);
+                    const collectionName = `dummy_collection_${Date.now()}`;
+                    let created = false;
+                    // Get actual embedding dimension instead of hardcoded 128
+                    const embeddingProvider = this.context.getEmbedding();
+                    // For custom models, we need to detect dimension first
+                    if ((embeddingProvider as any).detectDimension) {
+                        try {
+                            const detectedDim = await (embeddingProvider as any).detectDimension();
+                            console.debug(`[INDEX-VALIDATION] Detected embedding dimension: ${detectedDim}`);
+                        } catch (e: any) {
+                            console.warn(`[INDEX-VALIDATION] Could not detect dimension: ${e.message}`);
+                        }
+                    }
+                    const actualDimension = embeddingProvider.getDimension();
+                    console.debug(`[INDEX-VALIDATION] Using actual embedding dimension: ${actualDimension}`);
+                    try {
+                        await this.context.getVectorDatabase().createCollection(collectionName, actualDimension);
+                        created = await this.context.getVectorDatabase().hasCollection(collectionName);
+                        if (created) {
+                            console.debug(`[INDEX-VALIDATION] Dummy collection created successfully`);
+                        } else {
+                            console.debug(`[INDEX-VALIDATION] Dummy collection creation failed`);
+                        }
+                    } finally {
+                        if (created) {
+                            try {
+                                await this.context.getVectorDatabase().dropCollection(collectionName);
+                                console.debug(`[INDEX-VALIDATION] Dummy collection cleaned up`);
+                            } catch (cleanupErr: any) {
+                                console.warn('[INDEX-VALIDATION] Failed to drop dummy collection during cleanup:', cleanupErr?.message || cleanupErr);
+                            }
+                        }
+                    }
+                    console.log(`[INDEX-VALIDATION] Collection creation validation completed`);
                 }
-                console.log(`[INDEX-VALIDATION] Collection creation validation completed`);
             } catch (validationError: any) {
                 const errorMessage = typeof validationError === 'string' ? validationError :
                     (validationError instanceof Error ? validationError.message : String(validationError));
