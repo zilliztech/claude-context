@@ -125,6 +125,12 @@ export interface VectorDatabase {
      * @param limit Maximum number of results
      */
     query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
+
+    /**
+     * Check collection limit
+     * Returns true if collection can be created, false if limit exceeded
+     */
+    checkCollectionLimit(): Promise<boolean>;
 }
 
 /**

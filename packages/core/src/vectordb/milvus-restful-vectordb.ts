@@ -19,6 +19,7 @@ export interface MilvusRestfulConfig {
 }
 
 /**
+ * TODO: Change this usage to checkCollectionLimit()
  * Wrapper function to handle collection creation with limit detection
  * This is the single point where collection limit errors are detected and handled
  */
@@ -773,5 +774,17 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             console.error(`❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
             throw error;
         }
+    }
+
+    /**
+     * Check collection limit
+     * Returns true if collection can be created, false if limit exceeded
+     * TODO: Implement proper collection limit checking for REST API
+     */
+    async checkCollectionLimit(): Promise<boolean> {
+        // TODO: Implement REST API version of collection limit checking
+        // For now, always return true to maintain compatibility
+        console.warn('⚠️  checkCollectionLimit not implemented for REST API - returning true');
+        return true;
     }
 }
