@@ -230,21 +230,9 @@ export class ToolHandlers {
             // CRITICAL: Pre-index collection creation validation
             try {
                 console.log(`[INDEX-VALIDATION] 🔍 Validating collection creation capability`);
-                //dummy collection name
-                const collectionName = `dummy_collection_${Date.now()}`;
-                await this.context.getVectorDatabase().createCollection(collectionName, 128);
-                if (await this.context.getVectorDatabase().hasCollection(collectionName)) {
-                    console.log(`[INDEX-VALIDATION] ℹ️  Dummy collection created successfully`);
-                    await this.context.getVectorDatabase().dropCollection(collectionName);
-                } else {
-                    console.log(`[INDEX-VALIDATION] ❌ Dummy collection creation failed`);
-                }
-                console.log(`[INDEX-VALIDATION] ✅  Collection creation validation completed`);
-            } catch (validationError: any) {
-                const errorMessage = typeof validationError === 'string' ? validationError :
-                    (validationError instanceof Error ? validationError.message : String(validationError));
+                const canCreateCollection = await this.context.getVectorDatabase().checkCollectionLimit();
 
-                if (errorMessage === COLLECTION_LIMIT_MESSAGE || errorMessage.includes(COLLECTION_LIMIT_MESSAGE)) {
+                if (!canCreateCollection) {
                     console.error(`[INDEX-VALIDATION] ❌ Collection limit validation failed: ${absolutePath}`);
 
                     // CRITICAL: Immediately return the COLLECTION_LIMIT_MESSAGE to MCP client
@@ -255,17 +243,19 @@ export class ToolHandlers {
                         }],
                         isError: true
                     };
-                } else {
-                    // Handle other collection creation errors
-                    console.error(`[INDEX-VALIDATION] ❌ Collection creation validation failed:`, validationError);
-                    return {
-                        content: [{
-                            type: "text",
-                            text: `Error validating collection creation: ${validationError.message || validationError}`
-                        }],
-                        isError: true
-                    };
                 }
+
+                console.log(`[INDEX-VALIDATION] ✅  Collection creation validation completed`);
+            } catch (validationError: any) {
+                // Handle other collection creation errors
+                console.error(`[INDEX-VALIDATION] ❌ Collection creation validation failed:`, validationError);
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error validating collection creation: ${validationError.message || validationError}`
+                    }],
+                    isError: true
+                };
             }
 
             // Add custom extensions if provided

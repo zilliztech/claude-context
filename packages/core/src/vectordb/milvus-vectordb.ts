@@ -1,4 +1,4 @@
-import { MilvusClient, DataType, MetricType, FunctionType, LoadState, IndexState } from '@zilliz/milvus2-sdk-node';
+import { MilvusClient, DataType, MetricType, FunctionType, LoadState } from '@zilliz/milvus2-sdk-node';
 import {
     VectorDocument,
     SearchOptions,
@@ -7,7 +7,6 @@ import {
     HybridSearchRequest,
     HybridSearchOptions,
     HybridSearchResult,
-    COLLECTION_LIMIT_MESSAGE
 } from './types';
 import { ClusterManager } from './zilliz-utils';
 
@@ -19,27 +18,7 @@ export interface MilvusConfig {
     ssl?: boolean;
 }
 
-/**
- * Wrapper function to handle collection creation with limit detection for gRPC client
- * This is the single point where collection limit errors are detected and handled
- */
-async function createCollectionWithLimitCheck(
-    client: MilvusClient,
-    createCollectionParams: any
-): Promise<void> {
-    try {
-        await client.createCollection(createCollectionParams);
-    } catch (error: any) {
-        // Check if the error message contains the collection limit exceeded pattern
-        const errorMessage = error.message || error.toString() || '';
-        if (/exceeded the limit number of collections/i.test(errorMessage)) {
-            // Throw the exact message string, not an Error object
-            throw COLLECTION_LIMIT_MESSAGE;
-        }
-        // Re-throw other errors as-is
-        throw error;
-    }
-}
+
 
 export class MilvusVectorDatabase implements VectorDatabase {
     protected config: MilvusConfig;
@@ -127,58 +106,65 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
     /**
      * Wait for an index to be ready before proceeding
-     * Polls index status with exponential backoff up to 30 seconds
+     * Polls index build progress with exponential backoff up to 60 seconds
      */
-    protected async waitForIndexReady(collectionName: string, fieldName: string): Promise<void> {
+    protected async waitForIndexReady(
+        collectionName: string,
+        fieldName: string,
+        maxWaitTime: number = 60000, // 60 seconds
+        initialInterval: number = 500, // 500ms
+        maxInterval: number = 5000, // 5 seconds
+        backoffMultiplier: number = 1.5
+    ): Promise<void> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        const maxWaitTime = 60000; // 60 seconds
-        const initialInterval = 500; // 500ms
-        const maxInterval = 5000; // 5 seconds
-        const backoffMultiplier = 1.5;
-        
         let interval = initialInterval;
         const startTime = Date.now();
-        
+
         console.log(`⏳ Waiting for index on field '${fieldName}' in collection '${collectionName}' to be ready...`);
-        
+
         while (Date.now() - startTime < maxWaitTime) {
             try {
-                const indexStateResult = await this.client.getIndexState({
+                const indexBuildProgress = await this.client.getIndexBuildProgress({
                     collection_name: collectionName,
                     field_name: fieldName
                 });
-                
-                // Debug logging to understand the state value
-                console.log(`📊 Index state for '${fieldName}': raw=${indexStateResult.state}, type=${typeof indexStateResult.state}, IndexState.Finished=${IndexState.Finished}`);
-                console.log(`📊 Full response:`, JSON.stringify(indexStateResult));
-                
-                // Check both numeric and potential string values
-                // Cast to any to bypass TypeScript checks while debugging
-                const stateValue = indexStateResult.state as any;
-                if (stateValue === IndexState.Finished || 
-                    stateValue === 3 || 
-                    stateValue === 'Finished') {
-                    console.log(`✅ Index on field '${fieldName}' is ready!`);
+
+                // Debug logging to understand the progress
+                console.log(`📊 Index build progress for '${fieldName}': indexed_rows=${indexBuildProgress.indexed_rows}, total_rows=${indexBuildProgress.total_rows}`);
+                console.log(`📊 Full response:`, JSON.stringify(indexBuildProgress));
+
+                // Check if index building is complete
+                if (indexBuildProgress.indexed_rows === indexBuildProgress.total_rows) {
+                    console.log(`✅ Index on field '${fieldName}' is ready! (${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed)`);
                     return;
                 }
-                
-                if (indexStateResult.state === IndexState.Failed) {
-                    throw new Error(`Index creation failed for field '${fieldName}' in collection '${collectionName}'`);
+
+                // Check for error status
+                if (indexBuildProgress.status && indexBuildProgress.status.error_code !== 'Success') {
+                    // Handle known issue with older Milvus versions where sparse vector index progress returns incorrect error
+                    if (indexBuildProgress.status.reason && indexBuildProgress.status.reason.includes('index duplicates[indexName=]')) {
+                        console.log(`⚠️  Index progress check returned known older Milvus issue: ${indexBuildProgress.status.reason}`);
+                        console.log(`⚠️  This is a known issue with older Milvus versions - treating as index ready`);
+                        return; // Treat as ready since this is a false error
+                    }
+                    throw new Error(`Index creation failed for field '${fieldName}' in collection '${collectionName}': ${indexBuildProgress.status.reason}`);
                 }
-                
+
+                console.log(`📊 Index building in progress: ${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed`);
+
                 // Wait with exponential backoff
                 await new Promise(resolve => setTimeout(resolve, interval));
                 interval = Math.min(interval * backoffMultiplier, maxInterval);
-                
+
             } catch (error) {
-                console.error(`❌ Error checking index state for field '${fieldName}':`, error);
+                console.error(`❌ Error checking index build progress for field '${fieldName}':`, error);
                 throw error;
             }
         }
-        
+
         throw new Error(`Timeout waiting for index on field '${fieldName}' in collection '${collectionName}' to be ready after ${maxWaitTime}ms`);
     }
 
@@ -186,36 +172,37 @@ export class MilvusVectorDatabase implements VectorDatabase {
      * Load collection with retry logic and exponential backoff
      * Retries up to 5 times with exponential backoff
      */
-    protected async loadCollectionWithRetry(collectionName: string): Promise<void> {
+    protected async loadCollectionWithRetry(
+        collectionName: string,
+        maxRetries: number = 5,
+        initialInterval: number = 1000, // 1 second
+        backoffMultiplier: number = 2
+    ): Promise<void> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        const maxRetries = 5;
-        const initialInterval = 1000; // 1 second
-        const backoffMultiplier = 2;
-        
         let attempt = 1;
         let interval = initialInterval;
-        
+
         while (attempt <= maxRetries) {
             try {
                 console.log(`🔄 Loading collection '${collectionName}' to memory (attempt ${attempt}/${maxRetries})...`);
-                
+
                 await this.client.loadCollection({
                     collection_name: collectionName,
                 });
-                
+
                 console.log(`✅ Collection '${collectionName}' loaded successfully!`);
                 return;
-                
+
             } catch (error) {
                 console.error(`❌ Failed to load collection '${collectionName}' on attempt ${attempt}:`, error);
-                
+
                 if (attempt === maxRetries) {
                     throw new Error(`Failed to load collection '${collectionName}' after ${maxRetries} attempts: ${error}`);
                 }
-                
+
                 // Wait with exponential backoff before retry
                 console.log(`⏳ Retrying collection load in ${interval}ms...`);
                 await new Promise(resolve => setTimeout(resolve, interval));
@@ -290,12 +277,13 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        await createCollectionWithLimitCheck(this.client, createCollectionParams);
+        await this.client.createCollection(createCollectionParams);
 
         // Create index
         const indexParams = {
             collection_name: collectionName,
             field_name: 'vector',
+            index_name: 'vector_index',
             index_type: 'AUTOINDEX',
             metric_type: MetricType.COSINE,
         };
@@ -556,13 +544,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        await createCollectionWithLimitCheck(this.client, createCollectionParams);
+        await this.client.createCollection(createCollectionParams);
 
         // Create indexes for both vector fields
         // Index for dense vector
         const denseIndexParams = {
             collection_name: collectionName,
             field_name: 'vector',
+            index_name: 'vector_index',
             index_type: 'AUTOINDEX',
             metric_type: MetricType.COSINE,
         };
@@ -576,10 +565,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
         const sparseIndexParams = {
             collection_name: collectionName,
             field_name: 'sparse_vector',
+            index_name: 'sparse_vector_index',
             index_type: 'SPARSE_INVERTED_INDEX',
             metric_type: MetricType.BM25,
         };
         console.log(`🔧 Creating sparse vector index for field 'sparse_vector' in collection '${collectionName}'...`);
+
         await this.client.createIndex(sparseIndexParams);
 
         // Wait for sparse vector index to be ready
@@ -719,6 +710,55 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         } catch (error) {
             console.error(`❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Wrapper method to handle collection creation with limit detection for gRPC client
+     * Returns true if collection can be created, false if limit exceeded
+     */
+    async checkCollectionLimit(): Promise<boolean> {
+        if (!this.client) {
+            throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
+        }
+
+        const collectionName = `dummy_collection_${Date.now()}`;
+        const createCollectionParams = {
+            collection_name: collectionName,
+            description: 'Test collection for limit check',
+            fields: [
+                {
+                    name: 'id',
+                    data_type: DataType.VarChar,
+                    max_length: 512,
+                    is_primary_key: true,
+                },
+                {
+                    name: 'vector',
+                    data_type: DataType.FloatVector,
+                    dim: 128,
+                }
+            ]
+        };
+
+        try {
+            await this.client.createCollection(createCollectionParams);
+            // Immediately drop the collection after successful creation
+            if (await this.client.hasCollection({ collection_name: collectionName })) {
+                await this.client.dropCollection({
+                    collection_name: collectionName,
+                });
+            }
+            return true;
+        } catch (error: any) {
+            // Check if the error message contains the collection limit exceeded pattern
+            const errorMessage = error.message || error.toString() || '';
+            if (/exceeded the limit number of collections/i.test(errorMessage)) {
+                // Return false for collection limit exceeded
+                return false;
+            }
+            // Re-throw other errors as-is
             throw error;
         }
     }
