@@ -270,8 +270,15 @@ export class ToolHandlers {
                 this.context.addCustomIgnorePatterns(customIgnorePatterns);
             }
 
-            // Add to indexing list and save snapshot immediately
-            this.snapshotManager.addIndexingCodebase(absolutePath);
+            // Check current status and log if retrying after failure
+            const currentStatus = this.snapshotManager.getCodebaseStatus(absolutePath);
+            if (currentStatus === 'indexfailed') {
+                const failedInfo = this.snapshotManager.getCodebaseInfo(absolutePath) as any;
+                console.log(`[BACKGROUND-INDEX] Retrying indexing for previously failed codebase. Previous error: ${failedInfo?.errorMessage || 'Unknown error'}`);
+            }
+
+            // Set to indexing status and save snapshot immediately
+            this.snapshotManager.setCodebaseIndexing(absolutePath, 0);
             this.snapshotManager.saveCodebaseSnapshot();
 
             // Track the codebase path for syncing
@@ -359,8 +366,8 @@ export class ToolHandlers {
             // Start indexing with the appropriate context and progress tracking
             console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
             const stats = await contextForThisTask.indexCodebase(absolutePath, (progress) => {
-                // Update progress in snapshot manager
-                this.snapshotManager.updateIndexingProgress(absolutePath, progress.percentage);
+                // Update progress in snapshot manager using new method
+                this.snapshotManager.setCodebaseIndexing(absolutePath, progress.percentage);
 
                 // Save snapshot periodically (every 2 seconds to avoid too frequent saves)
                 const currentTime = Date.now();
@@ -374,8 +381,8 @@ export class ToolHandlers {
             });
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
-            // Move from indexing to indexed list
-            this.snapshotManager.moveFromIndexingToIndexed(absolutePath);
+            // Set codebase to indexed status with complete statistics
+            this.snapshotManager.setCodebaseIndexed(absolutePath, stats);
             this.indexingStats = { indexedFiles: stats.indexedFiles, totalChunks: stats.totalChunks };
 
             // Save snapshot after updating codebase lists
@@ -390,12 +397,17 @@ export class ToolHandlers {
 
         } catch (error: any) {
             console.error(`[BACKGROUND-INDEX] Error during indexing for ${absolutePath}:`, error);
-            // Remove from indexing list on error
-            this.snapshotManager.removeIndexingCodebase(absolutePath);
+
+            // Get the last attempted progress
+            const lastProgress = this.snapshotManager.getIndexingProgress(absolutePath);
+
+            // Set codebase to failed status with error information
+            const errorMessage = error.message || String(error);
+            this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress);
             this.snapshotManager.saveCodebaseSnapshot();
 
             // Log error but don't crash MCP service - indexing errors are handled gracefully
-            console.error(`[BACKGROUND-INDEX] Indexing failed for ${absolutePath}: ${error.message || error}`);
+            console.error(`[BACKGROUND-INDEX] Indexing failed for ${absolutePath}: ${errorMessage}`);
         }
     }
 
@@ -707,27 +719,62 @@ export class ToolHandlers {
                 };
             }
 
-            // Check indexing status
-            const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
-            const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
-            const indexingProgress = this.snapshotManager.getIndexingProgress(absolutePath);
+            // Check indexing status using new status system
+            const status = this.snapshotManager.getCodebaseStatus(absolutePath);
+            const info = this.snapshotManager.getCodebaseInfo(absolutePath);
 
             let statusMessage = '';
 
-            if (isIndexed) {
-                statusMessage = `✅ Codebase '${absolutePath}' is fully indexed and ready for search.`;
-            } else if (isIndexing) {
-                const progressPercentage = indexingProgress !== undefined ? indexingProgress : 0;
-                statusMessage = `🔄 Codebase '${absolutePath}' is currently being indexed. Progress: ${progressPercentage.toFixed(1)}%`;
+            switch (status) {
+                case 'indexed':
+                    if (info && 'indexedFiles' in info) {
+                        const indexedInfo = info as any;
+                        statusMessage = `✅ Codebase '${absolutePath}' is fully indexed and ready for search.`;
+                        statusMessage += `\n📊 Statistics: ${indexedInfo.indexedFiles} files, ${indexedInfo.totalChunks} chunks`;
+                        statusMessage += `\n📅 Status: ${indexedInfo.indexStatus}`;
+                        statusMessage += `\n🕐 Last updated: ${new Date(indexedInfo.lastUpdated).toLocaleString()}`;
+                    } else {
+                        statusMessage = `✅ Codebase '${absolutePath}' is fully indexed and ready for search.`;
+                    }
+                    break;
 
-                // Add more detailed status based on progress
-                if (progressPercentage < 10) {
-                    statusMessage += ' (Preparing and scanning files...)';
-                } else if (progressPercentage < 100) {
-                    statusMessage += ' (Processing files and generating embeddings...)';
-                }
-            } else {
-                statusMessage = `❌ Codebase '${absolutePath}' is not indexed. Please use the index_codebase tool to index it first.`;
+                case 'indexing':
+                    if (info && 'indexingPercentage' in info) {
+                        const indexingInfo = info as any;
+                        const progressPercentage = indexingInfo.indexingPercentage || 0;
+                        statusMessage = `🔄 Codebase '${absolutePath}' is currently being indexed. Progress: ${progressPercentage.toFixed(1)}%`;
+
+                        // Add more detailed status based on progress
+                        if (progressPercentage < 10) {
+                            statusMessage += ' (Preparing and scanning files...)';
+                        } else if (progressPercentage < 100) {
+                            statusMessage += ' (Processing files and generating embeddings...)';
+                        }
+                        statusMessage += `\n🕐 Last updated: ${new Date(indexingInfo.lastUpdated).toLocaleString()}`;
+                    } else {
+                        statusMessage = `🔄 Codebase '${absolutePath}' is currently being indexed.`;
+                    }
+                    break;
+
+                case 'indexfailed':
+                    if (info && 'errorMessage' in info) {
+                        const failedInfo = info as any;
+                        statusMessage = `❌ Codebase '${absolutePath}' indexing failed.`;
+                        statusMessage += `\n🚨 Error: ${failedInfo.errorMessage}`;
+                        if (failedInfo.lastAttemptedPercentage !== undefined) {
+                            statusMessage += `\n📊 Failed at: ${failedInfo.lastAttemptedPercentage.toFixed(1)}% progress`;
+                        }
+                        statusMessage += `\n🕐 Failed at: ${new Date(failedInfo.lastUpdated).toLocaleString()}`;
+                        statusMessage += `\n💡 You can retry indexing by running the index_codebase command again.`;
+                    } else {
+                        statusMessage = `❌ Codebase '${absolutePath}' indexing failed. You can retry indexing.`;
+                    }
+                    break;
+
+                case 'not_found':
+                default:
+                    statusMessage = `❌ Codebase '${absolutePath}' is not indexed. Please use the index_codebase tool to index it first.`;
+                    break;
             }
 
             const pathInfo = codebasePath !== absolutePath
