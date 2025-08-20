@@ -1,6 +1,6 @@
 {
     "name": "claude-context-basic-example",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Basic usage example for Claude Context",
     "main": "index.ts",
     "scripts": {
