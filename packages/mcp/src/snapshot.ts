@@ -1,16 +1,123 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { CodebaseSnapshot } from "./config.js";
+import {
+    CodebaseSnapshot,
+    CodebaseSnapshotV1,
+    CodebaseSnapshotV2,
+    CodebaseInfo,
+    CodebaseInfoIndexing,
+    CodebaseInfoIndexed,
+    CodebaseInfoIndexFailed
+} from "./config.js";
 
 export class SnapshotManager {
     private snapshotFilePath: string;
     private indexedCodebases: string[] = [];
     private indexingCodebases: Map<string, number> = new Map(); // Map of codebase path to progress percentage
+    private codebaseFileCount: Map<string, number> = new Map(); // Map of codebase path to indexed file count
+    private codebaseInfoMap: Map<string, CodebaseInfo> = new Map(); // Map of codebase path to complete info
 
     constructor() {
         // Initialize snapshot file path
         this.snapshotFilePath = path.join(os.homedir(), '.context', 'mcp-codebase-snapshot.json');
+    }
+
+    /**
+     * Check if snapshot is v2 format
+     */
+    private isV2Format(snapshot: any): snapshot is CodebaseSnapshotV2 {
+        return snapshot && snapshot.formatVersion === 'v2';
+    }
+
+    /**
+     * Convert v1 format to internal state
+     */
+    private loadV1Format(snapshot: CodebaseSnapshotV1): void {
+        console.log('[SNAPSHOT-DEBUG] Loading v1 format snapshot');
+
+        // Validate that the codebases still exist
+        const validCodebases: string[] = [];
+        for (const codebasePath of snapshot.indexedCodebases) {
+            if (fs.existsSync(codebasePath)) {
+                validCodebases.push(codebasePath);
+                console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
+            } else {
+                console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
+            }
+        }
+
+        // Handle indexing codebases - treat them as not indexed since they were interrupted
+        let indexingCodebasesList: string[] = [];
+        if (Array.isArray(snapshot.indexingCodebases)) {
+            // Legacy format: string[]
+            indexingCodebasesList = snapshot.indexingCodebases;
+            console.log(`[SNAPSHOT-DEBUG] Found legacy indexingCodebases array format with ${indexingCodebasesList.length} entries`);
+        } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+            // New format: Record<string, number>
+            indexingCodebasesList = Object.keys(snapshot.indexingCodebases);
+            console.log(`[SNAPSHOT-DEBUG] Found new indexingCodebases object format with ${indexingCodebasesList.length} entries`);
+        }
+
+        for (const codebasePath of indexingCodebasesList) {
+            if (fs.existsSync(codebasePath)) {
+                console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath}. Treating as not indexed.`);
+                // Don't add to validIndexingCodebases - treat as not indexed
+            } else {
+                console.warn(`[SNAPSHOT-DEBUG] Interrupted indexing codebase no longer exists: ${codebasePath}`);
+            }
+        }
+
+        // Restore state - only fully indexed codebases
+        this.indexedCodebases = validCodebases;
+        this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
+        this.codebaseFileCount = new Map(); // No file count info in v1 format
+    }
+
+    /**
+ * Convert v2 format to internal state
+ */
+    private loadV2Format(snapshot: CodebaseSnapshotV2): void {
+        console.log('[SNAPSHOT-DEBUG] Loading v2 format snapshot');
+
+        const validIndexedCodebases: string[] = [];
+        const validIndexingCodebases = new Map<string, number>();
+        const validFileCount = new Map<string, number>();
+        const validCodebaseInfoMap = new Map<string, CodebaseInfo>();
+
+        for (const [codebasePath, info] of Object.entries(snapshot.codebases)) {
+            if (!fs.existsSync(codebasePath)) {
+                console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
+                continue;
+            }
+
+            // Store the complete info for this codebase
+            validCodebaseInfoMap.set(codebasePath, info);
+
+            if (info.status === 'indexed') {
+                validIndexedCodebases.push(codebasePath);
+                if ('indexedFiles' in info) {
+                    validFileCount.set(codebasePath, info.indexedFiles);
+                }
+                console.log(`[SNAPSHOT-DEBUG] Validated indexed codebase: ${codebasePath} (${info.indexedFiles || 'unknown'} files, ${info.totalChunks || 'unknown'} chunks)`);
+            } else if (info.status === 'indexing') {
+                if ('indexingPercentage' in info) {
+                    validIndexingCodebases.set(codebasePath, info.indexingPercentage);
+                }
+                console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath} (${info.indexingPercentage || 0}%). Treating as not indexed.`);
+                // Don't add to indexed - treat interrupted indexing as not indexed
+            } else if (info.status === 'indexfailed') {
+                console.warn(`[SNAPSHOT-DEBUG] Found failed indexing codebase: ${codebasePath}. Error: ${info.errorMessage}`);
+                // Failed indexing codebases are not added to indexed or indexing lists
+                // But we keep the info for potential retry
+            }
+        }
+
+        // Restore state
+        this.indexedCodebases = validIndexedCodebases;
+        this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
+        this.codebaseFileCount = validFileCount;
+        this.codebaseInfoMap = validCodebaseInfoMap;
     }
 
     public getIndexedCodebases(): string[] {
@@ -23,7 +130,14 @@ export class SnapshotManager {
             const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
             const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
 
-            return snapshot.indexedCodebases || [];
+            if (this.isV2Format(snapshot)) {
+                return Object.entries(snapshot.codebases)
+                    .filter(([_, info]) => info.status === 'indexed')
+                    .map(([path, _]) => path);
+            } else {
+                // V1 format
+                return snapshot.indexedCodebases || [];
+            }
         } catch (error) {
             console.warn(`[SNAPSHOT-DEBUG] Error reading indexed codebases from file:`, error);
             // Fallback to memory if file reading fails
@@ -41,13 +155,19 @@ export class SnapshotManager {
             const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
             const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
 
-            // Handle both legacy array format and new object format
-            if (Array.isArray(snapshot.indexingCodebases)) {
-                // Legacy format: return the array directly
-                return snapshot.indexingCodebases;
-            } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
-                // New format: return the keys of the object
-                return Object.keys(snapshot.indexingCodebases);
+            if (this.isV2Format(snapshot)) {
+                return Object.entries(snapshot.codebases)
+                    .filter(([_, info]) => info.status === 'indexing')
+                    .map(([path, _]) => path);
+            } else {
+                // V1 format - Handle both legacy array format and new object format
+                if (Array.isArray(snapshot.indexingCodebases)) {
+                    // Legacy format: return the array directly
+                    return snapshot.indexingCodebases;
+                } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                    // New format: return the keys of the object
+                    return Object.keys(snapshot.indexingCodebases);
+                }
             }
 
             return [];
@@ -72,13 +192,21 @@ export class SnapshotManager {
             const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
             const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
 
-            // Handle both legacy array format and new object format
-            if (Array.isArray(snapshot.indexingCodebases)) {
-                // Legacy format: if path exists in array, assume 0% progress
-                return snapshot.indexingCodebases.includes(codebasePath) ? 0 : undefined;
-            } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
-                // New format: return the actual progress percentage
-                return snapshot.indexingCodebases[codebasePath];
+            if (this.isV2Format(snapshot)) {
+                const info = snapshot.codebases[codebasePath];
+                if (info && info.status === 'indexing') {
+                    return info.indexingPercentage || 0;
+                }
+                return undefined;
+            } else {
+                // V1 format - Handle both legacy array format and new object format
+                if (Array.isArray(snapshot.indexingCodebases)) {
+                    // Legacy format: if path exists in array, assume 0% progress
+                    return snapshot.indexingCodebases.includes(codebasePath) ? 0 : undefined;
+                } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                    // New format: return the actual progress percentage
+                    return snapshot.indexingCodebases[codebasePath];
+                }
             }
 
             return undefined;
@@ -103,19 +231,126 @@ export class SnapshotManager {
         this.indexingCodebases.delete(codebasePath);
     }
 
-    public addIndexedCodebase(codebasePath: string): void {
+    public addIndexedCodebase(codebasePath: string, fileCount?: number): void {
         if (!this.indexedCodebases.includes(codebasePath)) {
             this.indexedCodebases.push(codebasePath);
+        }
+        if (fileCount !== undefined) {
+            this.codebaseFileCount.set(codebasePath, fileCount);
         }
     }
 
     public removeIndexedCodebase(codebasePath: string): void {
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
+        this.codebaseFileCount.delete(codebasePath);
     }
 
-    public moveFromIndexingToIndexed(codebasePath: string): void {
+    public moveFromIndexingToIndexed(codebasePath: string, fileCount?: number): void {
         this.removeIndexingCodebase(codebasePath);
-        this.addIndexedCodebase(codebasePath);
+        this.addIndexedCodebase(codebasePath, fileCount);
+    }
+
+    public getIndexedFileCount(codebasePath: string): number | undefined {
+        return this.codebaseFileCount.get(codebasePath);
+    }
+
+    public setIndexedFileCount(codebasePath: string, fileCount: number): void {
+        this.codebaseFileCount.set(codebasePath, fileCount);
+    }
+
+    /**
+     * Set codebase to indexing status
+     */
+    public setCodebaseIndexing(codebasePath: string, progress: number = 0): void {
+        this.indexingCodebases.set(codebasePath, progress);
+
+        // Remove from other states
+        this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
+        this.codebaseFileCount.delete(codebasePath);
+
+        // Update info map
+        const info: CodebaseInfoIndexing = {
+            status: 'indexing',
+            indexingPercentage: progress,
+            lastUpdated: new Date().toISOString()
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
+    }
+
+    /**
+     * Set codebase to indexed status with complete statistics
+     */
+    public setCodebaseIndexed(
+        codebasePath: string,
+        stats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }
+    ): void {
+        // Add to indexed list if not already there
+        if (!this.indexedCodebases.includes(codebasePath)) {
+            this.indexedCodebases.push(codebasePath);
+        }
+
+        // Remove from indexing state
+        this.indexingCodebases.delete(codebasePath);
+
+        // Update file count and info
+        this.codebaseFileCount.set(codebasePath, stats.indexedFiles);
+
+        const info: CodebaseInfoIndexed = {
+            status: 'indexed',
+            indexedFiles: stats.indexedFiles,
+            totalChunks: stats.totalChunks,
+            indexStatus: stats.status,
+            lastUpdated: new Date().toISOString()
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
+    }
+
+    /**
+     * Set codebase to failed status
+     */
+    public setCodebaseIndexFailed(
+        codebasePath: string,
+        errorMessage: string,
+        lastAttemptedPercentage?: number
+    ): void {
+        // Remove from other states
+        this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
+        this.indexingCodebases.delete(codebasePath);
+        this.codebaseFileCount.delete(codebasePath);
+
+        // Update info map
+        const info: CodebaseInfoIndexFailed = {
+            status: 'indexfailed',
+            errorMessage: errorMessage,
+            lastAttemptedPercentage: lastAttemptedPercentage,
+            lastUpdated: new Date().toISOString()
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
+    }
+
+    /**
+     * Get codebase status
+     */
+    public getCodebaseStatus(codebasePath: string): 'indexed' | 'indexing' | 'indexfailed' | 'not_found' {
+        const info = this.codebaseInfoMap.get(codebasePath);
+        if (!info) return 'not_found';
+        return info.status;
+    }
+
+    /**
+     * Get complete codebase information
+     */
+    public getCodebaseInfo(codebasePath: string): CodebaseInfo | undefined {
+        return this.codebaseInfoMap.get(codebasePath);
+    }
+
+    /**
+     * Get all failed codebases
+     */
+    public getFailedCodebases(): string[] {
+        return Array.from(this.codebaseInfoMap.entries())
+            .filter(([_, info]) => info.status === 'indexfailed')
+            .map(([path, _]) => path);
     }
 
     public loadCodebaseSnapshot(): void {
@@ -132,54 +367,14 @@ export class SnapshotManager {
 
             console.log('[SNAPSHOT-DEBUG] Loaded snapshot:', snapshot);
 
-            // Validate that the codebases still exist
-            const validCodebases: string[] = [];
-            for (const codebasePath of snapshot.indexedCodebases) {
-                if (fs.existsSync(codebasePath)) {
-                    validCodebases.push(codebasePath);
-                    console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
-                } else {
-                    console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
-                }
+            if (this.isV2Format(snapshot)) {
+                this.loadV2Format(snapshot);
+            } else {
+                this.loadV1Format(snapshot);
             }
 
-            // Handle indexing codebases - treat them as not indexed since they were interrupted
-            // Support both legacy array format and new object format
-            let indexingCodebasesList: string[] = [];
-            if (Array.isArray(snapshot.indexingCodebases)) {
-                // Legacy format: string[]
-                indexingCodebasesList = snapshot.indexingCodebases;
-                console.log(`[SNAPSHOT-DEBUG] Found legacy indexingCodebases array format with ${indexingCodebasesList.length} entries`);
-            } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
-                // New format: Record<string, number>
-                indexingCodebasesList = Object.keys(snapshot.indexingCodebases);
-                console.log(`[SNAPSHOT-DEBUG] Found new indexingCodebases object format with ${indexingCodebasesList.length} entries`);
-            }
-
-            for (const codebasePath of indexingCodebasesList) {
-                if (fs.existsSync(codebasePath)) {
-                    console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath}. Treating as not indexed.`);
-                    // Don't add to validIndexingCodebases - treat as not indexed
-                } else {
-                    console.warn(`[SNAPSHOT-DEBUG] Interrupted indexing codebase no longer exists: ${codebasePath}`);
-                }
-            }
-
-            // Restore state - only fully indexed codebases
-            this.indexedCodebases = validCodebases;
-            this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
-
-            console.log(`[SNAPSHOT-DEBUG] Restored ${validCodebases.length} fully indexed codebases.`);
-            console.log(`[SNAPSHOT-DEBUG] Reset ${indexingCodebasesList.length} interrupted indexing codebases.`);
-
-            // Save updated snapshot if we removed any invalid paths or reset indexing codebases
-            const originalIndexingCount = Array.isArray(snapshot.indexingCodebases)
-                ? snapshot.indexingCodebases.length
-                : Object.keys(snapshot.indexingCodebases || {}).length;
-
-            if (validCodebases.length !== snapshot.indexedCodebases.length || originalIndexingCount > 0) {
-                this.saveCodebaseSnapshot();
-            }
+            // Always save in v2 format after loading (migration)
+            this.saveCodebaseSnapshot();
 
         } catch (error: any) {
             console.error('[SNAPSHOT-DEBUG] Error loading snapshot:', error);
@@ -198,20 +393,27 @@ export class SnapshotManager {
                 console.log('[SNAPSHOT-DEBUG] Created snapshot directory:', snapshotDir);
             }
 
-            // Convert Map to object for JSON serialization
-            const indexingCodebasesObject: Record<string, number> = {};
-            this.indexingCodebases.forEach((progress, path) => {
-                indexingCodebasesObject[path] = progress;
-            });
+            // Build v2 format snapshot using the complete info map
+            const codebases: Record<string, CodebaseInfo> = {};
 
-            const snapshot: CodebaseSnapshot = {
-                indexedCodebases: this.indexedCodebases,
-                indexingCodebases: indexingCodebasesObject,
+            // Add all codebases from the info map
+            for (const [codebasePath, info] of this.codebaseInfoMap) {
+                codebases[codebasePath] = info;
+            }
+
+            const snapshot: CodebaseSnapshotV2 = {
+                formatVersion: 'v2',
+                codebases: codebases,
                 lastUpdated: new Date().toISOString()
             };
 
             fs.writeFileSync(this.snapshotFilePath, JSON.stringify(snapshot, null, 2));
-            console.log('[SNAPSHOT-DEBUG] Snapshot saved successfully. Indexed codebases:', this.indexedCodebases.length, 'Indexing codebases:', this.indexingCodebases.size);
+
+            const indexedCount = this.indexedCodebases.length;
+            const indexingCount = this.indexingCodebases.size;
+            const failedCount = this.getFailedCodebases().length;
+
+            console.log(`[SNAPSHOT-DEBUG] Snapshot saved successfully in v2 format. Indexed: ${indexedCount}, Indexing: ${indexingCount}, Failed: ${failedCount}`);
 
         } catch (error: any) {
             console.error('[SNAPSHOT-DEBUG] Error saving snapshot:', error);

@@ -19,11 +19,52 @@ export interface ContextMcpConfig {
     milvusToken?: string;
 }
 
-export interface CodebaseSnapshot {
+// Legacy format (v1) - for backward compatibility
+export interface CodebaseSnapshotV1 {
     indexedCodebases: string[];
     indexingCodebases: string[] | Record<string, number>;  // Array (legacy) or Map of codebase path to progress percentage
     lastUpdated: string;
 }
+
+// New format (v2) - structured with codebase information
+
+// Base interface for common fields
+interface CodebaseInfoBase {
+    lastUpdated: string;
+}
+
+// Indexing state - when indexing is in progress
+export interface CodebaseInfoIndexing extends CodebaseInfoBase {
+    status: 'indexing';
+    indexingPercentage: number;  // Current progress percentage
+}
+
+// Indexed state - when indexing completed successfully
+export interface CodebaseInfoIndexed extends CodebaseInfoBase {
+    status: 'indexed';
+    indexedFiles: number;        // Number of files indexed
+    totalChunks: number;         // Total number of chunks generated
+    indexStatus: 'completed' | 'limit_reached';  // Status from indexing result
+}
+
+// Index failed state - when indexing failed
+export interface CodebaseInfoIndexFailed extends CodebaseInfoBase {
+    status: 'indexfailed';
+    errorMessage: string;        // Error message from the failure
+    lastAttemptedPercentage?: number;  // Progress when failure occurred
+}
+
+// Union type for all codebase information states
+export type CodebaseInfo = CodebaseInfoIndexing | CodebaseInfoIndexed | CodebaseInfoIndexFailed;
+
+export interface CodebaseSnapshotV2 {
+    formatVersion: 'v2';
+    codebases: Record<string, CodebaseInfo>;  // codebasePath -> CodebaseInfo
+    lastUpdated: string;
+}
+
+// Union type for all supported formats
+export type CodebaseSnapshot = CodebaseSnapshotV1 | CodebaseSnapshotV2;
 
 // Helper function to get default model for each provider
 export function getDefaultModelForProvider(provider: string): string {
