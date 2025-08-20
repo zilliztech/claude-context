@@ -31,7 +31,7 @@ Before using the MCP server, make sure you have:
 
 Claude Context MCP supports multiple embedding providers. Choose the one that best fits your needs:
 
-> 💡 **Tip**: You can also use [global environment variables](../../docs/getting-started/environment-variables.md) for easier configuration management across different MCP clients.
+> 📋 **Quick Reference**: For a complete list of environment variables and their descriptions, see the [Environment Variables Guide](../../docs/getting-started/environment-variables.md).
 
 ```bash
 # Supported providers: OpenAI, VoyageAI, Gemini, Ollama
@@ -55,9 +55,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
 **Available Models:**
-- `text-embedding-3-small` (1536 dimensions, faster, lower cost)
-- `text-embedding-3-large` (3072 dimensions, higher quality)
-- `text-embedding-ada-002` (1536 dimensions, legacy model)
+See `getSupportedModels` in [`openai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/openai-embedding.ts) for the full list of supported models.
 
 **Getting API Key:**
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
@@ -81,9 +79,7 @@ EMBEDDING_MODEL=voyage-code-3
 ```
 
 **Available Models:**
-- `voyage-code-3` (1024 dimensions, optimized for code)
-- `voyage-3` (1024 dimensions, general purpose)
-- `voyage-3-lite` (512 dimensions, faster inference)
+See `getSupportedModels` in [`voyageai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/voyageai-embedding.ts) for the full list of supported models.
 
 **Getting API Key:**
 1. Visit [VoyageAI Console](https://dash.voyageai.com/)
@@ -107,7 +103,7 @@ EMBEDDING_MODEL=gemini-embedding-001
 ```
 
 **Available Models:**
-- `gemini-embedding-001` (3072 dimensions, latest model)
+See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/gemini-embedding.ts) for the full list of supported models.
 
 **Getting API Key:**
 1. Visit [Google AI Studio](https://aistudio.google.com/)
@@ -129,11 +125,6 @@ EMBEDDING_MODEL=nomic-embed-text
 # Optional: Specify Ollama host (default: http://127.0.0.1:11434)
 OLLAMA_HOST=http://127.0.0.1:11434
 ```
-
-**Available Models:**
-- `nomic-embed-text` (768 dimensions, recommended for code)
-- `mxbai-embed-large` (1024 dimensions, higher quality)
-- `all-minilm` (384 dimensions, lightweight)
 
 **Setup Instructions:**
 1. Install Ollama from [ollama.ai](https://ollama.ai/)
@@ -557,18 +548,19 @@ npx @zilliz/claude-context-mcp@latest
 
 ## Features
 
-- 🔌 MCP Protocol Compliance: Full compatibility with MCP-enabled AI assistants and agents
-- 🔍 Semantic Code Search: Natural language queries to find relevant code snippets
-- 📁 Codebase Indexing: Index entire codebases for fast semantic search
-- 🔄 Auto-Sync: Automatically detects and synchronizes file changes to keep index up-to-date
-- 🧠 AI-Powered: Uses OpenAI embeddings and Milvus vector database
-- ⚡ Real-time: Interactive indexing and searching with progress feedback
-- 🛠️ Tool-based: Exposes three main tools via MCP protocol
+- 🔌 **MCP Protocol Compliance**: Full compatibility with MCP-enabled AI assistants and agents
+- 🔍 **Hybrid Code Search**: Natural language queries using advanced hybrid search (BM25 + dense vector) to find relevant code snippets
+- 📁 **Codebase Indexing**: Index entire codebases for fast hybrid search across millions of lines of code
+- 🔄 **Incremental Indexing**: Efficiently re-index only changed files using Merkle trees for auto-sync
+- 🧩 **Intelligent Code Chunking**: AST-based code analysis for syntax-aware chunking with automatic fallback
+- 🗄️ **Scalable**: Integrates with Zilliz Cloud for scalable vector search, no matter how large your codebase is
+- 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models
+- ⚡ **Real-time**: Interactive indexing and searching with progress feedback
 
 ## Available Tools
 
 ### 1. `index_codebase`
-Index a codebase directory for semantic search.
+Index a codebase directory for hybrid search (BM25 + dense vector).
 
 **Parameters:**
 - `path` (required): Absolute path to the codebase directory to index
@@ -578,18 +570,25 @@ Index a codebase directory for semantic search.
 - `ignorePatterns` (optional): Additional ignore patterns to exclude specific files/directories beyond defaults (e.g., ['static/**', '*.tmp', 'private/**']) (default: [])
 
 ### 2. `search_code`
-Search the indexed codebase using natural language queries.
+Search the indexed codebase using natural language queries with hybrid search (BM25 + dense vector).
 
 **Parameters:**
 - `path` (required): Absolute path to the codebase directory to search in
 - `query` (required): Natural language query to search for in the codebase
 - `limit` (optional): Maximum number of results to return (default: 10, max: 50)
+- `extensionFilter` (optional): List of file extensions to filter results (e.g., ['.ts', '.py']) (default: [])
 
 ### 3. `clear_index`
 Clear the search index for a specific codebase.
 
 **Parameters:**
 - `path` (required): Absolute path to the codebase directory to clear index for
+
+### 4. `get_indexing_status`
+Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.
+
+**Parameters:**
+- `path` (required): Absolute path to the codebase directory to check status for
 
 
 ## Contributing
