@@ -45,7 +45,7 @@ export function getDefaultModelForProvider(provider: string): string {
 export function getEmbeddingModelForProvider(provider: string): string {
     switch (provider) {
         case 'Ollama':
-            // For Ollama, prioritize OLLAMA_MODEL over EMBEDDING_MODEL
+            // For Ollama, prioritize OLLAMA_MODEL over EMBEDDING_MODEL for backward compatibility
             const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
             console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`);
             return ollamaModel;
@@ -53,8 +53,10 @@ export function getEmbeddingModelForProvider(provider: string): string {
         case 'VoyageAI':
         case 'Gemini':
         default:
-            // For other providers, use EMBEDDING_MODEL or default
-            return envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
+            // For all other providers, use EMBEDDING_MODEL or default
+            const selectedModel = envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
+            console.log(`[DEBUG] 🎯 ${provider} model selection: EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${selectedModel}`);
+            return selectedModel;
     }
 }
 
@@ -138,7 +140,7 @@ Environment Variables:
   
   Embedding Provider Configuration:
   EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
-  EMBEDDING_MODEL         Embedding model name (auto-detected if not specified)
+  EMBEDDING_MODEL         Embedding model name (works for all providers)
   
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
@@ -148,7 +150,7 @@ Environment Variables:
   
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
-  OLLAMA_MODEL            Ollama model name (default: nomic-embed-text)
+  OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
   
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
@@ -158,16 +160,19 @@ Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
   
-  # Start MCP server with OpenAI and auto-resolve Milvus address from token
-  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-zilliz-token npx @zilliz/claude-context-mcp@latest
+  # Start MCP server with OpenAI and specific model
+  OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
-  # Start MCP server with VoyageAI
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  # Start MCP server with VoyageAI and specific model
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
-  # Start MCP server with Gemini
-  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  # Start MCP server with Gemini and specific model
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
-  # Start MCP server with Ollama
+  # Start MCP server with Ollama and specific model (using OLLAMA_MODEL)
+  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
         `);
 } 

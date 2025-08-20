@@ -411,12 +411,12 @@ npx @zilliz/claude-context-mcp@latest
 
 </details>
 
-For more detailed MCP environment variable configuration, see our [Environment Variables Guide](docs/getting-started/environment-variables.md).
+---
+**How to configure environment variables for MCP:** For more detailed MCP environment variable configuration, see our [Environment Variables Guide](docs/getting-started/environment-variables.md).
+
+**Using Different Embedding Models with MCP:** To configure specific embedding models (e.g., `text-embedding-3-large` for OpenAI, `voyage-code-3` for VoyageAI), see the [MCP Configuration Examples](packages/mcp/README.md#embedding-provider-configuration) for detailed setup instructions for each provider.
 
 📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
-
----
-
 
 ---
 

@@ -21,9 +21,24 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
+| `EMBEDDING_MODEL` | Embedding model name (works for all providers) | Provider-specific default |
 | `OPENAI_API_KEY` | OpenAI API key | Required for OpenAI |
 | `VOYAGEAI_API_KEY` | VoyageAI API key | Required for VoyageAI |
 | `GEMINI_API_KEY` | Gemini API key | Required for Gemini |
+
+> **💡 Note:** `EMBEDDING_MODEL` is a universal environment variable that works with all embedding providers. Simply set it to the model name you want to use (e.g., `text-embedding-3-large` for OpenAI, `voyage-code-3` for VoyageAI, etc.).
+
+> **Supported Model Names:**
+> 
+> - OpenAI Models: See `getSupportedModels` in [`openai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/openai-embedding.ts) for the full list of supported models.
+> 
+> - VoyageAI Models: See `getSupportedModels` in [`voyageai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/voyageai-embedding.ts) for the full list of supported models.
+> 
+> - Gemini Models: See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/gemini-embedding.ts) for the full list of supported models.
+> 
+> - Ollama Models: Depends on the model you install locally.
+
+> **📖 For detailed provider-specific configuration examples and setup instructions, see the [MCP Configuration Guide](../../packages/mcp/README.md#embedding-provider-configuration).**
 
 ### Vector Database
 | Variable | Description | Default |
@@ -31,11 +46,12 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `MILVUS_TOKEN` | Milvus authentication token. Get [Zilliz Personal API Key](https://github.com/zilliztech/claude-context/blob/master/assets/signup_and_get_apikey.png) | Recommended |
 | `MILVUS_ADDRESS` | Milvus server address. Optional when using Zilliz Personal API Key | Auto-resolved from token |
 
-### Ollama (Local)
+### Ollama (Optional)
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OLLAMA_HOST` | Ollama server URL | `http://127.0.0.1:11434` |
-| `OLLAMA_MODEL` | Model name | `nomic-embed-text` |
+| `OLLAMA_MODEL`(alternative to `EMBEDDING_MODEL`) | Model name |  |
+
 
 ### Advanced Configuration
 | Variable | Description | Default |
@@ -54,6 +70,7 @@ mkdir -p ~/.context
 cat > ~/.context/.env << 'EOF'
 EMBEDDING_PROVIDER=OpenAI
 OPENAI_API_KEY=sk-your-openai-api-key
+EMBEDDING_MODEL=text-embedding-3-small
 MILVUS_TOKEN=your-zilliz-cloud-api-key
 EOF
 ```
