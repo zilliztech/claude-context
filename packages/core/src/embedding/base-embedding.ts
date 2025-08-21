@@ -16,19 +16,27 @@ export abstract class Embedding {
      * @returns Processed text
      */
     protected preprocessText(text: string): string {
+        // Handle null/undefined inputs
+        if (text == null || text === undefined) {
+            return '';
+        }
+
+        // Convert to string if needed
+        const stringText = String(text);
+
         // Replace empty string with single space
-        if (text === '') {
-            return ' ';
+        if (stringText === '') {
+            return '';
         }
 
         // Simple character-based truncation (approximation)
         // Each token is roughly 4 characters on average for English text
         const maxChars = this.maxTokens * 4;
-        if (text.length > maxChars) {
-            return text.substring(0, maxChars);
+        if (stringText.length > maxChars) {
+            return stringText.substring(0, maxChars);
         }
 
-        return text;
+        return stringText;
     }
 
     /**
