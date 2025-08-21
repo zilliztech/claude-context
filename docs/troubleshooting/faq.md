@@ -2,51 +2,17 @@
 
 ## Q: What files does Claude Context decide to embed?
 
-**A:** Claude Context embeds files based on the following rules:
+**A:** Claude Context uses a comprehensive rule system to determine which files to include in indexing:
 
-**Files that are included:**
-- Files with supported extensions from multiple sources:
-  - DEFAULT_SUPPORTED_EXTENSIONS (built-in defaults)
-  - MCP custom extensions (via `customExtensions` parameter)
-  - Environment variable custom extensions (via `CUSTOM_EXTENSIONS`)
+**Simple Rule:**
+```
+Final Files = (All Supported Extensions) - (All Ignore Patterns)
+```
 
-**Files that are excluded:**
-- Files matching ignore patterns from multiple sources:
-  - DEFAULT_IGNORE_PATTERNS (built-in defaults)
-  - MCP custom ignore patterns (via `ignorePatterns` parameter)
-  - Environment variable custom ignore patterns (via `CUSTOM_IGNORE_PATTERNS`)
-  - Files matching patterns in .gitignore
-  - Files matching patterns in any .xxxignore files (e.g., .cursorignore, .codeiumignore)
-  - Files matching patterns in global ~/.context/.contextignore
+- **Extensions are additive**: Default extensions + MCP custom + Environment variables
+- **Ignore patterns are additive**: Default patterns + MCP custom + Environment variables + .gitignore + .xxxignore files + global .contextignore
 
-The final rule is: `(DEFAULT_SUPPORTED_EXTENSIONS + MCP custom extensions + custom extensions from env variable) - (DEFAULT_IGNORE_PATTERNS + MCP custom ignore patterns + custom ignore patterns from env variable + .gitignore + .xxxignore files + global .contextignore)`
-
-**Extension sources (all patterns are combined):**
-1. **Default extensions**: Built-in supported file extensions (.ts, .js, .py, .java, .cpp, .md, etc.)
-2. **MCP custom extensions**: Additional extensions passed via MCP `customExtensions` parameter
-3. **Environment custom extensions**: Extensions from `CUSTOM_EXTENSIONS` env variable (comma-separated, e.g., `.vue,.svelte,.astro`)
-
-**Ignore pattern sources (all patterns are combined):**
-1. **Default patterns**: Built-in ignore patterns for common build outputs, dependencies, etc.
-2. **MCP custom ignore patterns**: Additional patterns passed via MCP `ignorePatterns` parameter
-3. **Environment custom ignore patterns**: Patterns from `CUSTOM_IGNORE_PATTERNS` env variable (comma-separated)
-4. **.gitignore**: Standard Git ignore patterns in codebase root
-5. **.xxxignore files**: Any file in codebase root matching pattern `.xxxignore` (e.g., `.cursorignore`, `.codeiumignore`)
-6. **Global ignore**: `~/.context/.contextignore` for user-wide patterns
-
-All patterns are merged together - MCP custom patterns and environment variables will NOT be overwritten by file-based patterns.
-
-**Environment Variables:**
-- `CUSTOM_EXTENSIONS`: Comma-separated list of file extensions (e.g., `.vue,.svelte,.astro`)
-- `CUSTOM_IGNORE_PATTERNS`: Comma-separated list of ignore patterns (e.g., `temp/**,*.backup,private/**`)
-
-These environment variables can be set in:
-- System environment variables (highest priority)
-- Global `~/.context/.env` file (lower priority)
-
-Supported extensions include common programming languages (.ts, .js, .py, .java, .cpp, etc.) and documentation files (.md, .markdown). Default ignore patterns cover build outputs, dependencies (node_modules), IDE files, and temporary files.
-
-**See the `DEFAULT_SUPPORTED_EXTENSIONS` and `DEFAULT_IGNORE_PATTERNS` definition:** [`packages/core/src/context.ts`](../../packages/core/src/context.ts)
+**For detailed explanation see:** [File Inclusion Rules](../dive-deep/file-inclusion-rules.md)
 
 ## Q: Can I use a fully local deployment setup?
 

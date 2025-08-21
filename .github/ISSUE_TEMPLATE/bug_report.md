@@ -10,6 +10,9 @@ assignees: ''
 **Describe the bug**
 Please describe your problem in **English**
 
+**Troubleshooting Guide**
+Try to follow the [Troubleshooting Guide](https://github.com/zilliztech/claude-context/blob/main/docs/troubleshooting/troubleshooting-guide.md) to solve the problem. If you can not solve the problem, please open an issue.
+
 ## For MCP Use Cases
 **Get your MCP logs first**
 - If you use Claude Code or Gemini CLI, you can start them with `--debug` mode, e.g.,`claude --debug` or `gemini --debug` to get the detailed MCP logs.
@@ -29,6 +32,9 @@ Suppose you can not solve the problem from the logs. You can report the settings
 Try to locate the issue and provide more detailed setting information.
 
 ## Other Information
+
+**Whether you can reproduce the error**
+Try to see if the results of reproduced errors are the same every time.
 
 **Screenshots**
 If applicable, add screenshots to help explain your problem.

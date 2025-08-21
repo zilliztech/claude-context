@@ -60,14 +60,17 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 Use the command line interface to add the Claude Context MCP server:
 
 ```bash
-# Add the Claude Context MCP server
-claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
+claude mcp add claude-context \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e MILVUS_TOKEN=your-zilliz-cloud-api-key \
+  -- npx @zilliz/claude-context-mcp@latest
 ```
+
 
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
 
-### Other MCP Client Configurations (Gemini CLI, Cursor, Windsurf, etc.)
+### Other MCP Client Configurations
 
 <details>
 <summary><strong>Gemini CLI</strong></summary>
@@ -412,11 +415,55 @@ npx @zilliz/claude-context-mcp@latest
 </details>
 
 ---
-**How to configure environment variables for MCP:** For more detailed MCP environment variable configuration, see our [Environment Variables Guide](docs/getting-started/environment-variables.md).
+### Usage in Your Codebase
 
-**Using Different Embedding Models with MCP:** To configure specific embedding models (e.g., `text-embedding-3-large` for OpenAI, `voyage-code-3` for VoyageAI), see the [MCP Configuration Examples](packages/mcp/README.md#embedding-provider-configuration) for detailed setup instructions for each provider.
+1. **Open Claude Code**
+   ```
+   cd your-project-directory
+   claude
+   ```
+2. **Index your codebase**:
+   ```
+   Index this codebase
+   ```
+3. **Check indexing status**:
+   ```
+   Check the indexing status
+   ```
+4. **Start searching**:
+   ```
+   Find functions that handle user authentication
+   ```
 
-📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
+🎉 **That's it!** You now have semantic code search in Claude Code.
+
+---
+
+### Environment Variables Configuration
+
+For more detailed MCP environment variable configuration, see our [Environment Variables Guide](docs/getting-started/environment-variables.md).
+
+### Using Different Embedding Models
+
+To configure custom embedding models (e.g., `text-embedding-3-large` for OpenAI, `voyage-code-3` for VoyageAI), see the [MCP Configuration Examples](packages/mcp/README.md#embedding-provider-configuration) for detailed setup instructions for each provider.
+
+### File Inclusion & Exclusion Rules
+
+For detailed explanation of file inclusion and exclusion rules, and how to customize them, see our [File Inclusion & Exclusion Rules](docs/dive-deep/file-inclusion-rules.md).
+
+### Available Tools
+
+#### 1. `index_codebase`
+Index a codebase directory for hybrid search (BM25 + dense vector).
+
+#### 2. `search_code`
+Search the indexed codebase using natural language queries with hybrid search (BM25 + dense vector).
+
+#### 3. `clear_index`
+Clear the search index for a specific codebase.
+
+#### 4. `get_indexing_status`
+Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.
 
 ---
 
@@ -545,25 +592,6 @@ cd examples/basic-usage
 pnpm dev
 ```
 
-### Supported File Extensions
-
-By default, Claude Context supports:
-- Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`
-- Documentation: `.md`, `.markdown`, `.ipynb`
-
-### Ignore Patterns
-
-Common directories and files are automatically ignored:
-- Build outputs: `node_modules/**`, `dist/**`, `build/**`, `out/**`, `target/**`, `coverage/**`, `.nyc_output/**`
-- Version control: `.git/**`, `.svn/**`, `.hg/**`
-- IDE/Editor files: `.vscode/**`, `.idea/**`, `*.swp`, `*.swo`
-- Cache directories: `.cache/**`, `__pycache__/**`, `.pytest_cache/**`
-- Logs and temporary: `logs/**`, `tmp/**`, `temp/**`, `*.log`
-- Environment files: `.env`, `.env.*`, `*.local`
-- Minified/bundled files: `*.min.js`, `*.min.css`, `*.bundle.js`, `*.bundle.css`, `*.chunk.js`, `*.map`
-
-See [FAQ Guide](docs/troubleshooting/faq.md) for detailed and customized configuration of supported file extensions and ignore patterns. 
-
 ---
 
 ## 📖 Examples
@@ -593,6 +621,8 @@ For detailed evaluation methodology and results, see the [evaluation directory](
 - **[Does it support multiple projects / codebases?](docs/troubleshooting/faq.md#q-does-it-support-multiple-projects--codebases)**
 
 For detailed answers and more troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
+
+📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
 
 ---
 

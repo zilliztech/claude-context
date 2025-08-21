@@ -6,8 +6,8 @@ Welcome to the Claude Context documentation! Claude Context is a powerful tool t
 ## 🚀 Quick Navigation
 
 ### Getting Started
-- [📋 Project Overview](getting-started/overview.md) - What is Claude Context and how it works
 - [🛠️ Prerequisites](getting-started/prerequisites.md) - What you need before starting
+- [🔍 Environment Variables](getting-started/environment-variables.md) - How to configure environment variables for MCP
 - [⚡ Quick Start Guide](getting-started/quick-start.md) - Get up and running in 1 minutes
 
 
@@ -16,8 +16,13 @@ Welcome to the Claude Context documentation! Claude Context is a powerful tool t
 - [VSCode Extension](../packages/vscode-extension/README.md) - The VSCode extension of Claude Context
 - [Core Package](../packages/core/README.md) - The core package of Claude Context
 
+### Dive Deep
+- [File Inclusion & Exclusion Rules](dive-deep/file-inclusion-rules.md) - Detailed explanation of file inclusion and exclusion rules
+- [Asynchronous Indexing Workflow](dive-deep/asynchronous-indexing-workflow.md) - Detailed explanation of asynchronous indexing workflow
+
 ### Troubleshooting
 - [❓ FAQ](troubleshooting/faq.md) - Frequently asked questions
+- [🐛 Troubleshooting Guide](troubleshooting/troubleshooting-guide.md) - Troubleshooting guide
 
 ## 🔗 External Resources
 
