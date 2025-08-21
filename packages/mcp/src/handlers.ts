@@ -638,9 +638,8 @@ export class ToolHandlers {
                 };
             }
 
-            // Remove the cleared codebase from both lists
-            this.snapshotManager.removeIndexedCodebase(absolutePath);
-            this.snapshotManager.removeIndexingCodebase(absolutePath);
+            // Completely remove the cleared codebase from snapshot
+            this.snapshotManager.removeCodebaseCompletely(absolutePath);
 
             // Reset indexing stats if this was the active codebase
             this.indexingStats = null;
