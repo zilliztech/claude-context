@@ -75,6 +75,8 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 EOF
 ```
 
+See the [Example File](../../.env.example) for more details.
+
 ### 2. Simplified MCP Configuration
 
 **Claude Code:**

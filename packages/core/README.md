@@ -104,8 +104,10 @@ results.forEach(result => {
 
 ## Embedding Providers
 
-- **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`)
-- **VoyageAI Embeddings** - High-quality embeddings optimized for code
+- **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002`)
+- **VoyageAI Embeddings** - High-quality embeddings optimized for code (`voyage-code-3`, `voyage-3.5`, etc.)
+- **Gemini Embeddings** - Google's embedding models (`gemini-embedding-001`)
+- **Ollama Embeddings** - Local embedding models via Ollama
 
 ## Vector Database Support
 
@@ -127,6 +129,8 @@ interface ContextConfig {
   codeSplitter?: Splitter;        // Code splitting strategy
   supportedExtensions?: string[]; // File extensions to index
   ignorePatterns?: string[];      // Patterns to ignore
+  customExtensions?: string[];    // Custom extensions from MCP
+  customIgnorePatterns?: string[]; // Custom ignore patterns from MCP
 }
 ```
 
@@ -138,16 +142,19 @@ interface ContextConfig {
   '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
   '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
   // Text and markup files  
-  '.md', '.markdown'
+  '.md', '.markdown', '.ipynb'
 ]
 ```
 
 ### Default Ignore Patterns
 
-- `node_modules/**`, `dist/**`, `build/**`, `out/**`
-- `.git/**`, `.vscode/**`, `.idea/**`
-- `*.min.js`, `*.bundle.js`, `*.map`
-- Log files, cache directories, and temporary files
+- Build and dependency directories: `node_modules/**`, `dist/**`, `build/**`, `out/**`, `target/**`
+- Version control: `.git/**`, `.svn/**`, `.hg/**`
+- IDE files: `.vscode/**`, `.idea/**`, `*.swp`, `*.swo`
+- Cache directories: `.cache/**`, `__pycache__/**`, `.pytest_cache/**`, `coverage/**`
+- Minified files: `*.min.js`, `*.min.css`, `*.bundle.js`, `*.map`
+- Log and temp files: `logs/**`, `tmp/**`, `temp/**`, `*.log`
+- Environment files: `.env`, `.env.*`, `*.local`
 
 ## API Reference
 
@@ -155,13 +162,17 @@ interface ContextConfig {
 
 #### Methods
 
-- `indexCodebase(path, progressCallback?)` - Index an entire codebase
-- `semanticSearch(path, query, topK?, threshold?)` - Search indexed code semantically
+- `indexCodebase(path, progressCallback?, forceReindex?)` - Index an entire codebase
+- `reindexByChange(path, progressCallback?)` - Incrementally re-index only changed files
+- `semanticSearch(path, query, topK?, threshold?, filterExpr?)` - Search indexed code semantically
 - `hasIndex(path)` - Check if codebase is already indexed
 - `clearIndex(path, progressCallback?)` - Remove index for a codebase
 - `updateIgnorePatterns(patterns)` - Update ignore patterns
+- `addCustomIgnorePatterns(patterns)` - Add custom ignore patterns
+- `addCustomExtensions(extensions)` - Add custom file extensions
 - `updateEmbedding(embedding)` - Switch embedding provider
 - `updateVectorDatabase(vectorDB)` - Switch vector database
+- `updateSplitter(splitter)` - Switch code splitter
 
 ### Search Results
 
@@ -173,7 +184,6 @@ interface SemanticSearchResult {
   endLine: number;      // Ending line number
   language: string;     // Programming language
   score: number;        // Similarity score (0-1)
-  fileExtension: string; // File extension
 }
 ```
 

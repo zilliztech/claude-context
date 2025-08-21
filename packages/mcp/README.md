@@ -175,6 +175,50 @@ These settings work in combination with tool parameters - patterns from both sou
 
 
 <details>
+<summary><strong>Claude Code</strong></summary>
+
+Use the command line interface to add the Claude Context MCP server:
+
+```bash
+# Add the Claude Context MCP server
+claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
+
+```
+
+See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
+
+</details>
+
+
+<details>
+<summary><strong>Gemini CLI</strong></summary>
+
+Gemini CLI requires manual configuration through a JSON file:
+
+1. Create or edit the `~/.gemini/settings.json` file.
+
+2. Add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+3. Save the file and restart Gemini CLI to apply the changes.
+
+</details>
+
+<details>
 <summary><strong>Qwen Code</strong></summary>
 
 Create or edit the `~/.qwen/settings.json` file and add the following configuration:
@@ -325,21 +369,6 @@ Add to your Claude Desktop configuration:
 </details>
 
 <details>
-<summary><strong>Claude Code</strong></summary>
-
-Use the command line interface to add the Claude Context MCP server:
-
-```bash
-# Add the Claude Context MCP server
-claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
-
-```
-
-See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
-
-</details>
-
-<details>
 <summary><strong>Windsurf</strong></summary>
 
 Windsurf supports MCP configuration through a JSON file. Add the following configuration to your Windsurf MCP settings:
@@ -480,34 +509,6 @@ To configure Claude Context MCP in Augment Code, you can use either the graphica
 </details>
 
 <details>
-<summary><strong>Gemini CLI</strong></summary>
-
-Gemini CLI requires manual configuration through a JSON file:
-
-1. Create or edit the `~/.gemini/settings.json` file.
-
-2. Add the following configuration:
-
-```json
-{
-  "mcpServers": {
-    "claude-context": {
-      "command": "npx",
-      "args": ["@zilliz/claude-context-mcp@latest"],
-      "env": {
-        "OPENAI_API_KEY": "your-openai-api-key",
-        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
-      }
-    }
-  }
-}
-```
-
-3. Save the file and restart Gemini CLI to apply the changes.
-
-</details>
-
-<details>
 <summary><strong>Roo Code</strong></summary>
 
 Roo Code utilizes a JSON configuration file for MCP servers:
@@ -532,6 +533,34 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 ```
 
 3. Save the file to activate the server.
+
+</details>
+
+
+<details>
+<summary><strong>Zencoder</strong></summary>
+
+Zencoder offers support for MCP tools and servers in both its JetBrains and VS Code plugin versions.
+
+1. Go to the Zencoder menu (...)
+2. From the dropdown menu, select `Tools`
+3. Click on the `Add Custom MCP`
+4. Add the name (i.e. `Claude Context` and server configuration from below, and make sure to hit the `Install` button
+
+```json
+{
+    "command": "npx",
+    "args": ["@zilliz/claude-context-mcp@latest"],
+    "env": {
+      "OPENAI_API_KEY": "your-openai-api-key",
+      "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
+      "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+    }
+}
+
+```
+
+5. Save the server by hitting the `Install` button.
 
 </details>
 
