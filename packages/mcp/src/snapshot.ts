@@ -72,6 +72,20 @@ export class SnapshotManager {
         this.indexedCodebases = validCodebases;
         this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
         this.codebaseFileCount = new Map(); // No file count info in v1 format
+
+        // Populate codebaseInfoMap for v1 indexed codebases (with minimal info)
+        this.codebaseInfoMap = new Map();
+        const now = new Date().toISOString();
+        for (const codebasePath of validCodebases) {
+            const info: CodebaseInfoIndexed = {
+                status: 'indexed',
+                indexedFiles: 0, // Unknown in v1 format
+                totalChunks: 0,  // Unknown in v1 format
+                indexStatus: 'completed', // Assume completed for v1 format
+                lastUpdated: now
+            };
+            this.codebaseInfoMap.set(codebasePath, info);
+        }
     }
 
     /**
@@ -225,6 +239,14 @@ export class SnapshotManager {
      */
     public addIndexingCodebase(codebasePath: string, progress: number = 0): void {
         this.indexingCodebases.set(codebasePath, progress);
+
+        // Also update codebaseInfoMap for v2 compatibility
+        const info: CodebaseInfoIndexing = {
+            status: 'indexing',
+            indexingPercentage: progress,
+            lastUpdated: new Date().toISOString()
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
     }
 
     /**
@@ -233,6 +255,14 @@ export class SnapshotManager {
     public updateIndexingProgress(codebasePath: string, progress: number): void {
         if (this.indexingCodebases.has(codebasePath)) {
             this.indexingCodebases.set(codebasePath, progress);
+
+            // Also update codebaseInfoMap for v2 compatibility
+            const info: CodebaseInfoIndexing = {
+                status: 'indexing',
+                indexingPercentage: progress,
+                lastUpdated: new Date().toISOString()
+            };
+            this.codebaseInfoMap.set(codebasePath, info);
         }
     }
 
@@ -241,6 +271,8 @@ export class SnapshotManager {
      */
     public removeIndexingCodebase(codebasePath: string): void {
         this.indexingCodebases.delete(codebasePath);
+        // Also remove from codebaseInfoMap for v2 compatibility
+        this.codebaseInfoMap.delete(codebasePath);
     }
 
     /**
@@ -253,6 +285,16 @@ export class SnapshotManager {
         if (fileCount !== undefined) {
             this.codebaseFileCount.set(codebasePath, fileCount);
         }
+
+        // Also update codebaseInfoMap for v2 compatibility
+        const info: CodebaseInfoIndexed = {
+            status: 'indexed',
+            indexedFiles: fileCount || 0,
+            totalChunks: 0, // Unknown in v1 method
+            indexStatus: 'completed',
+            lastUpdated: new Date().toISOString()
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
     }
 
     /**
@@ -261,6 +303,8 @@ export class SnapshotManager {
     public removeIndexedCodebase(codebasePath: string): void {
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
         this.codebaseFileCount.delete(codebasePath);
+        // Also remove from codebaseInfoMap for v2 compatibility
+        this.codebaseInfoMap.delete(codebasePath);
     }
 
     /**
