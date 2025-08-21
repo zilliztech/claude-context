@@ -92,13 +92,11 @@ export class OllamaEmbedding extends Embedding {
         // Preprocess all texts
         const processedTexts = this.preprocessTexts(texts);
 
-        // Detect dimension on first use
+        // Detect dimension on first use if not configured
         if (!this.dimensionDetected && !this.config.dimension) {
             this.dimension = await this.detectDimension();
             this.dimensionDetected = true;
             console.log(`📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
-        } else {
-            throw new Error('Failed to detect dimension for model ' + this.config.model);
         }
 
         // Use Ollama's native batch embedding API
