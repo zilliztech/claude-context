@@ -178,6 +178,9 @@ export class SnapshotManager {
         }
     }
 
+    /**
+     * @deprecated Use getCodebaseInfo() for individual codebases or iterate through codebases for v2 format support
+     */
     public getIndexingCodebasesWithProgress(): Map<string, number> {
         return new Map(this.indexingCodebases);
     }
@@ -217,20 +220,32 @@ export class SnapshotManager {
         }
     }
 
+    /**
+     * @deprecated Use setCodebaseIndexing() instead for v2 format support
+     */
     public addIndexingCodebase(codebasePath: string, progress: number = 0): void {
         this.indexingCodebases.set(codebasePath, progress);
     }
 
+    /**
+     * @deprecated Use setCodebaseIndexing() instead for v2 format support
+     */
     public updateIndexingProgress(codebasePath: string, progress: number): void {
         if (this.indexingCodebases.has(codebasePath)) {
             this.indexingCodebases.set(codebasePath, progress);
         }
     }
 
+    /**
+     * @deprecated Use removeCodebaseCompletely() or state-specific methods instead for v2 format support
+     */
     public removeIndexingCodebase(codebasePath: string): void {
         this.indexingCodebases.delete(codebasePath);
     }
 
+    /**
+     * @deprecated Use setCodebaseIndexed() instead for v2 format support
+     */
     public addIndexedCodebase(codebasePath: string, fileCount?: number): void {
         if (!this.indexedCodebases.includes(codebasePath)) {
             this.indexedCodebases.push(codebasePath);
@@ -240,20 +255,32 @@ export class SnapshotManager {
         }
     }
 
+    /**
+     * @deprecated Use removeCodebaseCompletely() or state-specific methods instead for v2 format support
+     */
     public removeIndexedCodebase(codebasePath: string): void {
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
         this.codebaseFileCount.delete(codebasePath);
     }
 
+    /**
+     * @deprecated Use setCodebaseIndexed() instead for v2 format support
+     */
     public moveFromIndexingToIndexed(codebasePath: string, fileCount?: number): void {
         this.removeIndexingCodebase(codebasePath);
         this.addIndexedCodebase(codebasePath, fileCount);
     }
 
+    /**
+     * @deprecated Use getCodebaseInfo() and check indexedFiles property instead for v2 format support
+     */
     public getIndexedFileCount(codebasePath: string): number | undefined {
         return this.codebaseFileCount.get(codebasePath);
     }
 
+    /**
+     * @deprecated Use setCodebaseIndexed() with complete stats instead for v2 format support
+     */
     public setIndexedFileCount(codebasePath: string, fileCount: number): void {
         this.codebaseFileCount.set(codebasePath, fileCount);
     }
@@ -351,6 +378,19 @@ export class SnapshotManager {
         return Array.from(this.codebaseInfoMap.entries())
             .filter(([_, info]) => info.status === 'indexfailed')
             .map(([path, _]) => path);
+    }
+
+    /**
+     * Completely remove a codebase from all tracking (for clear_index operation)
+     */
+    public removeCodebaseCompletely(codebasePath: string): void {
+        // Remove from all internal state
+        this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
+        this.indexingCodebases.delete(codebasePath);
+        this.codebaseFileCount.delete(codebasePath);
+        this.codebaseInfoMap.delete(codebasePath);
+
+        console.log(`[SNAPSHOT-DEBUG] Completely removed codebase from snapshot: ${codebasePath}`);
     }
 
     public loadCodebaseSnapshot(): void {
