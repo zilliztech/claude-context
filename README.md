@@ -402,6 +402,13 @@ Zencoder offers support for MCP tools and servers in both its JetBrains and VS C
 
 </details>
 
+<details>
+<summary><strong>LangChain/LangGraph</strong></summary>
+
+For LangChain/LangGraph integration examples, see [this example](https://github.com/zilliztech/claude-context/blob/643796a0d30e706a2a0dff3d55621c9b5d831807/evaluation/retrieval/custom.py#L88).
+
+</details>
+
 
 <details>
 <summary><strong>Other MCP Clients</strong></summary>
@@ -619,8 +626,11 @@ For detailed evaluation methodology and results, see the [evaluation directory](
 - **[What files does Claude Context decide to embed?](docs/troubleshooting/faq.md#q-what-files-does-claude-context-decide-to-embed)**
 - **[Can I use a fully local deployment setup?](docs/troubleshooting/faq.md#q-can-i-use-a-fully-local-deployment-setup)**
 - **[Does it support multiple projects / codebases?](docs/troubleshooting/faq.md#q-does-it-support-multiple-projects--codebases)**
+- **[How does Claude Context compare to other coding tools?](docs/troubleshooting/faq.md#q-how-does-claude-context-compare-to-other-coding-tools-like-serena-context7-or-deepwiki)**
 
-For detailed answers and more troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
+❓ For detailed answers and more troubleshooting tips, see our [FAQ Guide](docs/troubleshooting/faq.md).
+
+🔧 **Encountering issues?** Visit our [Troubleshooting Guide](docs/troubleshooting/troubleshooting-guide.md) for step-by-step solutions.
 
 📚 **Need more help?** Check out our [complete documentation](docs/) for detailed guides and troubleshooting tips.
 
