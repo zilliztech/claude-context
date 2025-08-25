@@ -46,7 +46,7 @@ export class FileSynchronizer {
         try {
             entries = await fs.readdir(dir, { withFileTypes: true });
         } catch (error: any) {
-            console.warn(`Cannot read directory ${dir}: ${error.message}`);
+            console.warn(`[Synchronizer] Cannot read directory ${dir}: ${error.message}`);
             return fileHashes;
         }
 
@@ -64,7 +64,7 @@ export class FileSynchronizer {
             try {
                 stat = await fs.stat(fullPath);
             } catch (error: any) {
-                console.warn(`Cannot stat ${fullPath}: ${error.message}`);
+                console.warn(`[Synchronizer] Cannot stat ${fullPath}: ${error.message}`);
                 continue;
             }
 
@@ -85,7 +85,7 @@ export class FileSynchronizer {
                         const hash = await this.hashFile(fullPath);
                         fileHashes.set(relativePath, hash);
                     } catch (error: any) {
-                        console.warn(`Cannot hash file ${fullPath}: ${error.message}`);
+                        console.warn(`[Synchronizer] Cannot hash file ${fullPath}: ${error.message}`);
                         continue;
                     }
                 }
@@ -218,11 +218,11 @@ export class FileSynchronizer {
         console.log(`Initializing file synchronizer for ${this.rootDir}`);
         await this.loadSnapshot();
         this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
-        console.log(`File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
+        console.log(`[Synchronizer] File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
     }
 
     public async checkForChanges(): Promise<{ added: string[], removed: string[], modified: string[] }> {
-        console.log('Checking for file changes...');
+        console.log('[Synchronizer] Checking for file changes...');
 
         const newFileHashes = await this.generateFileHashes(this.rootDir);
         const newMerkleDAG = this.buildMerkleDAG(newFileHashes);
@@ -232,18 +232,18 @@ export class FileSynchronizer {
 
         // If there are any changes in the DAG, we should also do a file-level comparison
         if (changes.added.length > 0 || changes.removed.length > 0 || changes.modified.length > 0) {
-            console.log('Merkle DAG has changed. Comparing file states...');
+            console.log('[Synchronizer] Merkle DAG has changed. Comparing file states...');
             const fileChanges = this.compareStates(this.fileHashes, newFileHashes);
 
             this.fileHashes = newFileHashes;
             this.merkleDAG = newMerkleDAG;
             await this.saveSnapshot();
 
-            console.log(`Found changes: ${fileChanges.added.length} added, ${fileChanges.removed.length} removed, ${fileChanges.modified.length} modified.`);
+            console.log(`[Synchronizer] Found changes: ${fileChanges.added.length} added, ${fileChanges.removed.length} removed, ${fileChanges.modified.length} modified.`);
             return fileChanges;
         }
 
-        console.log('No changes detected based on Merkle DAG comparison.');
+        console.log('[Synchronizer] No changes detected based on Merkle DAG comparison.');
         return { added: [], removed: [], modified: [] };
     }
 
@@ -340,7 +340,7 @@ export class FileSynchronizer {
             if (error.code === 'ENOENT') {
                 console.log(`Snapshot file not found (already deleted): ${snapshotPath}`);
             } else {
-                console.error(`Failed to delete snapshot file ${snapshotPath}:`, error.message);
+                console.error(`[Synchronizer] Failed to delete snapshot file ${snapshotPath}:`, error.message);
                 throw error; // Re-throw non-ENOENT errors
             }
         }

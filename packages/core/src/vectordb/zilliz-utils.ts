@@ -153,7 +153,7 @@ export class ClusterManager {
             return result as T;
         } catch (error: any) {
             // Log the original error for more details, especially for fetch errors
-            console.error('Original error in makeRequest:', error);
+            console.error('[ZillizUtils] ❌ Original error in makeRequest:', error);
             throw new Error(`Zilliz API request failed: ${error.message}`);
         }
     }
@@ -308,7 +308,7 @@ export class ClusterManager {
                     regionId: 'gcp-us-west1' // Default region
                 });
 
-                console.log(`✅ Created new cluster: ${createResponse.clusterId}`);
+                console.log(`[ZillizUtils] ✅ Created new cluster: ${createResponse.clusterId}`);
                 return createResponse.clusterDetails.connectAddress;
             }
         } catch (error: any) {

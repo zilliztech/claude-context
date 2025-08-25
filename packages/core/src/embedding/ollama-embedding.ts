@@ -62,7 +62,7 @@ export class OllamaEmbedding extends Embedding {
         if (!this.dimensionDetected && !this.config.dimension) {
             this.dimension = await this.detectDimension();
             this.dimensionDetected = true;
-            console.log(`📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
+            console.log(`[OllamaEmbedding] 📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
         }
 
         const embedOptions: any = {
@@ -96,7 +96,7 @@ export class OllamaEmbedding extends Embedding {
         if (!this.dimensionDetected && !this.config.dimension) {
             this.dimension = await this.detectDimension();
             this.dimensionDetected = true;
-            console.log(`📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
+            console.log(`[OllamaEmbedding] 📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
         }
 
         // Use Ollama's native batch embedding API
@@ -145,9 +145,9 @@ export class OllamaEmbedding extends Embedding {
         if (!this.config.dimension) {
             this.dimension = await this.detectDimension();
             this.dimensionDetected = true;
-            console.log(`📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
+            console.log(`[OllamaEmbedding] 📏 Detected Ollama embedding dimension: ${this.dimension} for model: ${this.config.model}`);
         } else {
-            console.log('Dimension already detected for model ' + this.config.model);
+            console.log('[OllamaEmbedding] Dimension already detected for model ' + this.config.model);
         }
     }
 
@@ -196,7 +196,7 @@ export class OllamaEmbedding extends Embedding {
     }
 
     async detectDimension(testText: string = "test"): Promise<number> {
-        console.log(`[Ollama] Detecting embedding dimension...`);
+        console.log(`[OllamaEmbedding] Detecting embedding dimension...`);
 
         try {
             const processedText = this.preprocessText(testText);
@@ -217,11 +217,11 @@ export class OllamaEmbedding extends Embedding {
             }
 
             const dimension = response.embeddings[0].length;
-            console.log(`[Ollama] Successfully detected embedding dimension: ${dimension}`);
+            console.log(`[OllamaEmbedding] Successfully detected embedding dimension: ${dimension}`);
             return dimension;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error(`[Ollama] Failed to detect dimension: ${errorMessage}`);
+            console.error(`[OllamaEmbedding] Failed to detect dimension: ${errorMessage}`);
             throw new Error(`Failed to detect Ollama embedding dimension: ${errorMessage}`);
         }
     }

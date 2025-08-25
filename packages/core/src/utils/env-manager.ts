@@ -65,7 +65,7 @@ export class EnvManager {
                         // Replace the existing value
                         lines[i] = `${name}=${value}`;
                         found = true;
-                        console.log(`✅ Updated ${name} in ${this.envFilePath}`);
+                        console.log(`[EnvManager] ✅ Updated ${name} in ${this.envFilePath}`);
                         break;
                     }
                 }
@@ -78,13 +78,13 @@ export class EnvManager {
                     content += '\n';
                 }
                 content += `${name}=${value}\n`;
-                console.log(`✅ Added ${name} to ${this.envFilePath}`);
+                console.log(`[EnvManager] ✅ Added ${name} to ${this.envFilePath}`);
             }
 
             fs.writeFileSync(this.envFilePath, content, 'utf-8');
 
         } catch (error) {
-            console.error(`Failed to write env file: ${error}`);
+            console.error(`[EnvManager] ❌ Failed to write env file: ${error}`);
             throw error;
         }
     }
