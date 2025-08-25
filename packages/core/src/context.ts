@@ -6,7 +6,8 @@ import {
 import {
     Embedding,
     EmbeddingVector,
-    OpenAIEmbedding
+    OpenAIEmbedding,
+    AzureOpenAIEmbedding
 } from './embedding';
 import {
     VectorDatabase,
@@ -106,10 +107,18 @@ export class Context {
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
-        this.embedding = config.embedding || new OpenAIEmbedding({
-            apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
-            model: 'text-embedding-3-small',
-            ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
+        // this.embedding = config.embedding || new OpenAIEmbedding({
+        //     apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
+        //     model: 'text-embedding-3-small',
+        //     ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
+        // });
+
+        this.embedding = new AzureOpenAIEmbedding({
+            model: "text-embedding-3-large",
+            apiKey: "",
+            endpoint: "https://compassbotmodel01.openai.azure.com/", // Azure OpenAI endpoint URL
+            apiVersion: "2024-12-01-preview", // Azure OpenAI API version
+            deploymentName: "text-embedding-3-large" // Azure OpenAI deployment name (optional, can use model name)
         });
 
         if (!config.vectorDatabase) {
