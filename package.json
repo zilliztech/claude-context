@@ -30,6 +30,7 @@
         "eslint": "^9.25.1",
         "https-browserify": "^1.0.0",
         "os-browserify": "^0.3.0",
+        "rimraf": "^6.0.1",
         "stream-http": "^3.2.0",
         "tree-sitter-cli": "^0.25.6",
         "typescript": "^5.8.3",

@@ -6,7 +6,7 @@
     "scripts": {
         "build": "webpack --mode=production",
         "dev": "webpack --mode=development --watch",
-        "clean": "rm -rf dist",
+        "clean": "rimraf dist",
         "lint": "eslint src --ext .ts,.tsx",
         "lint:fix": "eslint src --ext .ts,.tsx --fix",
         "typecheck": "tsc --noEmit",

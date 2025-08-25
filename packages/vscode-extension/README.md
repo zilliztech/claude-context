@@ -109,6 +109,7 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 - `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama)
 - `semanticCodeSearch.embeddingProvider.model` - Embedding model to use
 - `semanticCodeSearch.embeddingProvider.apiKey` - API key for embedding provider
+- `semanticCodeSearch.embeddingProvider.baseURL` - Custom API endpoint URL (optional, for OpenAI and Gemini)
 - `semanticCodeSearch.embeddingProvider.outputDimensionality` - Output dimension for Gemini (supports 3072, 1536, 768, 256)
 - `semanticCodeSearch.milvus.address` - Milvus server address
 
