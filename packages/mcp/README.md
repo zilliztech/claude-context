@@ -1,4 +1,5 @@
 # @zilliz/claude-context-mcp
+
 ![](../../assets/claude-context.png)
 Model Context Protocol (MCP) integration for Claude Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
@@ -7,19 +8,18 @@ Model Context Protocol (MCP) integration for Claude Context - A powerful MCP ser
 
 > 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
-
 ## 🚀 Use Claude Context as MCP in Claude Code and others
 
 ![img](https://lh7-rt.googleusercontent.com/docsz/AD_4nXf2uIf2c5zowp-iOMOqsefHbY_EwNGiutkxtNXcZVJ8RI6SN9DsCcsc3amXIhOZx9VcKFJQLSAqM-2pjU9zoGs1r8GCTUL3JIsLpLUGAm1VQd5F2o5vpEajx2qrc77iXhBu1zWj?key=qYdFquJrLcfXCUndY-YRBQ)
 
 Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
-
 ## Quick Start
 
 ### Prerequisites
 
 Before using the MCP server, make sure you have:
+
 - API key for your chosen embedding provider (OpenAI, VoyageAI, Gemini, or Ollama setup)
 - Milvus vector database (local or cloud)
 
@@ -58,6 +58,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 See `getSupportedModels` in [`openai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/openai-embedding.ts) for the full list of supported models.
 
 **Getting API Key:**
+
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Sign in or create an account
 3. Generate a new API key
@@ -82,6 +83,7 @@ EMBEDDING_MODEL=voyage-code-3
 See `getSupportedModels` in [`voyageai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/voyageai-embedding.ts) for the full list of supported models.
 
 **Getting API Key:**
+
 1. Visit [VoyageAI Console](https://dash.voyageai.com/)
 2. Sign up for an account
 3. Navigate to API Keys section
@@ -100,12 +102,16 @@ GEMINI_API_KEY=your-gemini-api-key
 
 # Optional: Specify embedding model (default: gemini-embedding-001)
 EMBEDDING_MODEL=gemini-embedding-001
+
+# Optional: Custom API base URL (for custom endpoints)
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 ```
 
 **Available Models:**
 See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/gemini-embedding.ts) for the full list of supported models.
 
 **Getting API Key:**
+
 1. Visit [Google AI Studio](https://aistudio.google.com/)
 2. Sign in with your Google account
 3. Go to "Get API key" section
@@ -127,12 +133,16 @@ OLLAMA_HOST=http://127.0.0.1:11434
 ```
 
 **Setup Instructions:**
+
 1. Install Ollama from [ollama.ai](https://ollama.ai/)
 2. Pull the embedding model:
+
    ```bash
    ollama pull nomic-embed-text
    ```
+
 3. Ensure Ollama is running:
+
    ```bash
    ollama serve
    ```
@@ -149,16 +159,18 @@ Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configurati
 
 ```bash
 MILVUS_TOKEN=your-zilliz-cloud-api-key
-``` 
-
+```
 
 #### Embedding Batch Size
+
 You can set the embedding batch size to optimize the performance of the MCP server, depending on your embedding model throughput. The default value is 100.
+
 ```bash
 EMBEDDING_BATCH_SIZE=512
 ```
 
 #### Custom File Processing (Optional)
+
 You can configure custom file extensions and ignore patterns globally via environment variables:
 
 ```bash
@@ -172,7 +184,6 @@ CUSTOM_IGNORE_PATTERNS=temp/**,*.backup,private/**,uploads/**
 These settings work in combination with tool parameters - patterns from both sources will be merged together.
 
 ## Usage with MCP Clients
-
 
 <details>
 <summary><strong>Claude Code</strong></summary>
@@ -188,7 +199,6 @@ claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TO
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
 
 </details>
-
 
 <details>
 <summary><strong>Gemini CLI</strong></summary>
@@ -248,6 +258,7 @@ Go to: `Settings` -> `Cursor Settings` -> `MCP` -> `Add new global MCP server`
 Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file is the recommended approach. You may also install in a specific project by creating `.cursor/mcp.json` in your project folder. See [Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol) for more info.
 
 **OpenAI Configuration (Default):**
+
 ```json
 {
   "mcpServers": {
@@ -265,6 +276,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```
 
 **VoyageAI Configuration:**
+
 ```json
 {
   "mcpServers": {
@@ -283,6 +295,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```
 
 **Gemini Configuration:**
+
 ```json
 {
   "mcpServers": {
@@ -300,6 +313,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```
 
 **Ollama Configuration:**
+
 ```json
 {
   "mcpServers": {
@@ -318,8 +332,6 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 ```
 
 </details>
-
-
 
 <details>
 <summary><strong>Void</strong></summary>
@@ -536,7 +548,6 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 
 </details>
 
-
 <details>
 <summary><strong>Zencoder</strong></summary>
 
@@ -596,9 +607,11 @@ npx @zilliz/claude-context-mcp@latest
 ## Available Tools
 
 ### 1. `index_codebase`
+
 Index a codebase directory for hybrid search (BM25 + dense vector).
 
 **Parameters:**
+
 - `path` (required): Absolute path to the codebase directory to index
 - `force` (optional): Force re-indexing even if already indexed (default: false)
 - `splitter` (optional): Code splitter to use - 'ast' for syntax-aware splitting with automatic fallback, 'langchain' for character-based splitting (default: "ast")
@@ -606,30 +619,36 @@ Index a codebase directory for hybrid search (BM25 + dense vector).
 - `ignorePatterns` (optional): Additional ignore patterns to exclude specific files/directories beyond defaults (e.g., ['static/**', '*.tmp', 'private/**']) (default: [])
 
 ### 2. `search_code`
+
 Search the indexed codebase using natural language queries with hybrid search (BM25 + dense vector).
 
 **Parameters:**
+
 - `path` (required): Absolute path to the codebase directory to search in
 - `query` (required): Natural language query to search for in the codebase
 - `limit` (optional): Maximum number of results to return (default: 10, max: 50)
 - `extensionFilter` (optional): List of file extensions to filter results (e.g., ['.ts', '.py']) (default: [])
 
 ### 3. `clear_index`
+
 Clear the search index for a specific codebase.
 
 **Parameters:**
+
 - `path` (required): Absolute path to the codebase directory to clear index for
 
 ### 4. `get_indexing_status`
+
 Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.
 
 **Parameters:**
-- `path` (required): Absolute path to the codebase directory to check status for
 
+- `path` (required): Absolute path to the codebase directory to check status for
 
 ## Contributing
 
 This package is part of the Claude Context monorepo. Please see:
+
 - [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines  
 - [MCP Package Contributing](CONTRIBUTING.md) - Specific development guide for this package
 
@@ -641,4 +660,4 @@ This package is part of the Claude Context monorepo. Please see:
 
 ## License
 
-MIT - See [LICENSE](../../LICENSE) for details 
+MIT - See [LICENSE](../../LICENSE) for details

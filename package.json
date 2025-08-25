@@ -19,7 +19,8 @@
         "release:core": "pnpm --filter @zilliz/claude-context-core... run build && pnpm --filter @zilliz/claude-context-core publish --access public --no-git-checks",
         "release:mcp": "pnpm --filter @zilliz/claude-context-mcp... run build && pnpm --filter @zilliz/claude-context-mcp publish --access public --no-git-checks",
         "release:vscode": "pnpm --filter @zilliz/claude-context-core build && pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
-        "example:basic": "pnpm --filter claude-context-basic-example start"
+        "example:basic": "pnpm --filter claude-context-basic-example start",
+        "benchmark": "node scripts/build-benchmark.js"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",

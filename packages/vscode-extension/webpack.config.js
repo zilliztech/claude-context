@@ -13,6 +13,12 @@ module.exports = {
         filename: 'extension.js',
         libraryTarget: 'commonjs2'
     },
+    cache: {
+        type: 'filesystem',
+        buildDependencies: {
+            config: [__filename]
+        }
+    },
     devtool: 'nosources-source-map',
     externals: {
         vscode: 'commonjs vscode', // the vscode-module is created on-the-fly and must be excluded

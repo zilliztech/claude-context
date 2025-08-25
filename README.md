@@ -1,4 +1,5 @@
 ![](assets/claude-context.png)
+
 ### Your entire codebase as Claude's context
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -27,6 +28,7 @@
 Model Context Protocol (MCP) allows you to integrate Claude Context with your favorite AI coding assistants, e.g. Claude Code.
 
 ## Quick Start
+
 ### Prerequisites
 
 <details>
@@ -52,7 +54,9 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 ### Configure MCP for Claude Code
 
 **System Requirements:**
+
 - Node.js >= 20.0.0 and < 24.0.0
+
 > Claude Context is not compatible with Node.js 24.0.0, you need downgrade it first if your node version is greater or equal to 24.
 
 #### Configuration
@@ -66,9 +70,7 @@ claude mcp add claude-context \
   -- npx @zilliz/claude-context-mcp@latest
 ```
 
-
 See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for more details about MCP server management.
-
 
 ### Other MCP Client Configurations
 
@@ -94,6 +96,7 @@ Gemini CLI requires manual configuration through a JSON file:
   }
 }
 ```
+
 3. Save the file and restart Gemini CLI to apply the changes.
 
 </details>
@@ -120,7 +123,6 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
 ```
 
 </details>
-
 
 <details>
 <summary><strong>Cursor</strong></summary>
@@ -409,7 +411,6 @@ For LangChain/LangGraph integration examples, see [this example](https://github.
 
 </details>
 
-
 <details>
 <summary><strong>Other MCP Clients</strong></summary>
 
@@ -422,22 +423,30 @@ npx @zilliz/claude-context-mcp@latest
 </details>
 
 ---
+
 ### Usage in Your Codebase
 
 1. **Open Claude Code**
+
    ```
    cd your-project-directory
    claude
    ```
+
 2. **Index your codebase**:
+
    ```
    Index this codebase
    ```
+
 3. **Check indexing status**:
+
    ```
    Check the indexing status
    ```
+
 4. **Start searching**:
+
    ```
    Find functions that handle user authentication
    ```
@@ -461,22 +470,26 @@ For detailed explanation of file inclusion and exclusion rules, and how to custo
 ### Available Tools
 
 #### 1. `index_codebase`
+
 Index a codebase directory for hybrid search (BM25 + dense vector).
 
 #### 2. `search_code`
+
 Search the indexed codebase using natural language queries with hybrid search (BM25 + dense vector).
 
 #### 3. `clear_index`
+
 Clear the search index for a specific codebase.
 
 #### 4. `get_indexing_status`
+
 Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.
 
 ---
 
 ## 🏗️ Architecture
-![](assets/Architecture.png)
 
+![](assets/Architecture.png)
 
 ### 🔧 Implementation Details
 
@@ -488,6 +501,7 @@ Get the current indexing status of a codebase. Shows progress percentage for act
 - 🛠️ **Customizable**: Configure file extensions, ignore patterns, and embedding models.
 
 ### Core Components
+
 Claude Context is a monorepo containing three main packages:
 
 - **`@zilliz/claude-context-core`**: Core indexing engine with embedding and vector database integration
@@ -495,6 +509,7 @@ Claude Context is a monorepo containing three main packages:
 - **`@zilliz/claude-context-mcp`**: Model Context Protocol server for AI agent integration
 
 ### Supported Technologies
+
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
 - **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
@@ -564,6 +579,13 @@ Integrates Claude Context directly into your IDE. Provides an intuitive interfac
 
 ### Setup Development Environment
 
+#### Prerequisites
+
+- Node.js 20.x or 22.x
+- pnpm (recommended package manager)
+
+#### Cross-Platform Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/zilliztech/claude-context.git
@@ -579,17 +601,52 @@ pnpm build
 pnpm dev
 ```
 
+#### Windows-Specific Setup
+
+On Windows, ensure you have:
+
+- **Git for Windows** with proper line ending configuration
+- **Node.js** installed via the official installer or package manager
+- **pnpm** installed globally: `npm install -g pnpm`
+
+```powershell
+# Windows PowerShell/Command Prompt
+git clone https://github.com/zilliztech/claude-context.git
+cd claude-context
+
+# Configure git line endings (recommended)
+git config core.autocrlf false
+
+# Install dependencies
+pnpm install
+
+# Build all packages (uses cross-platform scripts)
+pnpm build
+
+# Start development mode
+pnpm dev
+```
+
 ### Building
 
 ```bash
-# Build all packages
+# Build all packages (cross-platform)
 pnpm build
 
 # Build specific package
 pnpm build:core
 pnpm build:vscode
 pnpm build:mcp
+
+# Performance benchmarking
+pnpm benchmark
 ```
+
+#### Windows Build Notes
+
+- All build scripts are cross-platform compatible using rimraf
+- Build caching is enabled for faster subsequent builds
+- Use PowerShell or Command Prompt - both work equally well
 
 ### Running Examples
 
@@ -641,6 +698,7 @@ For detailed evaluation methodology and results, see the [evaluation directory](
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.
 
 **Package-specific contributing guides:**
+
 - [Core Package Contributing](packages/core/CONTRIBUTING.md)
 - [MCP Server Contributing](packages/mcp/CONTRIBUTING.md)  
 - [VSCode Extension Contributing](packages/vscode-extension/CONTRIBUTING.md)

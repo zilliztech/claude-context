@@ -13,22 +13,44 @@ Thank you for your interest in contributing to Claude Context! This guide will h
 ### Development Setup
 
 1. **Fork and Clone**
+
    ```bash
    git clone https://github.com/your-username/claude-context.git
    cd claude-context
    ```
 
-2. **Install Dependencies**
+2. **Platform-Specific Setup**
+
+   **Windows Users:**
+
+   ```powershell
+   # Configure git line endings (recommended)
+   git config core.autocrlf false
+
+   # Ensure pnpm is installed
+   npm install -g pnpm
+   ```
+
+   **Linux/macOS Users:**
+
+   ```bash
+   # Standard setup - no additional configuration needed
+   ```
+
+3. **Install Dependencies**
+
    ```bash
    pnpm install
    ```
 
-3. **Build All Packages**
+4. **Build All Packages**
+
    ```bash
    pnpm build
    ```
 
-4. **Start Development Mode**
+5. **Start Development Mode**
+
    ```bash
    pnpm dev
    ```
@@ -71,6 +93,7 @@ pnpm dev
 ### Package-Specific Development
 
 For detailed development instructions for each package, see:
+
 - [Core Package Development](packages/core/CONTRIBUTING.md)
 - [VSCode Extension Development](packages/vscode-extension/CONTRIBUTING.md)
 - [MCP Server Development](packages/mcp/CONTRIBUTING.md)
@@ -97,6 +120,7 @@ refactor(mcp): improve error handling
 ### Pull Request Process
 
 1. **Create Feature Branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -106,17 +130,20 @@ refactor(mcp): improve error handling
    - Update documentation if needed
 
 3. **Build and Verify**
+
    ```bash
    pnpm build
    ```
 
 4. **Commit Your Changes**
+
    ```bash
    git add .
    git commit -m "feat(core): add your feature description"
    ```
 
 5. **Push and Create PR**
+
    ```bash
    git push origin feature/your-feature-name
    ```
