@@ -56,7 +56,7 @@ export class AstCodeSplitter implements Splitter {
             const tree = this.parser.parse(code);
 
             if (!tree.rootNode) {
-                console.warn(`⚠️  Failed to parse AST for ${language}, falling back to LangChain: ${filePath || 'unknown'}`);
+                console.warn(`[ASTSplitter] ⚠️  Failed to parse AST for ${language}, falling back to LangChain: ${filePath || 'unknown'}`);
                 return await this.langchainFallback.split(code, language, filePath);
             }
 
@@ -68,7 +68,7 @@ export class AstCodeSplitter implements Splitter {
 
             return refinedChunks;
         } catch (error) {
-            console.warn(`⚠️  AST splitter failed for ${language}, falling back to LangChain: ${error}`);
+            console.warn(`[ASTSplitter] ⚠️  AST splitter failed for ${language}, falling back to LangChain: ${error}`);
             return await this.langchainFallback.split(code, language, filePath);
         }
     }

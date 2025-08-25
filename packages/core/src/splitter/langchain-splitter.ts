@@ -47,7 +47,7 @@ export class LangChainCodeSplitter implements Splitter {
                 return this.fallbackSplit(code, language, filePath);
             }
         } catch (error) {
-            console.error('Error splitting code:', error);
+            console.error('[LangChainSplitter] ❌ Error splitting code:', error);
             // If specific language splitting fails, use generic splitter
             return this.fallbackSplit(code, language, filePath);
         }
