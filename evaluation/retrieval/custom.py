@@ -90,7 +90,7 @@ class CustomRetrieval(BaseRetrieval):
                 # "command": "node",
                 # "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
                 "command": "npx",
-                "args": ["-y", "@zilliz/claude-context-mcp@0.1.0"],  # For reproduction environment
+                "args": ["-y", "@suoshengzhang/claude-context-mcp@0.1.0"],  # For reproduction environment
                 "env": {
                     "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
                     "MILVUS_ADDRESS": os.getenv("MILVUS_ADDRESS"),

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Context } from '@zilliz/claude-context-core';
+import { Context } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
 
 export class IndexCommand {
@@ -74,7 +74,7 @@ export class IndexCommand {
 
                 // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
-                const { FileSynchronizer } = await import("@zilliz/claude-context-core");
+                const { FileSynchronizer } = await import("@suoshengzhang/claude-context-core");
                 const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.context.getIgnorePatterns() || []);
                 await synchronizer.initialize();
                 // Store synchronizer in the context's internal map using the collection name from context

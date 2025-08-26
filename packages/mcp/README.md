@@ -2,8 +2,8 @@
 ![](../../assets/claude-context.png)
 Model Context Protocol (MCP) integration for Claude Context - A powerful MCP server that enables AI assistants and agents to index and search codebases using semantic search.
 
-[![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-mcp.svg)](https://www.npmjs.com/package/@zilliz/claude-context-mcp)
+[![npm version](https://img.shields.io/npm/v/@suoshengzhang/claude-context-mcp.svg)](https://www.npmjs.com/package/@suoshengzhang/claude-context-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@suoshengzhang/claude-context-mcp.svg)](https://www.npmjs.com/package/@suoshengzhang/claude-context-mcp)
 
 > 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and setup instructions.
 
@@ -635,7 +635,7 @@ This package is part of the Claude Context monorepo. Please see:
 
 ## Related Projects
 
-- **[@zilliz/claude-context-core](../core)** - Core indexing engine used by this MCP server
+- **[@suoshengzhang/claude-context-core](../core)** - Core indexing engine used by this MCP server
 - **[VSCode Extension](../vscode-extension)** - Alternative VSCode integration
 - [Model Context Protocol](https://modelcontextprotocol.io/) - Official MCP documentation
 

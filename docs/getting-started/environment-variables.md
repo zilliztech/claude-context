@@ -81,7 +81,7 @@ See the [Example File](../../.env.example) for more details.
 
 **Claude Code:**
 ```bash
-claude mcp add claude-context -- npx @zilliz/claude-context-mcp@latest
+claude mcp add claude-context -- npx @suoshengzhang/claude-context-mcp@latest
 ```
 
 **Cursor/Windsurf/Others:**
@@ -90,7 +90,7 @@ claude mcp add claude-context -- npx @zilliz/claude-context-mcp@latest
   "mcpServers": {
     "claude-context": {
       "command": "npx",
-      "args": ["-y", "@zilliz/claude-context-mcp@latest"]
+      "args": ["-y", "@suoshengzhang/claude-context-mcp@latest"]
     }
   }
 }

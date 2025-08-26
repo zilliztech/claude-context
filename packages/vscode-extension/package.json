@@ -175,7 +175,7 @@
         "release": "vsce publish --no-dependencies"
     },
     "dependencies": {
-        "@zilliz/claude-context-core": "workspace:*",
+        "@suoshengzhang/claude-context-core": "workspace:*",
         "web-tree-sitter": "^0.25.6"
     },
     "devDependencies": {
