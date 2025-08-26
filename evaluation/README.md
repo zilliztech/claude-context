@@ -103,4 +103,8 @@ The evaluation framework is designed to be reproducible and can be easily extend
 
 ![MCP Efficiency Analysis](../assets/mcp_efficiency_analysis_chart.png)
 
-*The chart above shows the dramatic efficiency improvements achieved by Claude Context MCP while maintaining equivalent retrieval quality. Token usage and tool calls are significantly reduced with no loss in F1-score performance.*
+*The chart above shows the dramatic efficiency improvements achieved by Claude Context MCP. The token usage and tool calls are significantly reduced.*
+
+## Case Study
+
+For detailed analysis of why grep-only approaches have limitations and how semantic search addresses these challenges, please refer to our **[Case Study](./case_study/)** which provides in-depth comparisons and analysis on the this experiment results.
