@@ -1,4 +1,4 @@
-# Contributing to @zilliz/claude-context-mcp
+# Contributing to @suoshengzhang/code-agent
 
 Thanks for your interest in contributing to the Claude Context MCP server!
 
