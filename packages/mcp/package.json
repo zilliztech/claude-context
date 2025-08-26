@@ -29,7 +29,8 @@
     },
     "files": [
         "dist",
-        "README.md"
+        "README.md",
+        "*.zip"
     ],
     "repository": {
         "type": "git",
