@@ -74,25 +74,19 @@ export class AzureOpenAIEmbedding extends Embedding {
         }
 
         try {
-            const embeddings = await this.getEmbedding([text]);
+            const response = await this.client.embeddings.create({
+                model: model,
+                input: processedText,
+                encoding_format: 'float',
+            });
+
+            // Update dimension from actual response
+            this.dimension = response.data[0].embedding.length;
+
             return {
-                vector: embeddings[0],
+                vector: response.data[0].embedding,
                 dimension: this.dimension
             };
-
-            // const response = await this.client.embeddings.create({
-            //     model: model,
-            //     input: processedText,
-            //     encoding_format: 'float',
-            // });
-
-            // // Update dimension from actual response
-            // this.dimension = response.data[0].embedding.length;
-
-            // return {
-            //     vector: response.data[0].embedding,
-            //     dimension: this.dimension
-            // };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to generate Azure OpenAI embedding: ${errorMessage}`);
@@ -129,12 +123,20 @@ export class AzureOpenAIEmbedding extends Embedding {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const embeddings = await response.json() as number[][];
+            const embeddings = await response.json() as any;
             console.log("##### " + embeddings.length);
-            return embeddings.map((embedding: number[]) => ({
-                vector: embedding,
-                dimension: embedding.length
+            // const parsedEmbeddings = JSON.parse(embeddings);
+            console.log("Parsed Embeddings: ", embeddings);
+            console.log("Number of embeddings received: ", embeddings.embeddings.length);
+            console.log("Type of embeddings: ", typeof embeddings.embeddings[0]);
+            const processedEmbeddings = embeddings.embeddings.map((embedding: any) => ({
+                vector: JSON.parse(embedding.embedding),
+                dimension: JSON.parse(embedding.embedding).length
             }));
+
+            console.log("Processed Embeddings: ", JSON.stringify(processedEmbeddings[0]));
+            // console.log(`Process completed at ${new Date().toISOString()}`);
+            return processedEmbeddings;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to get embeddings from local endpoint: ${errorMessage}`);

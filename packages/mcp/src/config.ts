@@ -1,4 +1,6 @@
 import { envManager } from "@suoshengzhang/claude-context-core";
+import path from "path";
+import os from "os";
 
 export interface ContextMcpConfig {
     name: string;
@@ -24,6 +26,7 @@ export interface ContextMcpConfig {
     milvusToken?: string;
     chromaAddress?: string;
     chromaPort?: number;
+    chromaWorkingDir?: string;
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -144,7 +147,8 @@ export function createMcpConfig(): ContextMcpConfig {
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
         chromaAddress: envManager.get('CHROMA_ADDRESS'),
-        chromaPort: Number(envManager.get('CHROMA_PORT')) || 8000
+        chromaPort: Number(envManager.get('CHROMA_PORT')) || 8000,
+        chromaWorkingDir: envManager.get('CHROMA_WORKING_DIR') || path.join(os.homedir(), '.context', 'chromadb')
     };
 
     return config;

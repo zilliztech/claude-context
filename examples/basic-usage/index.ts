@@ -53,7 +53,7 @@ async function main() {
 
         let vectorDatabase = new ChromaVectorDatabase({
             host: chromaAddress,
-            port: chromaPort
+            port: Number(chromaPort)
         });
 
         // 2. Create Context instance
@@ -69,32 +69,29 @@ async function main() {
             supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h']
         });
 
-        // 3. Check if index already exists and clear if needed
-        console.log('\n📖 Starting to index codebase...');
-        // const codebasePath = path.join(__dirname, './code'); // Index entire project
-        const codebasePath = "D:/AdsMCP"; //path.join(__dirname, '../..'); // Index entire project
+        // // 3. Check if index already exists and clear if needed
+        // console.log('\n📖 Starting to index codebase...');
+        // // const codebasePath = path.join(__dirname, './code'); // Index entire project
+        const codebasePath = "d:/demos/test1"; //path.join(__dirname, '../..'); // Index entire project
 
-        // Check if index already exists
-        const hasExistingIndex = await context.hasIndex(codebasePath);
-        if (hasExistingIndex) {
-            console.log('🗑️  Existing index found, clearing it first...');
-            await context.clearIndex(codebasePath);
-        }
+        // // Check if index already exists
+        // const hasExistingIndex = await context.hasIndex(codebasePath);
+        // if (hasExistingIndex) {
+        //     console.log('🗑️  Existing index found, clearing it first...');
+        //     await context.clearIndex(codebasePath);
+        // }
 
-        // Index with progress tracking
-        const indexStats = await context.indexCodebase(codebasePath);
+        // // Index with progress tracking
+        // const indexStats = await context.indexCodebase(codebasePath);
 
-        // 4. Show indexing statistics
-        console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
-
-        // return;
+        // // 4. Show indexing statistics
+        // console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
 
         // 5. Perform semantic search
         console.log('\n🔍 Performing semantic search...');
 
         const queries = [
-            'what is CompassMCPServer',
-            'code splitting functions'
+            'get me the detail of GetEnvToComps'
         ];
 
         for (const query of queries) {
@@ -107,7 +104,7 @@ async function main() {
                     console.log(`      File: ${path.join(codebasePath, result.relativePath)}`);
                     console.log(`      Language: ${result.language}`);
                     console.log(`      Lines: ${result.startLine}-${result.endLine}`);
-                    console.log(`      Preview: ${result.content.substring(0, 100)}...`);
+                    console.log(`      Preview: ${result.content}...`);
                 });
             } else {
                 console.log('   No relevant results found');

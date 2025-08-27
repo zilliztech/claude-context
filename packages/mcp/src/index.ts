@@ -36,6 +36,7 @@ import { SnapshotManager } from "./snapshot.js";
 import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
 import { ChromaVectorDatabase } from "@suoshengzhang/claude-context-core";
+import { ChromaManager } from "./chroma-manager.js";
 
 class ContextMcpServer {
     private server: Server;
@@ -43,6 +44,7 @@ class ContextMcpServer {
     private snapshotManager: SnapshotManager;
     private syncManager: SyncManager;
     private toolHandlers: ToolHandlers;
+    private chromaManager: ChromaManager;
 
     constructor(config: ContextMcpConfig) {
         // Initialize MCP server
@@ -61,6 +63,7 @@ class ContextMcpServer {
         // Initialize embedding provider
         console.log(`[EMBEDDING] Initializing embedding provider: ${config.embeddingProvider}`);
         console.log(`[EMBEDDING] Using model: ${config.embeddingModel}`);
+        console.log(`[CHROMA] Using working directory: ${config.chromaWorkingDir}`);
 
         const embedding = createEmbeddingInstance(config);
         logEmbeddingProviderInfo(config, embedding);
@@ -85,6 +88,9 @@ class ContextMcpServer {
         this.snapshotManager = new SnapshotManager();
         this.syncManager = new SyncManager(this.context, this.snapshotManager);
         this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager);
+
+        // Initialize Chroma manager (will be done in start() method)
+        this.chromaManager = new ChromaManager(config.chromaWorkingDir || '');
 
         // Load existing codebase snapshot on startup
         this.snapshotManager.loadCodebaseSnapshot();
@@ -231,6 +237,15 @@ This tool is versatile and can be used before completing various tasks to retrie
                             required: ["path"]
                         }
                     },
+                    {
+                        name: "get_chroma_status",
+                        description: `Get the current status of the Chroma vector database process. Shows whether the process is running, alive, and restart attempts.`,
+                        inputSchema: {
+                            type: "object",
+                            properties: {},
+                            required: []
+                        }
+                    },
                 ]
             };
         });
@@ -248,6 +263,8 @@ This tool is versatile and can be used before completing various tasks to retrie
                     return await this.toolHandlers.handleClearIndex(args);
                 case "get_indexing_status":
                     return await this.toolHandlers.handleGetIndexingStatus(args);
+                case "get_chroma_status":
+                    return await this.handleGetChromaStatus(args);
 
                 default:
                     throw new Error(`Unknown tool: ${name}`);
@@ -258,6 +275,16 @@ This tool is versatile and can be used before completing various tasks to retrie
     async start() {
         console.log('[SYNC-DEBUG] MCP server start() method called');
         console.log('Starting Context MCP server...');
+
+        // Initialize and start Chroma process
+        console.log('[CHROMA] Initializing Chroma manager...');
+        try {
+            await this.chromaManager.start();
+            console.log('[CHROMA] Chroma process started successfully');
+        } catch (error) {
+            console.error('[CHROMA] Failed to initialize or start Chroma process:', error);
+            throw error;
+        }
 
         const transport = new StdioServerTransport();
         console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
@@ -271,7 +298,43 @@ This tool is versatile and can be used before completing various tasks to retrie
         this.syncManager.startBackgroundSync();
         console.log('[SYNC-DEBUG] MCP server initialization complete');
     }
+
+    /**
+     * Stop the MCP server and all associated processes
+     */
+    public async stop(): Promise<void> {
+        console.log('[MCP] Stopping MCP server...');
+
+        // Stop Chroma process
+        if (this.chromaManager) {
+            await this.chromaManager.stop();
+        }
+
+        console.log('[MCP] MCP server stopped');
+    }
+
+    /**
+     * Handle get_chroma_status tool
+     */
+    private async handleGetChromaStatus(args: any): Promise<any> {
+        const status = this.chromaManager.getStatus();
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `Chroma Process Status:
+- Running: ${status.isRunning}
+- Alive: ${status.isAlive}
+- Restart Attempts: ${status.restartAttempts}
+- PID: ${this.chromaManager['chromaProcess']?.pid || 'N/A'}`
+                }
+            ]
+        };
+    }
 }
+
+// // Global server instance for shutdown handling
+let globalServerInstance: ContextMcpServer | null = null;
 
 // Main execution
 async function main() {
@@ -289,17 +352,24 @@ async function main() {
     logConfigurationSummary(config);
 
     const server = new ContextMcpServer(config);
+    globalServerInstance = server;
     await server.start();
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     console.error("Received SIGINT, shutting down gracefully...");
+    if (globalServerInstance) {
+        await globalServerInstance.stop();
+    }
     process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     console.error("Received SIGTERM, shutting down gracefully...");
+    if (globalServerInstance) {
+        await globalServerInstance.stop();
+    }
     process.exit(0);
 });
 
