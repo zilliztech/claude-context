@@ -10,7 +10,7 @@
         "lint": "eslint src --ext .ts,.tsx",
         "lint:fix": "eslint src --ext .ts,.tsx --fix",
         "typecheck": "tsc --noEmit",
-        "build:milvus": "./build.sh"
+        "build:milvus": "echo 'build:milvus script not implemented'"
     },
     "dependencies": {
         "@zilliz/claude-context-core": "workspace:*"

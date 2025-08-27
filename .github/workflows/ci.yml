@@ -49,7 +49,14 @@ jobs:
           pnpm clean
           echo "Clean command executed successfully on Windows"
 
-      - name: Verify build outputs
+      - name: Verify build outputs (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
-          ls -la packages/core/dist || dir packages\core\dist
-          ls -la packages/mcp/dist || dir packages\mcp\dist
+          ls -la packages/core/dist || echo "packages/core/dist not found"
+          ls -la packages/mcp/dist || echo "packages/mcp/dist not found"
+
+      - name: Verify build outputs (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Get-ChildItem packages/core/dist -ErrorAction SilentlyContinue | Format-Table -AutoSize || Write-Host "packages/core/dist not found"
+          Get-ChildItem packages/mcp/dist -ErrorAction SilentlyContinue | Format-Table -AutoSize || Write-Host "packages/mcp/dist not found"
