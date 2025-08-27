@@ -132,7 +132,10 @@ function createContextWithConfig(configManager: ConfigManager): Context {
         // Create embedding instance
         if (embeddingConfig) {
             embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
-            console.log(`Embedding initialized with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
+            const modelOrDeployment = embeddingConfig.provider === 'AzureOpenAI' 
+                ? (embeddingConfig.config as any).deploymentName 
+                : (embeddingConfig.config as any).model;
+            console.log(`Embedding initialized with ${embeddingConfig.provider} (${embeddingConfig.provider === 'AzureOpenAI' ? 'deployment' : 'model'}: ${modelOrDeployment})`);
             contextConfig.embedding = embedding;
         } else {
             console.log('No embedding configuration found');
@@ -193,7 +196,10 @@ function reloadContextConfiguration() {
         if (embeddingConfig) {
             const embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
             codeContext.updateEmbedding(embedding);
-            console.log(`Embedding updated with ${embeddingConfig.provider} (model: ${embeddingConfig.config.model})`);
+            const modelOrDeployment = embeddingConfig.provider === 'AzureOpenAI' 
+                ? (embeddingConfig.config as any).deploymentName 
+                : (embeddingConfig.config as any).model;
+            console.log(`Embedding updated with ${embeddingConfig.provider} (${embeddingConfig.provider === 'AzureOpenAI' ? 'deployment' : 'model'}: ${modelOrDeployment})`);
         }
 
         // Update vector database if configuration exists

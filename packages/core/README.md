@@ -105,6 +105,7 @@ results.forEach(result => {
 ## Embedding Providers
 
 - **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002`)
+- **Azure OpenAI Embeddings** - Same models as OpenAI, deployed on Azure infrastructure
 - **VoyageAI Embeddings** - High-quality embeddings optimized for code (`voyage-code-3`, `voyage-3.5`, etc.)
 - **Gemini Embeddings** - Google's embedding models (`gemini-embedding-001`)
 - **Ollama Embeddings** - Local embedding models via Ollama
@@ -189,6 +190,30 @@ interface SemanticSearchResult {
 
 
 ## Examples
+
+### Using Azure OpenAI Embeddings
+
+```typescript
+import { Context, MilvusVectorDatabase, AzureOpenAIEmbedding } from '@zilliz/claude-context-core';
+
+// Initialize with Azure OpenAI embedding provider
+const embedding = new AzureOpenAIEmbedding({
+  deploymentName: 'text-embedding-3-small-deployment',
+  apiKey: process.env.AZURE_OPENAI_API_KEY || 'your-azure-api-key',
+  azureEndpoint: process.env.AZURE_OPENAI_ENDPOINT || 'https://your-resource.openai.azure.com',
+  apiVersion: '2024-02-01' // Optional
+});
+
+const vectorDatabase = new MilvusVectorDatabase({
+  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+  token: process.env.MILVUS_TOKEN || ''
+});
+
+const context = new Context({
+  embedding,
+  vectorDatabase
+});
+```
 
 ### Using VoyageAI Embeddings
 
