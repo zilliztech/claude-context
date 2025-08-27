@@ -74,6 +74,12 @@ export class AzureOpenAIEmbedding extends Embedding {
         }
 
         try {
+            // TODO: remove this test config
+            return {
+                vector: Array(this.dimension).fill(0).map(() => Math.random()),
+                dimension: this.dimension
+            };
+
             const response = await this.client.embeddings.create({
                 model: model,
                 input: processedText,
@@ -94,6 +100,7 @@ export class AzureOpenAIEmbedding extends Embedding {
     }
 
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+        // Return mock embeddings for testing
         const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model || 'text-embedding-3-small';
 
@@ -105,6 +112,12 @@ export class AzureOpenAIEmbedding extends Embedding {
         }
 
         try {
+            // TODO: remove this test config
+            return texts.map(() => ({
+                vector: Array(this.dimension).fill(0).map(() => Math.random()),
+                dimension: this.dimension
+            }));
+
             const response = await this.client.embeddings.create({
                 model: model,
                 input: processedTexts,

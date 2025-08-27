@@ -1,8 +1,8 @@
-import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@suoshengzhang/claude-context-core";
+import { OpenAIEmbedding, AzureOpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@suoshengzhang/claude-context-core";
 import { ContextMcpConfig } from "./config.js";
 
 // Helper function to create embedding instance based on provider
-export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding {
+export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbedding | AzureOpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding {
     console.log(`[EMBEDDING] Creating ${config.embeddingProvider} embedding instance...`);
 
     switch (config.embeddingProvider) {
@@ -19,6 +19,26 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
             });
             console.log(`[EMBEDDING] ✅ OpenAI embedding instance created successfully`);
             return openaiEmbedding;
+
+        case 'Azure OpenAI':
+            if (!config.azureOpenAIApiKey) {
+                console.error(`[EMBEDDING] ❌ Azure OpenAI API key is required but not provided`);
+                throw new Error('AZURE_OPENAI_API_KEY is required for Azure OpenAI embedding provider');
+            }
+            if (!config.azureOpenAIEndpoint) {
+                console.error(`[EMBEDDING] ❌ Azure OpenAI endpoint is required but not provided`);
+                throw new Error('AZURE_OPENAI_ENDPOINT is required for Azure OpenAI embedding provider');
+            }
+            console.log(`[EMBEDDING] 🔧 Configuring Azure OpenAI with model: ${config.embeddingModel}`);
+            const azureOpenAIEmbedding = new AzureOpenAIEmbedding({
+                apiKey: config.azureOpenAIApiKey,
+                endpoint: config.azureOpenAIEndpoint,
+                model: config.embeddingModel,
+                ...(config.azureOpenAIApiVersion && { apiVersion: config.azureOpenAIApiVersion }),
+                ...(config.azureOpenAIDeploymentName && { deploymentName: config.azureOpenAIDeploymentName })
+            });
+            console.log(`[EMBEDDING] ✅ Azure OpenAI embedding instance created successfully`);
+            return azureOpenAIEmbedding;
 
         case 'VoyageAI':
             if (!config.voyageaiApiKey) {
@@ -62,7 +82,7 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
     }
 }
 
-export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding): void {
+export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: OpenAIEmbedding | AzureOpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding): void {
     console.log(`[EMBEDDING] ✅ Successfully initialized ${config.embeddingProvider} embedding provider`);
     console.log(`[EMBEDDING] Provider details - Model: ${config.embeddingModel}, Dimension: ${embedding.getDimension()}`);
 
@@ -70,6 +90,15 @@ export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: Op
     switch (config.embeddingProvider) {
         case 'OpenAI':
             console.log(`[EMBEDDING] OpenAI configuration - API Key: ${config.openaiApiKey ? '✅ Provided' : '❌ Missing'}, Base URL: ${config.openaiBaseUrl || 'Default'}`);
+            break;
+        case 'Azure OpenAI':
+            console.log(`[EMBEDDING] Azure OpenAI configuration - API Key: ${config.azureOpenAIApiKey ? '✅ Provided' : '❌ Missing'}, Endpoint: ${config.azureOpenAIEndpoint || '❌ Missing'}`);
+            if (config.azureOpenAIDeploymentName) {
+                console.log(`[EMBEDDING] Azure OpenAI Deployment: ${config.azureOpenAIDeploymentName}`);
+            }
+            if (config.azureOpenAIApiVersion) {
+                console.log(`[EMBEDDING] Azure OpenAI API Version: ${config.azureOpenAIApiVersion}`);
+            }
             break;
         case 'VoyageAI':
             console.log(`[EMBEDDING] VoyageAI configuration - API Key: ${config.voyageaiApiKey ? '✅ Provided' : '❌ Missing'}`);

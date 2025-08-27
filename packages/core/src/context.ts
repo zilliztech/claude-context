@@ -395,7 +395,7 @@ export class Context {
         const escapedPath = relativePath.replace(/\\/g, '\\\\');
         const results = await this.vectorDatabase.query(
             collectionName,
-            `relativePath == "${escapedPath}"`,
+            JSON.stringify({ relativePath: escapedPath }),
             ['id']
         );
 

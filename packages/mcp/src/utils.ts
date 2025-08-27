@@ -14,14 +14,16 @@ export function truncateContent(content: string, maxLength: number): string {
  * Ensure path is absolute. If relative path is provided, resolve it properly.
  */
 export function ensureAbsolutePath(inputPath: string): string {
-    // If already absolute, return as is
+    // Convert input path to lowercase
+    inputPath = inputPath.toLowerCase();
+    // If already absolute, return as is with normalized slashes
     if (path.isAbsolute(inputPath)) {
-        return inputPath;
+        return inputPath.replace(/\\/g, '/');
     }
 
-    // For relative paths, resolve to absolute path
+    // For relative paths, resolve to absolute path and normalize slashes
     const resolved = path.resolve(inputPath);
-    return resolved;
+    return resolved.replace(/\\/g, '/');
 }
 
 export function trackCodebasePath(codebasePath: string): void {

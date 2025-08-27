@@ -5,11 +5,16 @@
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
 
+import fs from 'fs';
+const logStream = fs.createWriteStream('d:/src/log/mcp.log', { flags: 'a' });
+
 console.log = (...args: any[]) => {
+    logStream.write(`[LOG] ${args.join(' ')}\n`);
     process.stderr.write('[LOG] ' + args.join(' ') + '\n');
 };
 
 console.warn = (...args: any[]) => {
+    logStream.write(`[WARN] ${args.join(' ')}\n`);
     process.stderr.write('[WARN] ' + args.join(' ') + '\n');
 };
 
@@ -30,6 +35,7 @@ import { createEmbeddingInstance, logEmbeddingProviderInfo } from "./embedding.j
 import { SnapshotManager } from "./snapshot.js";
 import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
+import { ChromaVectorDatabase } from "@suoshengzhang/claude-context-core";
 
 class ContextMcpServer {
     private server: Server;
@@ -60,9 +66,13 @@ class ContextMcpServer {
         logEmbeddingProviderInfo(config, embedding);
 
         // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
-            address: config.milvusAddress,
-            ...(config.milvusToken && { token: config.milvusToken })
+        // const vectorDatabase = new MilvusVectorDatabase({
+        //     address: config.milvusAddress,
+        //     ...(config.milvusToken && { token: config.milvusToken })
+        // });
+        let vectorDatabase = new ChromaVectorDatabase({
+            host: config.chromaAddress,
+            port: config.chromaPort
         });
 
         // Initialize Claude Context

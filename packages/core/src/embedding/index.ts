@@ -6,4 +6,4 @@ export * from './openai-embedding';
 export * from './voyageai-embedding';
 export * from './ollama-embedding';
 export * from './gemini-embedding';
-export * from './azureopenai-embedding';
+export * from './azure-openai-embedding';

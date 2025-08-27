@@ -1,6 +1,7 @@
-import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@suoshengzhang/claude-context-core';
+import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, ChromaConfig, ChromaVectorDatabase } from '@suoshengzhang/claude-context-core';
 import { envManager } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
+import { ChromaClient } from "chromadb";
 
 // Try to load .env file
 try {
@@ -17,28 +18,43 @@ async function main() {
         // 1. Choose Vector Database implementation
         // Set to true to use RESTful API (for environments without gRPC support)
         // Set to false to use gRPC (default, more efficient)
-        const useRestfulApi = false;
-        const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
-        const milvusToken = envManager.get('MILVUS_TOKEN');
+        const chromaAddress = envManager.get('CHROMA_HOST') || 'localhost';
+        const chromaPort = envManager.get('CHROMA_PORT') || 8000;
         const splitterType = envManager.get('SPLITTER_TYPE')?.toLowerCase() || 'ast';
 
-        console.log(`🔧 Using ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
-        console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);
+        // envManager.set('CUSTOM_IGNORE_PATTERNS', '');
+        envManager.set('CUSTOM_IGNORE_PATTERNS', 'AdsSnR_Common/**,AdsSnR_Idhash/**');
 
-        let vectorDatabase;
-        if (useRestfulApi) {
-            // Use RESTful implementation (for environments without gRPC support)
-            vectorDatabase = new MilvusRestfulVectorDatabase({
-                address: milvusAddress,
-                ...(milvusToken && { token: milvusToken })
-            });
-        } else {
-            // Use gRPC implementation (default, more efficient)
-            vectorDatabase = new MilvusVectorDatabase({
-                address: milvusAddress,
-                ...(milvusToken && { token: milvusToken })
-            });
-        }
+        console.log(`🔌 Connecting to Chroma at: ${chromaAddress}`);
+
+        let client = new ChromaClient({
+            host: chromaAddress,
+            port: Number(chromaPort)
+        });
+
+        // let collection = await client.getCollection({
+        //     name: 'hybrid_code_chunks_12bbd60e'
+        // });
+
+        // let filter = "";//JSON.stringify({ relativePath: "Services\\AcsDebugModeService.cs"});
+        // const queryParams: any = {
+        //     limit: 16384,
+        //     include: ['documents', 'metadatas'] as any
+        // };
+        // if (filter) {
+        //     queryParams.where = JSON.parse(filter);
+        // }
+
+        // let result = await collection.get(queryParams);
+
+        // console.log(result);
+
+        // return;
+
+        let vectorDatabase = new ChromaVectorDatabase({
+            host: chromaAddress,
+            port: chromaPort
+        });
 
         // 2. Create Context instance
         let codeSplitter;
@@ -50,12 +66,13 @@ async function main() {
         const context = new Context({
             vectorDatabase,
             codeSplitter,
-            supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp', '.go', '.rs']
+            supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h']
         });
 
         // 3. Check if index already exists and clear if needed
         console.log('\n📖 Starting to index codebase...');
-        const codebasePath = path.join(__dirname, '../..'); // Index entire project
+        // const codebasePath = path.join(__dirname, './code'); // Index entire project
+        const codebasePath = "D:/AdsMCP"; //path.join(__dirname, '../..'); // Index entire project
 
         // Check if index already exists
         const hasExistingIndex = await context.hasIndex(codebasePath);
@@ -70,14 +87,14 @@ async function main() {
         // 4. Show indexing statistics
         console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
 
+        // return;
+
         // 5. Perform semantic search
         console.log('\n🔍 Performing semantic search...');
 
         const queries = [
-            'vector database operations',
-            'code splitting functions',
-            'embedding generation',
-            'typescript interface definitions'
+            'what is CompassMCPServer',
+            'code splitting functions'
         ];
 
         for (const query of queries) {

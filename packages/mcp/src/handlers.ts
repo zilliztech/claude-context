@@ -150,7 +150,7 @@ export class ToolHandlers {
 
         try {
             // Sync indexed codebases from cloud first
-            await this.syncIndexedCodebasesFromCloud();
+            // await this.syncIndexedCodebasesFromCloud();
 
             // Validate splitter parameter
             if (splitterType !== 'ast' && splitterType !== 'langchain') {
@@ -417,7 +417,7 @@ export class ToolHandlers {
 
         try {
             // Sync indexed codebases from cloud first
-            await this.syncIndexedCodebasesFromCloud();
+            // await this.syncIndexedCodebasesFromCloud();
 
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = ensureAbsolutePath(codebasePath);

@@ -4,11 +4,16 @@ export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
-    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
+    embeddingProvider: 'OpenAI' | 'Azure OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
     embeddingModel: string;
     // Provider-specific API keys
     openaiApiKey?: string;
     openaiBaseUrl?: string;
+    // Azure OpenAI configuration
+    azureOpenAIApiKey?: string;
+    azureOpenAIEndpoint?: string;
+    azureOpenAIApiVersion?: string;
+    azureOpenAIDeploymentName?: string;
     voyageaiApiKey?: string;
     geminiApiKey?: string;
     // Ollama configuration
@@ -17,6 +22,8 @@ export interface ContextMcpConfig {
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    chromaAddress?: string;
+    chromaPort?: number;
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -70,6 +77,7 @@ export type CodebaseSnapshot = CodebaseSnapshotV1 | CodebaseSnapshotV2;
 export function getDefaultModelForProvider(provider: string): string {
     switch (provider) {
         case 'OpenAI':
+        case 'Azure OpenAI':
             return 'text-embedding-3-small';
         case 'VoyageAI':
             return 'voyage-code-3';
@@ -91,6 +99,7 @@ export function getEmbeddingModelForProvider(provider: string): string {
             console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`);
             return ollamaModel;
         case 'OpenAI':
+        case 'Azure OpenAI':
         case 'VoyageAI':
         case 'Gemini':
         default:
@@ -116,11 +125,16 @@ export function createMcpConfig(): ContextMcpConfig {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'Azure OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
         openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
+        // Azure OpenAI configuration
+        azureOpenAIApiKey: envManager.get('AZURE_OPENAI_API_KEY'),
+        azureOpenAIEndpoint: envManager.get('AZURE_OPENAI_ENDPOINT'),
+        azureOpenAIApiVersion: envManager.get('AZURE_OPENAI_API_VERSION'),
+        azureOpenAIDeploymentName: envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME'),
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
         // Ollama configuration
@@ -128,7 +142,9 @@ export function createMcpConfig(): ContextMcpConfig {
         ollamaHost: envManager.get('OLLAMA_HOST'),
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        chromaAddress: envManager.get('CHROMA_ADDRESS'),
+        chromaPort: Number(envManager.get('CHROMA_PORT')) || 8000
     };
 
     return config;
@@ -151,6 +167,16 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
                 console.log(`[MCP]   OpenAI Base URL: ${config.openaiBaseUrl}`);
             }
             break;
+        case 'Azure OpenAI':
+            console.log(`[MCP]   Azure OpenAI API Key: ${config.azureOpenAIApiKey ? '✅ Configured' : '❌ Missing'}`);
+            console.log(`[MCP]   Azure OpenAI Endpoint: ${config.azureOpenAIEndpoint || '❌ Missing'}`);
+            if (config.azureOpenAIDeploymentName) {
+                console.log(`[MCP]   Azure OpenAI Deployment: ${config.azureOpenAIDeploymentName}`);
+            }
+            if (config.azureOpenAIApiVersion) {
+                console.log(`[MCP]   Azure OpenAI API Version: ${config.azureOpenAIApiVersion}`);
+            }
+            break;
         case 'VoyageAI':
             console.log(`[MCP]   VoyageAI API Key: ${config.voyageaiApiKey ? '✅ Configured' : '❌ Missing'}`);
             break;
@@ -170,7 +196,7 @@ export function showHelpMessage(): void {
     console.log(`
 Context MCP Server
 
-Usage: npx @suoshengzhang/code-agent@latest [options]
+Usage: npx @suoshengzhang/claude-context-mcp@latest [options]
 
 Options:
   --help, -h                          Show this help message
@@ -178,42 +204,49 @@ Options:
 Environment Variables:
   MCP_SERVER_NAME         Server name
   MCP_SERVER_VERSION      Server version
-  
+
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, Azure OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
-  
+
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
+  AZURE_OPENAI_API_KEY    Azure OpenAI API key (required for Azure OpenAI provider)
+  AZURE_OPENAI_ENDPOINT   Azure OpenAI endpoint URL (required for Azure OpenAI provider)
+  AZURE_OPENAI_API_VERSION Azure OpenAI API version (optional, default: 2024-02-15-preview)
+  AZURE_OPENAI_DEPLOYMENT_NAME Azure OpenAI deployment name (optional, uses model name if not specified)
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
-  
+
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
-  
+
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
-  OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @suoshengzhang/code-agent@latest
-  
+  OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @suoshengzhang/claude-context-mcp@latest
+
   # Start MCP server with OpenAI and specific model
-  OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @suoshengzhang/code-agent@latest
-  
+  OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @suoshengzhang/claude-context-mcp@latest
+
+  # Start MCP server with Azure OpenAI and specific model
+  EMBEDDING_PROVIDER="Azure OpenAI" AZURE_OPENAI_API_KEY=your-key AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com EMBEDDING_MODEL=text-embedding-3-small MILVUS_TOKEN=your-token npx @suoshengzhang/claude-context-mcp@latest
+
   # Start MCP server with VoyageAI and specific model
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @suoshengzhang/code-agent@latest
-  
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @suoshengzhang/claude-context-mcp@latest
+
   # Start MCP server with Gemini and specific model
-  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @suoshengzhang/code-agent@latest
-  
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @suoshengzhang/claude-context-mcp@latest
+
   # Start MCP server with Ollama and specific model (using OLLAMA_MODEL)
-  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @suoshengzhang/code-agent@latest
-  
+  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @suoshengzhang/claude-context-mcp@latest
+
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
-  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @suoshengzhang/code-agent@latest
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @suoshengzhang/claude-context-mcp@latest
         `);
-} 
+}
