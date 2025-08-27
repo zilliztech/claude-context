@@ -74,25 +74,25 @@ export class AzureOpenAIEmbedding extends Embedding {
         }
 
         try {
-            // TODO: remove this test config
+            const embeddings = await this.getEmbedding([text]);
             return {
-                vector: Array(this.dimension).fill(0).map(() => Math.random()),
+                vector: embeddings[0],
                 dimension: this.dimension
             };
 
-            const response = await this.client.embeddings.create({
-                model: model,
-                input: processedText,
-                encoding_format: 'float',
-            });
+            // const response = await this.client.embeddings.create({
+            //     model: model,
+            //     input: processedText,
+            //     encoding_format: 'float',
+            // });
 
-            // Update dimension from actual response
-            this.dimension = response.data[0].embedding.length;
+            // // Update dimension from actual response
+            // this.dimension = response.data[0].embedding.length;
 
-            return {
-                vector: response.data[0].embedding,
-                dimension: this.dimension
-            };
+            // return {
+            //     vector: response.data[0].embedding,
+            //     dimension: this.dimension
+            // };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to generate Azure OpenAI embedding: ${errorMessage}`);
@@ -111,29 +111,48 @@ export class AzureOpenAIEmbedding extends Embedding {
             this.dimension = await this.detectDimension();
         }
 
-        try {
-            // TODO: remove this test config
-            return texts.map(() => ({
-                vector: Array(this.dimension).fill(0).map(() => Math.random()),
-                dimension: this.dimension
-            }));
+        const jsonTexts = processedTexts.map(text => ({
+            code: text
+        }));
 
-            const response = await this.client.embeddings.create({
-                model: model,
-                input: processedTexts,
-                encoding_format: 'float',
+        // Send HTTP POST request to local embeddings endpoint
+        try {
+            const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jsonTexts)
             });
 
-            this.dimension = response.data[0].embedding.length;
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-            return response.data.map((item) => ({
-                vector: item.embedding,
-                dimension: this.dimension
+            const embeddings = await response.json() as number[][];
+            console.log("##### " + embeddings.length);
+            return embeddings.map((embedding: number[]) => ({
+                vector: embedding,
+                dimension: embedding.length
             }));
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            throw new Error(`Failed to generate Azure OpenAI batch embeddings: ${errorMessage}`);
+            throw new Error(`Failed to get embeddings from local endpoint: ${errorMessage}`);
         }
+    }
+
+    async getEmbedding(texts: string[]): Promise<number[][]> {
+        // put texts into json body with key "code_str_list"
+        const response = await fetch(`https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/embedding`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ code_str_list: texts })
+        });
+        const responseData = await response.json() as number[][];
+        console.log(responseData);
+        return responseData;
     }
 
     getDimension(): number {

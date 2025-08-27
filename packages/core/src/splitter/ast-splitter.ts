@@ -50,7 +50,9 @@ export class AstCodeSplitter implements Splitter {
         }
 
         try {
-            console.log(`🌳 Using AST splitter for ${language} file: ${filePath || 'unknown'}`);
+            // add current time to log
+
+            console.log(`🌳 Using AST splitter for ${language} file: ${filePath || 'unknown'} at ${new Date().toISOString()}`);
 
             this.parser.setLanguage(langConfig.parser);
             const tree = this.parser.parse(code);
