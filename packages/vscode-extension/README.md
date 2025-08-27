@@ -14,7 +14,7 @@ A code indexing and semantic search VSCode extension powered by [Claude Context]
 - 🔍 **Semantic Search**: Intelligent code search based on semantic understanding, not just keyword matching
 - 📁 **Codebase Indexing**: Automatically index entire codebase and build semantic vector database
 - 🎯 **Context Search**: Search related code by selecting code snippets
-- 🔧 **Multi-platform Support**: Support for OpenAI, VoyageAI, Gemini, and Ollama as embedding providers
+- 🔧 **Multi-platform Support**: Support for OpenAI, Azure OpenAI, VoyageAI, Gemini, and Ollama as embedding providers
 - 💾 **Vector Storage**: Integrated with Milvus vector database for efficient storage and retrieval
 
 ## Requirements
@@ -45,6 +45,13 @@ Configure your embedding provider to convert code into semantic vectors.
 - `Model name`: Choose the embedding model (e.g., `text-embedding-3-small`, `text-embedding-3-large`)
 - `OpenAI API key`: Your OpenAI API key for authentication
 - `Custom API endpoint URL`: Optional custom endpoint (defaults to `https://api.openai.com/v1`)
+
+**Azure OpenAI Configuration:**
+- `Embedding Provider`: Select "Azure OpenAI" from the dropdown
+- `Deployment name`: Your Azure deployment name (not model name)
+- `Azure OpenAI endpoint URL`: Your Azure OpenAI resource endpoint
+- `Azure OpenAI API key`: Your Azure API key for authentication
+- `API version`: Optional API version (defaults to 2024-02-01)
 
 **Other Supported Providers:**
 - **Gemini**: Google's state-of-the-art embedding model with Matryoshka representation learning
