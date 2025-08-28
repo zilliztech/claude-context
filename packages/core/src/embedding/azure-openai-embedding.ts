@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { Embedding, EmbeddingVector } from './base-embedding';
+import request from 'sync-request';
 
 export interface AzureOpenAIEmbeddingConfig {
     model: string;
@@ -111,27 +112,24 @@ export class AzureOpenAIEmbedding extends Embedding {
 
         // Send HTTP POST request to local embeddings endpoint
         try {
-            const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(jsonTexts)
-            });
+            // const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json'
+            //     },
+            //     body: JSON.stringify(jsonTexts)
+            // });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const embeddings = this.postRequestSync('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', jsonTexts);
 
-            const embeddings = await response.json() as any;
             console.log("##### " + embeddings.length);
             // const parsedEmbeddings = JSON.parse(embeddings);
             console.log("Parsed Embeddings: ", embeddings);
             console.log("Number of embeddings received: ", embeddings.embeddings.length);
             console.log("Type of embeddings: ", typeof embeddings.embeddings[0]);
             const processedEmbeddings = embeddings.embeddings.map((embedding: any) => ({
-                vector: JSON.parse(embedding.embedding),
-                dimension: JSON.parse(embedding.embedding).length
+                vector: embedding.embedding,
+                dimension: embedding.embedding.length
             }));
 
             console.log("Processed Embeddings: ", JSON.stringify(processedEmbeddings[0]));
@@ -143,18 +141,18 @@ export class AzureOpenAIEmbedding extends Embedding {
         }
     }
 
-    async getEmbedding(texts: string[]): Promise<number[][]> {
-        // put texts into json body with key "code_str_list"
-        const response = await fetch(`https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/embedding`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ code_str_list: texts })
+    postRequestSync(url: string, data: any) {
+        const response = request('POST', url, {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
-        const responseData = await response.json() as number[][];
-        console.log(responseData);
-        return responseData;
+
+        if (response.statusCode !== 200) {
+            throw new Error(`HTTP error! status: ${response.statusCode}`);
+        }
+
+        const result = JSON.parse(response.getBody('utf8'));
+        return result;
     }
 
     getDimension(): number {
