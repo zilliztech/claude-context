@@ -45,6 +45,9 @@ const DEFAULT_IGNORE_PATTERNS = [
     'target/**',
     'coverage/**',
     '.nyc_output/**',
+    '.azuredevops/**',
+    '.config/**',
+    '.corext/**',
 
     // IDE and editor files
     '.vscode/**',
@@ -86,7 +89,9 @@ const DEFAULT_IGNORE_PATTERNS = [
     '*.map', // source map files
     'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
     'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
-    'coverage', '.nyc_output', 'logs', 'tmp', 'temp'
+    'coverage', '.nyc_output', 'logs', 'tmp', 'temp',
+    '.editorconfig',
+    '.gitattributes'
 ];
 
 export interface ContextConfig {
