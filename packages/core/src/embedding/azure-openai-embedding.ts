@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { Embedding, EmbeddingVector } from './base-embedding';
-import request from 'sync-request';
 
 export interface AzureOpenAIEmbeddingConfig {
     model: string;
@@ -112,47 +111,36 @@ export class AzureOpenAIEmbedding extends Embedding {
 
         // Send HTTP POST request to local embeddings endpoint
         try {
-            // const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json'
-            //     },
-            //     body: JSON.stringify(jsonTexts)
-            // });
+            const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jsonTexts)
+            });
 
-            const embeddings = this.postRequestSync('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', jsonTexts);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
+            const embeddings = await response.json() as any;
             console.log("##### " + embeddings.length);
             // const parsedEmbeddings = JSON.parse(embeddings);
             console.log("Parsed Embeddings: ", embeddings);
             console.log("Number of embeddings received: ", embeddings.embeddings.length);
             console.log("Type of embeddings: ", typeof embeddings.embeddings[0]);
             const processedEmbeddings = embeddings.embeddings.map((embedding: any) => ({
-                vector: embedding.embedding,
-                dimension: embedding.embedding.length
+                vector: JSON.parse(embedding.embedding),
+                dimension: JSON.parse(embedding.embedding).length
             }));
 
             console.log("Processed Embeddings: ", JSON.stringify(processedEmbeddings[0]));
-            // console.log(`Process completed at ${new Date().toISOString()}`);
+            console.log(`Process completed at ${new Date().toISOString()}`);
             return processedEmbeddings;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to get embeddings from local endpoint: ${errorMessage}`);
         }
-    }
-
-    postRequestSync(url: string, data: any) {
-        const response = request('POST', url, {
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        if (response.statusCode !== 200) {
-            throw new Error(`HTTP error! status: ${response.statusCode}`);
-        }
-
-        const result = JSON.parse(response.getBody('utf8'));
-        return result;
     }
 
     getDimension(): number {
