@@ -10,6 +10,7 @@ const Cpp = require('tree-sitter-cpp');
 const Go = require('tree-sitter-go');
 const Rust = require('tree-sitter-rust');
 const CSharp = require('tree-sitter-c-sharp');
+const Ruby = require('tree-sitter-ruby');
 const Scala = require('tree-sitter-scala');
 
 // Node types that represent logical code units
@@ -22,6 +23,7 @@ const SPLITTABLE_NODE_TYPES = {
     go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
     rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
     csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration'],
+    ruby: ['method', 'class', 'module', 'def', 'singleton_method'],
     scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
 };
 
@@ -100,6 +102,8 @@ export class AstCodeSplitter implements Splitter {
             'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
             'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
             'csharp': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
+            'ruby': { parser: Ruby, nodeTypes: SPLITTABLE_NODE_TYPES.ruby },
+            'rb': { parser: Ruby, nodeTypes: SPLITTABLE_NODE_TYPES.ruby },
             'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala }
         };
 
@@ -258,13 +262,19 @@ export class AstCodeSplitter implements Splitter {
     }
 
     /**
+     * Get list of languages supported by AST splitting
+     */
+    static getSupportedLanguages(): string[] {
+        return [
+            'javascript', 'js', 'typescript', 'ts', 'python', 'py',
+            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'ruby', 'rb', 'scala'
+        ];
+    }
+
+    /**
      * Check if AST splitting is supported for the given language
      */
     static isLanguageSupported(language: string): boolean {
-        const supportedLanguages = [
-            'javascript', 'js', 'typescript', 'ts', 'python', 'py',
-            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala'
-        ];
-        return supportedLanguages.includes(language.toLowerCase());
+        return this.getSupportedLanguages().includes(language.toLowerCase());
     }
 }
