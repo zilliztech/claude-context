@@ -9,6 +9,20 @@ export interface AzureOpenAIEmbeddingConfig {
     deploymentName?: string; // Azure OpenAI deployment name (optional, can use model name)
 }
 
+class BatchSemaphore {
+    private static count = 0;
+    private static readonly max = 5;
+    static async acquire() {
+        while (BatchSemaphore.count >= BatchSemaphore.max) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        BatchSemaphore.count++;
+    }
+    static release() {
+        BatchSemaphore.count = Math.max(0, BatchSemaphore.count - 1);
+    }
+}
+
 export class AzureOpenAIEmbedding extends Embedding {
     private client: OpenAI;
     private config: AzureOpenAIEmbeddingConfig;
@@ -110,6 +124,7 @@ export class AzureOpenAIEmbedding extends Embedding {
         }));
 
         // Send HTTP POST request to local embeddings endpoint
+        await BatchSemaphore.acquire();
         try {
             const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
                 method: 'POST',
@@ -124,22 +139,23 @@ export class AzureOpenAIEmbedding extends Embedding {
             }
 
             const embeddings = await response.json() as any;
-            console.log("##### " + embeddings.length);
+            // console.log(`[embedBatch][${new Date().toLocaleString()}] Received ${embeddings.length} embeddings`);
             // const parsedEmbeddings = JSON.parse(embeddings);
-            console.log("Parsed Embeddings: ", embeddings);
-            console.log("Number of embeddings received: ", embeddings.embeddings.length);
-            console.log("Type of embeddings: ", typeof embeddings.embeddings[0]);
+            console.log(`[embedBatch][${new Date().toLocaleString()}] Parsed Embeddings: ${JSON.stringify(embeddings)}`);
+            console.log(`[embedBatch][${new Date().toLocaleString()}] Number of embeddings received: ${embeddings.embeddings.length}`);
+            console.log(`[embedBatch][${new Date().toLocaleString()}] Type of embeddings: ${typeof embeddings.embeddings[0]}`);
             const processedEmbeddings = embeddings.embeddings.map((embedding: any) => ({
                 vector: JSON.parse(embedding.embedding),
                 dimension: JSON.parse(embedding.embedding).length
             }));
 
-            console.log("Processed Embeddings: ", JSON.stringify(processedEmbeddings[0]));
-            console.log(`Process completed at ${new Date().toISOString()}`);
+            console.log(`[embedBatch][${new Date().toLocaleString()}] Processed Embeddings: ${JSON.stringify(processedEmbeddings[0])}`);
             return processedEmbeddings;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             throw new Error(`Failed to get embeddings from local endpoint: ${errorMessage}`);
+        } finally {
+            BatchSemaphore.release();
         }
     }
 

@@ -35,8 +35,15 @@ export class FileSynchronizer {
         if (stat.isDirectory()) {
             throw new Error(`Attempted to hash a directory: ${filePath}`);
         }
-        const content = await fs.readFile(filePath, 'utf-8');
-        return crypto.createHash('sha256').update(content).digest('hex');
+
+        // For faster change detection, use file metadata instead of content
+        // Combine size and mtime for a quick "hash"
+        const quickHash = crypto.createHash('md5')
+            .update(stat.size.toString())
+            .update(stat.mtimeMs.toString())
+            .digest('hex');
+
+        return quickHash;
     }
 
     private async generateFileHashes(dir: string): Promise<Map<string, string>> {
@@ -199,9 +206,11 @@ export class FileSynchronizer {
 
         // Create a root node for the entire directory
         let valuesString = "";
+        console.log(`[${new Date().toLocaleString()}] Building Merkle DAG with ${keys.length} files.`);
         keys.forEach(key => {
             valuesString += fileHashes.get(key);
         });
+        console.log(`[${new Date().toLocaleString()}] Combined hash string length: ${valuesString.length}`);
         const rootNodeData = "root:" + valuesString;
         const rootNodeId = dag.addNode(rootNodeData);
 
@@ -210,15 +219,16 @@ export class FileSynchronizer {
             const fileData = path + ":" + fileHashes.get(path);
             dag.addNode(fileData, rootNodeId);
         }
+        console.log(`[${new Date().toLocaleString()}] Finish built Merkle DAG with root ID: ${rootNodeId}`);
 
         return dag;
     }
 
     public async initialize() {
-        console.log(`Initializing file synchronizer for ${this.rootDir}`);
+        console.log(`[${new Date().toLocaleString()}] Initializing file synchronizer for ${this.rootDir}`);
         await this.loadSnapshot();
         this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
-        console.log(`File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
+        console.log(`[${new Date().toLocaleString()}] File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
     }
 
     public async checkForChanges(): Promise<{ added: string[], removed: string[], modified: string[] }> {

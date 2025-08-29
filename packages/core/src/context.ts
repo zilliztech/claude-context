@@ -294,7 +294,7 @@ export class Context {
                 // Calculate progress percentage
                 const progressPercentage = indexingStartPercentage + (fileIndex / totalFiles) * indexingRange;
 
-                console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
+                // console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
                 progressCallback?.({
                     phase: `Processing files (${fileIndex}/${totalFiles})...`,
                     current: fileIndex,
@@ -809,7 +809,7 @@ export class Context {
 
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid' : 'regular';
-        console.log(`🔄 Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens) for ${searchType}`);
+        console.log(`[processChunkBatch][${new Date().toLocaleString()}] Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens) for ${searchType}`);
         await this.processChunkBatch(chunks, codebasePath);
     }
 
@@ -817,6 +817,7 @@ export class Context {
      * Process a batch of chunks
      */
     private async processChunkBatch(chunks: CodeChunk[], codebasePath: string): Promise<void> {
+        console.log(`[processChunkBatch][${new Date().toLocaleString()}] Start process ${chunks.length} chunks...`);
         const isHybrid = this.getIsHybrid();
 
         // Generate embedding vectors

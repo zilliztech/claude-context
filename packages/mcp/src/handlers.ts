@@ -274,7 +274,7 @@ export class ToolHandlers {
             const currentStatus = this.snapshotManager.getCodebaseStatus(absolutePath);
             if (currentStatus === 'indexfailed') {
                 const failedInfo = this.snapshotManager.getCodebaseInfo(absolutePath) as any;
-                console.log(`[BACKGROUND-INDEX] Retrying indexing for previously failed codebase. Previous error: ${failedInfo?.errorMessage || 'Unknown error'}`);
+                console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Retrying indexing for previously failed codebase. Previous error: ${failedInfo?.errorMessage || 'Unknown error'}`);
             }
 
             // Set to indexing status and save snapshot immediately
@@ -326,17 +326,17 @@ export class ToolHandlers {
         let lastSaveTime = 0; // Track last save timestamp
 
         try {
-            console.log(`[BACKGROUND-INDEX] Starting background indexing for: ${absolutePath}`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Starting background indexing for: ${absolutePath}`);
 
             // Note: If force reindex, collection was already cleared during validation phase
             if (forceReindex) {
-                console.log(`[BACKGROUND-INDEX] ℹ️  Force reindex mode - collection was already cleared during validation`);
+                console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] ℹ️  Force reindex mode - collection was already cleared during validation`);
             }
 
             // Use the existing Context instance for indexing.
             let contextForThisTask = this.context;
             if (splitterType !== 'ast') {
-                console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
+                console.warn(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
@@ -345,9 +345,10 @@ export class ToolHandlers {
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@suoshengzhang/claude-context-core");
             const ignorePatterns = this.context.getIgnorePatterns() || [];
-            console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
             await synchronizer.initialize();
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Finished initializing file synchronizer`);
 
             // Store synchronizer in the context (let context manage collection names)
             await this.context.getPreparedCollection(absolutePath);
@@ -357,14 +358,14 @@ export class ToolHandlers {
                 contextForThisTask.setSynchronizer(collectionName, synchronizer);
             }
 
-            console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
             // Log embedding provider information before indexing
             const embeddingProvider = this.context.getEmbedding();
-            console.log(`[BACKGROUND-INDEX] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] 🧠 Using embedding provider: ${embeddingProvider.getProvider()} with dimension: ${embeddingProvider.getDimension()}`);
 
             // Start indexing with the appropriate context and progress tracking
-            console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] 🚀 Beginning codebase indexing process...`);
             const stats = await contextForThisTask.indexCodebase(absolutePath, (progress) => {
                 // Update progress in snapshot manager using new method
                 this.snapshotManager.setCodebaseIndexing(absolutePath, progress.percentage);
@@ -374,12 +375,12 @@ export class ToolHandlers {
                 if (currentTime - lastSaveTime >= 2000) { // 2 seconds = 2000ms
                     this.snapshotManager.saveCodebaseSnapshot();
                     lastSaveTime = currentTime;
-                    console.log(`[BACKGROUND-INDEX] 💾 Saved progress snapshot at ${progress.percentage.toFixed(1)}%`);
+                    console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] 💾 Saved progress snapshot at ${progress.percentage.toFixed(1)}%`);
                 }
 
-                console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
+                console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
             });
-            console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics
             this.snapshotManager.setCodebaseIndexed(absolutePath, stats);
@@ -393,10 +394,10 @@ export class ToolHandlers {
                 message += `\n⚠️  Warning: Indexing stopped because the chunk limit (450,000) was reached. The index may be incomplete.`;
             }
 
-            console.log(`[BACKGROUND-INDEX] ${message}`);
+            console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] ${message}`);
 
         } catch (error: any) {
-            console.error(`[BACKGROUND-INDEX] Error during indexing for ${absolutePath}:`, error);
+            console.error(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Error during indexing for ${absolutePath}:`, error);
 
             // Get the last attempted progress
             const lastProgress = this.snapshotManager.getIndexingProgress(absolutePath);
@@ -407,7 +408,7 @@ export class ToolHandlers {
             this.snapshotManager.saveCodebaseSnapshot();
 
             // Log error but don't crash MCP service - indexing errors are handled gracefully
-            console.error(`[BACKGROUND-INDEX] Indexing failed for ${absolutePath}: ${errorMessage}`);
+            console.error(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Indexing failed for ${absolutePath}: ${errorMessage}`);
         }
     }
 
