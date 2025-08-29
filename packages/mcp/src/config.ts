@@ -146,8 +146,8 @@ export function createMcpConfig(): ContextMcpConfig {
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
-        chromaAddress: envManager.get('CHROMA_ADDRESS'),
-        chromaPort: Number(envManager.get('CHROMA_PORT')) || 8000,
+        chromaAddress: envManager.get('CHROMA_ADDRESS') || 'localhost',
+        chromaPort: Number(envManager.get('CHROMA_PORT')) || 19800,
         chromaWorkingDir: envManager.get('CHROMA_WORKING_DIR') || path.join(os.homedir(), '.context', 'chromadb')
     };
 
