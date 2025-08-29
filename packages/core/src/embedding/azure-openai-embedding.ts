@@ -145,8 +145,8 @@ export class AzureOpenAIEmbedding extends Embedding {
             console.log(`[embedBatch][${new Date().toLocaleString()}] Number of embeddings received: ${embeddings.embeddings.length}`);
             console.log(`[embedBatch][${new Date().toLocaleString()}] Type of embeddings: ${typeof embeddings.embeddings[0]}`);
             const processedEmbeddings = embeddings.embeddings.map((embedding: any) => ({
-                vector: JSON.parse(embedding.embedding),
-                dimension: JSON.parse(embedding.embedding).length
+                vector: embedding.embedding,
+                dimension: embedding.embedding.length
             }));
 
             console.log(`[embedBatch][${new Date().toLocaleString()}] Processed Embeddings: ${JSON.stringify(processedEmbeddings[0])}`);
