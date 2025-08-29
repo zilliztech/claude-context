@@ -71,18 +71,20 @@ async function main() {
 
         // // 3. Check if index already exists and clear if needed
         // console.log('\n📖 Starting to index codebase...');
-        // // const codebasePath = path.join(__dirname, './code'); // Index entire project
-        const codebasePath = "d:/demos/test1"; //path.join(__dirname, '../..'); // Index entire project
+        const codebasePath = path.join(__dirname, './code'); // Index entire project
+        // const codebasePath = "d:/demos/test1"; //path.join(__dirname, '../..'); // Index entire project
 
         // // Check if index already exists
-        // const hasExistingIndex = await context.hasIndex(codebasePath);
-        // if (hasExistingIndex) {
-        //     console.log('🗑️  Existing index found, clearing it first...');
-        //     await context.clearIndex(codebasePath);
-        // }
+        const hasExistingIndex = await context.hasIndex(codebasePath);
+        if (hasExistingIndex) {
+            console.log('🗑️  Existing index found, clearing it first...');
+            await context.clearIndex(codebasePath);
+        }
 
         // // Index with progress tracking
-        // const indexStats = await context.indexCodebase(codebasePath);
+        const indexStats = await context.indexCodebase(codebasePath);
+
+        return;
 
         // // 4. Show indexing statistics
         // console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
