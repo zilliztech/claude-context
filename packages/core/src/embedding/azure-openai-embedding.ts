@@ -140,10 +140,9 @@ export class AzureOpenAIEmbedding extends Embedding {
 
             const embeddings = await response.json() as any;
             // console.log(`[embedBatch][${new Date().toLocaleString()}] Received ${embeddings.length} embeddings`);
-            // const parsedEmbeddings = JSON.parse(embeddings);
-            console.log(`[embedBatch][${new Date().toLocaleString()}] Parsed Embeddings: ${JSON.stringify(embeddings)}`);
+            // console.log(`[embedBatch][${new Date().toLocaleString()}] Parsed Embeddings: ${JSON.stringify(embeddings)}`);
             console.log(`[embedBatch][${new Date().toLocaleString()}] Number of embeddings received: ${embeddings.embeddings.length}`);
-            console.log(`[embedBatch][${new Date().toLocaleString()}] Type of embeddings: ${typeof embeddings.embeddings[0]}`);
+            // console.log(`[embedBatch][${new Date().toLocaleString()}] Type of embeddings: ${typeof embeddings.embeddings[0]}`);
             const processedEmbeddings = embeddings.embeddings.map((embedding: any) => ({
                 vector: embedding.embedding,
                 dimension: embedding.embedding.length
