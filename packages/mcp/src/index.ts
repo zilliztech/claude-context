@@ -5,18 +5,21 @@
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
 
+import path from 'path';
+import os from 'os';
 import fs from 'fs';
-const logStream = fs.createWriteStream('d:/src/log/mcp.log', { flags: 'a' });
+let logPath = path.join(os.homedir(), '.context', 'mcp.log');
+const logStream = fs.createWriteStream(logPath, { flags: 'a' });
 
-console.log = (...args: any[]) => {
-    logStream.write(`[LOG] ${args.join(' ')}\n`);
-    process.stderr.write('[LOG] ' + args.join(' ') + '\n');
-};
+// console.log = (...args: any[]) => {
+//     logStream.write(`[LOG] ${args.join(' ')}\n`);
+//     process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+// };
 
-console.warn = (...args: any[]) => {
-    logStream.write(`[WARN] ${args.join(' ')}\n`);
-    process.stderr.write('[WARN] ' + args.join(' ') + '\n');
-};
+// console.warn = (...args: any[]) => {
+//     logStream.write(`[WARN] ${args.join(' ')}\n`);
+//     process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+// };
 
 // console.error already goes to stderr by default
 

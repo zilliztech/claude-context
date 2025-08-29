@@ -128,7 +128,7 @@ export function createMcpConfig(): ContextMcpConfig {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'Azure OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'Azure OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'Azure OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
