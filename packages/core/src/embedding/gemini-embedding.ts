@@ -4,6 +4,7 @@ import { Embedding, EmbeddingVector } from './base-embedding';
 export interface GeminiEmbeddingConfig {
     model: string;
     apiKey: string;
+    baseURL?: string; // Optional custom API endpoint URL
     outputDimensionality?: number; // Optional dimension override
 }
 
@@ -18,6 +19,11 @@ export class GeminiEmbedding extends Embedding {
         this.config = config;
         this.client = new GoogleGenAI({
             apiKey: config.apiKey,
+            ...(config.baseURL && {
+                httpOptions: {
+                    baseUrl: config.baseURL
+                }
+            }),
         });
 
         // Set dimension based on model and configuration

@@ -18,6 +18,8 @@
         "allowSyntheticDefaultImports": true,
         "baseUrl": ".",
         "downlevelIteration": true,
+        "incremental": true,
+        "tsBuildInfoFile": ".tsbuildinfo",
         "paths": {
             "@zilliz/claude-context-core": [
                 "./packages/core/src"

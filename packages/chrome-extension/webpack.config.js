@@ -14,6 +14,12 @@ module.exports = {
     filename: '[name].js',
     clean: true
   },
+  cache: {
+    type: 'filesystem',
+    buildDependencies: {
+      config: [__filename]
+    }
+  },
   devtool: false,
   experiments: {
     outputModule: false

@@ -97,6 +97,7 @@ const EMBEDDING_PROVIDERS = {
             { name: 'apiKey', type: 'string', description: 'Google AI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [
+            { name: 'baseURL', type: 'string', description: 'Custom API endpoint URL (optional)', inputType: 'url', placeholder: 'https://generativelanguage.googleapis.com/v1beta' },
             { name: 'outputDimensionality', type: 'number', description: 'Output dimension (supports Matryoshka representation)', inputType: 'text', placeholder: '3072' }
         ] as FieldDefinition[],
         defaultConfig: {

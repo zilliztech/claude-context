@@ -11,6 +11,7 @@ export interface ContextMcpConfig {
     openaiBaseUrl?: string;
     voyageaiApiKey?: string;
     geminiApiKey?: string;
+    geminiBaseUrl?: string;
     // Ollama configuration
     ollamaModel?: string;
     ollamaHost?: string;
@@ -123,6 +124,7 @@ export function createMcpConfig(): ContextMcpConfig {
         openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
+        geminiBaseUrl: envManager.get('GEMINI_BASE_URL'),
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
@@ -156,6 +158,9 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             break;
         case 'Gemini':
             console.log(`[MCP]   Gemini API Key: ${config.geminiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            if (config.geminiBaseUrl) {
+                console.log(`[MCP]   Gemini Base URL: ${config.geminiBaseUrl}`);
+            }
             break;
         case 'Ollama':
             console.log(`[MCP]   Ollama Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}`);
@@ -188,6 +193,7 @@ Environment Variables:
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
+  GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
   
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
