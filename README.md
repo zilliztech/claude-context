@@ -64,8 +64,18 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 Use the command line interface to add the Claude Context MCP server:
 
 ```bash
+# Add the Claude Context MCP server
 claude mcp add claude-context \
   -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e MILVUS_TOKEN=your-zilliz-cloud-api-key \
+  -- npx @zilliz/claude-context-mcp@latest
+
+# OAPI Forwarding: Use OpenAI-compatible API that forwards to Ollama
+claude mcp add claude-context-oapi \
+  -e OPENAI_API_KEY=ollama-key \
+  -e OPENAI_BASE_URL=http://localhost:8080/v1 \
+  -e EMBEDDING_MODEL=nomic-embed-text \
+  -e OPENAI_CUSTOM_BASE_USING_OLLAMA_MODEL=true \
   -e MILVUS_TOKEN=your-zilliz-cloud-api-key \
   -- npx @zilliz/claude-context-mcp@latest
 ```

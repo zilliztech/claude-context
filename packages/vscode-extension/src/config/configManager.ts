@@ -40,7 +40,7 @@ type FieldDefinition = {
     name: string;
     type: string;
     description: string;
-    inputType?: 'text' | 'password' | 'url' | 'select' | 'select-with-custom';
+    inputType?: 'text' | 'password' | 'url' | 'select' | 'select-with-custom' | 'checkbox';
     placeholder?: string;
     required?: boolean;
 };
@@ -55,7 +55,8 @@ const EMBEDDING_PROVIDERS = {
             { name: 'apiKey', type: 'string', description: 'OpenAI API key', inputType: 'password', required: true }
         ] as FieldDefinition[],
         optionalFields: [
-            { name: 'baseURL', type: 'string', description: 'Custom API endpoint URL (optional)', inputType: 'url', placeholder: 'https://api.openai.com/v1' }
+            { name: 'baseURL', type: 'string', description: 'Custom API endpoint URL (optional)', inputType: 'url', placeholder: 'https://api.openai.com/v1' },
+            { name: 'useOllamaModel', type: 'boolean', description: 'Enable OAPI forwarding for Ollama models via OpenAI-compatible APIs', inputType: 'checkbox' }
         ] as FieldDefinition[],
         defaultConfig: {
             model: 'text-embedding-3-small'
