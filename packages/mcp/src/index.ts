@@ -6,16 +6,18 @@ const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
 
 import fs from 'fs';
-const logStream = fs.createWriteStream('d:/src/log/mcp.log', { flags: 'a' });
+const logStream = fs.createWriteStream('d:/src/wangtt_log/mcp.log', { flags: 'a' });
 
 console.log = (...args: any[]) => {
-    logStream.write(`[LOG] ${args.join(' ')}\n`);
-    process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+    const timestamp = new Date().toLocaleString();
+    logStream.write(`[${timestamp}] [LOG] ${args.join(' ')}\n`);
+    process.stderr.write(`[${timestamp}] [LOG] ${args.join(' ')}\n`);
 };
 
 console.warn = (...args: any[]) => {
-    logStream.write(`[WARN] ${args.join(' ')}\n`);
-    process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+    const timestamp = new Date().toLocaleString();
+    logStream.write(`[${timestamp}] [WARN] ${args.join(' ')}\n`); 
+    process.stderr.write(`[${timestamp}] [WARN] ${args.join(' ')}\n`);
 };
 
 // console.error already goes to stderr by default
@@ -317,16 +319,14 @@ This tool is versatile and can be used before completing various tasks to retrie
      * Handle get_chroma_status tool
      */
     private async handleGetChromaStatus(args: any): Promise<any> {
-        const status = this.chromaManager.getStatus();
+        const status = await this.chromaManager.getStatus();
         return {
             content: [
                 {
                     type: "text",
                     text: `Chroma Process Status:
 - Running: ${status.isRunning}
-- Alive: ${status.isAlive}
-- Restart Attempts: ${status.restartAttempts}
-- PID: ${this.chromaManager['chromaProcess']?.pid || 'N/A'}`
+- Alive: ${status.isAlive}`
                 }
             ]
         };

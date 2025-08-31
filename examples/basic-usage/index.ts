@@ -10,108 +10,233 @@ try {
     // dotenv is not required, skip if not installed
 }
 
+/**
+ * Generate a snapshot file for the given codebase directory
+ * @param rootDir Absolute path to codebase directory
+ * @param ignorePatterns Optional array of glob patterns to ignore
+ * @returns Promise that resolves when snapshot is generated
+ */
+async function generateSnapshot(rootDir: string, ignorePatterns: string[] = []): Promise<void> {
+    try {
+        console.log(`Generating snapshot for codebase: ${rootDir}`);
+        
+        // Create synchronizer instance with provided ignore patterns
+        const { FileSynchronizer } = await import('@suoshengzhang/claude-context-core');
+        const synchronizer = new FileSynchronizer(rootDir, ignorePatterns);
+
+        // Initialize will generate initial hashes and save snapshot
+        await synchronizer.initialize();
+
+        console.log('✅ Snapshot generated successfully');
+    } catch (error: any) {
+        console.error('Failed to generate snapshot:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * Get the Git repository name from a folder path by looking for the .git directory
+ * and reading the remote origin URL from the git config
+ * @param folderPath Path to folder to check
+ * @returns Repository name or null if not a git repo
+ */
+async function getGitRepoName(folderPath: string): Promise<string | null> {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+
+        // Walk up directory tree looking for .git folder
+        let currentPath = folderPath;
+        let gitDir = null;
+        
+        while (currentPath !== path.parse(currentPath).root) {
+            const potentialGitDir = path.join(currentPath, '.git');
+            if (fs.existsSync(potentialGitDir)) {
+                gitDir = potentialGitDir;
+                break;
+            }
+            currentPath = path.dirname(currentPath);
+        }
+
+        if (!gitDir) {
+            return null;
+        }
+
+        // Read config file to get remote origin URL
+        const configPath = path.join(gitDir, 'config');
+        const config = fs.readFileSync(configPath, 'utf8');
+
+        // Extract remote origin URL using regex
+        const originUrlMatch = config.match(/\[remote "origin"\][\s\S]*?url = (.+)/);
+        if (!originUrlMatch) {
+            return null;
+        }
+
+        const originUrl = originUrlMatch[1].trim();
+
+        // Extract repo name from URL
+        const repoNameMatch = originUrl.match(/\/([^\/]+?)(\.git)?$/);
+        if (!repoNameMatch) {
+            return null;
+        }
+
+        return repoNameMatch[1];
+
+    } catch (error) {
+        console.error('Error getting git repo name:', error);
+        return null;
+    }
+}
+
+
+async function indexCodePathForAdsSnr() {
+    let codebasePath = "D:/src2/AdsSnR";
+    let host = 'localhost';
+    let port = 19802;
+
+    let vectorDatabase = new ChromaVectorDatabase({
+        host: host,
+        port: port
+    });
+
+    let context = new Context({
+        vectorDatabase,
+        codeSplitter: new LangChainCodeSplitter(1000, 200),
+        supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h'],
+        ignorePatterns: [
+            // for AdsSnR Test
+            'AdsSnR_RocksDB/',
+            'AdsSnR_PClick/',
+            'AdsSnR_FeatureExtraction/',
+            'AdsSnR_Selection/',
+            'AdsSnR_Common/',
+            'AdsSnR_IdHash/',
+            'packages/',
+            '.github/',
+            'AI/**',
+        ]
+    });
+
+    const hasExistingIndex = await context.hasIndex(codebasePath);
+    if (hasExistingIndex) {
+        console.log('🗑️  Existing index found, clearing it first...');
+        await context.clearIndex(codebasePath);
+    }
+
+    // // Index with progress tracking
+    const indexStats = await context.indexCodebase(codebasePath);
+    console.log(`🔍 Indexed ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
+
+    await generateSnapshot(codebasePath, context.getIgnorePatterns());
+    console.log('✅ Snapshot generated successfully');
+}
+
+async function searchCodePath(codebasePath: string, queries: string[]) {
+    let host = 'localhost';
+    let port = 19801;
+
+    let vectorDatabase = new ChromaVectorDatabase({
+        host: host,
+        port: port
+    });
+
+    let context = new Context({
+        vectorDatabase,
+        codeSplitter: new LangChainCodeSplitter(1000, 200),
+        supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h']
+    });
+
+    for (const query of queries) {
+        console.log(`\n🔎 Search: "${query}"`);
+        const results = await context.semanticSearch(codebasePath, query, 3, 0.3);
+
+        if (results.length > 0) {
+            results.forEach((result, index) => {
+                console.log(`   ${index + 1}. Similarity: ${(result.score * 100).toFixed(2)}%`);
+                console.log(`      File: ${path.join(codebasePath, result.relativePath)}`);
+                console.log(`      Language: ${result.language}`);
+                console.log(`      Lines: ${result.startLine}-${result.endLine}`);
+                console.log(`      Preview: ${result.content}...`);
+            });
+        } else {
+            console.log('   No relevant results found');
+        }
+
+        console.log(results);
+    }
+
+}
+
+
+function isPatternMatch(filePath: string, pattern: string): boolean {
+    // Handle directory patterns (ending with /)
+    if (pattern.endsWith('/')) {
+        const dirPattern = pattern.slice(0, -1);
+        const pathParts = filePath.split('/');
+        return pathParts.some(part => simpleGlobMatch(part, dirPattern));
+    }
+
+    // Handle file patterns
+    if (pattern.includes('/')) {
+        // Pattern with path separator - match exact path
+        return simpleGlobMatch(filePath, pattern);
+    } else {
+        // Pattern without path separator - match filename in any directory
+        const fileName = path.basename(filePath);
+        return simpleGlobMatch(fileName, pattern);
+    }
+}
+
+function simpleGlobMatch(text: string, pattern: string): boolean {
+    // Convert glob pattern to regex
+    const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
+        .replace(/\*/g, '.*'); // Convert * to .*
+
+    const regex = new RegExp(`^${regexPattern}$`);
+    console.log(regex);
+    return regex.test(text);
+}
+
+function matchesIgnorePattern(filePath: string, basePath: string): boolean {
+    const relativePath = path.relative(basePath, filePath);
+    const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
+
+    let ignorePatterns = [
+        "obj/"
+    ];
+    for (const pattern of ignorePatterns) {
+        if (isPatternMatch(normalizedPath, pattern)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function testMatch() {
+    let basePath = "D:/src/AdsSnR/private/";
+    let filePath = "D:/src/AdsSnR/private/De.Snr.Compass.Product/test/BackendWorker/obj/src/test/aaa.cs";
+
+    if (matchesIgnorePattern(filePath, basePath)) {
+        console.log("match");
+    } else {
+        console.log("not match");
+    }
+}
+
+
 async function main() {
     console.log('🚀 Context Real Usage Example');
     console.log('===============================');
 
     try {
-        // 1. Choose Vector Database implementation
-        // Set to true to use RESTful API (for environments without gRPC support)
-        // Set to false to use gRPC (default, more efficient)
-        const chromaAddress = envManager.get('CHROMA_HOST') || 'localhost';
-        const chromaPort = envManager.get('CHROMA_PORT') || 8000;
-        const splitterType = envManager.get('SPLITTER_TYPE')?.toLowerCase() || 'ast';
 
-        // envManager.set('CUSTOM_IGNORE_PATTERNS', '');
-        envManager.set('CUSTOM_IGNORE_PATTERNS', 'AdsSnR_Common/**,AdsSnR_Idhash/**');
-
-        console.log(`🔌 Connecting to Chroma at: ${chromaAddress}`);
-
-        let client = new ChromaClient({
-            host: chromaAddress,
-            port: Number(chromaPort)
-        });
-
-        // let collection = await client.getCollection({
-        //     name: 'hybrid_code_chunks_12bbd60e'
-        // });
-
-        // let filter = "";//JSON.stringify({ relativePath: "Services\\AcsDebugModeService.cs"});
-        // const queryParams: any = {
-        //     limit: 16384,
-        //     include: ['documents', 'metadatas'] as any
-        // };
-        // if (filter) {
-        //     queryParams.where = JSON.parse(filter);
-        // }
-
-        // let result = await collection.get(queryParams);
-
-        // console.log(result);
-
+        // testMatch();
         // return;
 
-        let vectorDatabase = new ChromaVectorDatabase({
-            host: chromaAddress,
-            port: Number(chromaPort)
-        });
-
-        // 2. Create Context instance
-        let codeSplitter;
-        if (splitterType === 'langchain') {
-            codeSplitter = new LangChainCodeSplitter(1000, 200);
-        } else {
-            codeSplitter = new AstCodeSplitter(2500, 300);
-        }
-        const context = new Context({
-            vectorDatabase,
-            codeSplitter,
-            supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h']
-        });
-
-        // // 3. Check if index already exists and clear if needed
-        // console.log('\n📖 Starting to index codebase...');
-        const codebasePath = path.join(__dirname, './code'); // Index entire project
-        // const codebasePath = "d:/demos/test1"; //path.join(__dirname, '../..'); // Index entire project
-
-        // // Check if index already exists
-        const hasExistingIndex = await context.hasIndex(codebasePath);
-        if (hasExistingIndex) {
-            console.log('🗑️  Existing index found, clearing it first...');
-            await context.clearIndex(codebasePath);
-        }
-
-        // // Index with progress tracking
-        const indexStats = await context.indexCodebase(codebasePath);
-
-        return;
-
-        // // 4. Show indexing statistics
-        // console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
-
-        // 5. Perform semantic search
-        console.log('\n🔍 Performing semantic search...');
-
-        const queries = [
-            'get me the detail of GetEnvToComps'
-        ];
-
-        for (const query of queries) {
-            console.log(`\n🔎 Search: "${query}"`);
-            const results = await context.semanticSearch(codebasePath, query, 3, 0.3);
-
-            if (results.length > 0) {
-                results.forEach((result, index) => {
-                    console.log(`   ${index + 1}. Similarity: ${(result.score * 100).toFixed(2)}%`);
-                    console.log(`      File: ${path.join(codebasePath, result.relativePath)}`);
-                    console.log(`      Language: ${result.language}`);
-                    console.log(`      Lines: ${result.startLine}-${result.endLine}`);
-                    console.log(`      Preview: ${result.content}...`);
-                });
-            } else {
-                console.log('   No relevant results found');
-            }
-        }
+        await indexCodePathForAdsSnr();
+        // await searchCodePath(codebasePath, ["what is service override"]);
 
         console.log('\n🎉 Example completed successfully!');
 

@@ -1,0 +1,7 @@
+You have access to a tool called "code-agent" that specializes in code search and understanding.
+ 
+- For any user question related to code (e.g., implementation, debugging, architecture, documentation, or file locations), always consider using this server.
+- If the codebase has not been indexed yet with `index_codebase(repo_path)`, you must first ask the user to provide a repository path and run the indexing before answering.
+- After indexing, answer code-related questions by calling `search_code(repo_path, question)`.
+- Always rely on `code-agent` for searching and understanding the repository, instead of attempting to answer purely from your own memory.
+- If the user asks a question outside of code (e.g., general knowledge, math, or chat), you may use other servers or your own reasoning.

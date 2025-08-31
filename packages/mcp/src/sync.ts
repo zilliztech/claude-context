@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import { Context, FileSynchronizer } from "@suoshengzhang/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
+import { getGitRepoName, checkServerSnapshot } from "@suoshengzhang/claude-context-core";
+import { CodebaseInfoIndexed } from "./config.js";
 
 export class SyncManager {
     private context: Context;
@@ -10,6 +12,36 @@ export class SyncManager {
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
         this.snapshotManager = snapshotManager;
+    }
+
+    private async compareAndDelete(codebasePath: string, serverSnapshot: any, gitRepoName: string): Promise<void> {
+        const oldFileHashes = this.context.getSynchronizer(codebasePath)?.getFileHashes();
+        // Convert array of file hash entries to Map
+        const newFileHashes = new Map<string, string>();
+        for (const item of serverSnapshot.fileHashes) {
+            const [key, value] = item;
+            newFileHashes.set(key, value);
+        }
+        console.log(`[SYNC-DEBUG] Converted new file hashes to Map with ${newFileHashes.size} entries`);
+        
+        if (!oldFileHashes || !newFileHashes) {
+            console.log('[SYNC-DEBUG] Missing file hashes for comparison');
+            return;
+        }
+
+        // Convert oldFileHashes Map to array of entries for iteration
+        const oldEntries = Array.from(oldFileHashes.entries());
+        
+        for (let i = 0; i < oldEntries.length; i++) {
+            const [relativePath, oldHash] = oldEntries[i];
+            // Find matching file in new hashes
+            const newHash = newFileHashes.get(relativePath);
+            
+            // If hashes match, delete chunks since file is unchanged
+            if (newHash && newHash === oldHash) {
+                await this.context.deleteFileChunks(`code_chunks_${gitRepoName}`, relativePath);
+            }
+        }
     }
 
     public async handleSyncIndex(): Promise<void> {
@@ -73,6 +105,39 @@ export class SyncManager {
                         console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
                     } else {
                         console.log(`[SYNC] No changes detected for '${codebasePath}' (${codebaseElapsed}ms)`);
+                    }
+
+                    // Get git repository name for server snapshot
+                    const gitInfo = await getGitRepoName(codebasePath);
+                    const gitRepoName = gitInfo.repoName;
+                    if (!gitRepoName) {
+                        console.log(`[SYNC-DEBUG] No git repository found for ${codebasePath}, skipping server snapshot comparison`);
+                        continue;
+                    }
+
+                    // Fetch server snapshot
+                    const serverSnapshot = await checkServerSnapshot(gitRepoName);
+                    if (serverSnapshot.error) {
+                        console.error(`[SYNC-DEBUG] Error fetching server snapshot for ${gitRepoName}:`, serverSnapshot.error);
+                        continue;
+                    }
+
+                    const serverSnapshotVersion = serverSnapshot.version;
+                    let codebaseInfo = this.snapshotManager.getCodebaseInfo(codebasePath) as CodebaseInfoIndexed;
+                    const curSnapshotVersion = codebaseInfo?.serverSnapshotVersion;
+                    console.log(`[SYNC-DEBUG] Current vs Server snapshot version for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
+
+                    let curCodebaseIndexStatus = {
+                        indexedFiles: codebaseInfo?.indexedFiles || 0,
+                        totalChunks: codebaseInfo?.totalChunks || 0,
+                        status: codebaseInfo?.indexStatus || 'completed',
+                    };
+                    this.snapshotManager.setCodebaseIndexed(codebasePath, curCodebaseIndexStatus, serverSnapshotVersion);
+                    this.snapshotManager.saveCodebaseSnapshot();
+                    
+                    if (curSnapshotVersion !== serverSnapshotVersion) {
+                        console.log(`[SYNC-DEBUG] Server snapshot version changed for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
+                        await this.compareAndDelete(codebasePath, serverSnapshot.json, gitRepoName);
                     }
                 } catch (error: any) {
                     const codebaseElapsed = Date.now() - codebaseStartTime;

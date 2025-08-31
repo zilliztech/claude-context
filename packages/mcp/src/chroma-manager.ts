@@ -1,127 +1,78 @@
-import { spawn, ChildProcess, exec } from 'child_process';
+import { spawn, exec } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { pipeline } from 'stream/promises';
-import { createWriteStream } from 'fs';
 import { get } from 'https';
 
 export class ChromaManager {
-    private chromaProcess: ChildProcess | null = null;
     private isRunning: boolean = false;
-    private restartInterval: NodeJS.Timeout | null = null;
     private healthCheckInterval: NodeJS.Timeout | null = null;
-    private restartAttempts: number = 0;
-    private maxRestartAttempts: number = 5;
-    private restartDelay: number = 5000; // 5 seconds
+    private healthCheckIntervalMs: number = 30000; // 30 seconds
 
     constructor(
         private readonly chromaWorkingDir: string,
-        private readonly healthCheckIntervalMs: number = 30000 // 30 seconds
-    ) { }
+        healthCheckIntervalMs: number = 30000 // 30 seconds
+    ) {
+        this.healthCheckIntervalMs = healthCheckIntervalMs;
+    }
 
     /**
      * Start the Chroma process
      */
     public async start(): Promise<void> {
         if (this.isRunning) {
-            console.log('[CHROMA] Chroma process is already running');
+            console.log('[CHROMA] Chroma manager is already running');
             return;
         }
 
-        console.log('[CHROMA] Starting Chroma process...');
+        console.log('[CHROMA] Starting Chroma manager...');
         console.log(`[CHROMA] Working directory: ${this.chromaWorkingDir}`);
 
         try {
-            // First, check for and terminate any existing chroma_starter.exe processes
-            await this.terminateExistingChromaProcesses();
-            await this.spawnChromaProcess();
+            if (!fs.existsSync(this.chromaWorkingDir)) {
+                fs.mkdirSync(this.chromaWorkingDir, { recursive: true });
+                console.log(`[CHROMA] Created working directory: ${this.chromaWorkingDir}`);
+            }
+        } catch (error) {
+            throw new Error(`Failed to create directory ${this.chromaWorkingDir}: ${error}`);
+        }
+
+        try {
+            // Check if there's already a chroma_starter.exe process running
+            const existingProcesses = await this.findChromaProcesses();
+            
+            if (existingProcesses.length > 0) {
+                console.log(`[CHROMA] Found existing chroma_starter.exe process(es): ${existingProcesses.map(p => p.pid).join(', ')}`);
+                console.log('[CHROMA] Reusing existing Chroma process');
+            } else {
+                console.log('[CHROMA] No existing chroma_starter.exe process found, starting new one...');
+                await this.spawnChromaProcess();
+            }
+
             this.startHealthCheck();
             this.isRunning = true;
-            console.log('[CHROMA] Chroma process started successfully');
+            console.log('[CHROMA] Chroma manager started successfully');
         } catch (error) {
-            console.error('[CHROMA] Failed to start Chroma process:', error);
+            console.error('[CHROMA] Failed to start Chroma manager:', error);
             throw error;
         }
     }
 
     /**
-     * Stop the Chroma process
+     * Stop the Chroma manager
      */
     public async stop(): Promise<void> {
-        console.log('[CHROMA] Stopping Chroma process...');
+        console.log('[CHROMA] Stopping Chroma manager...');
 
         this.isRunning = false;
 
-        // Clear intervals
+        // Clear health check interval
         if (this.healthCheckInterval) {
             clearInterval(this.healthCheckInterval);
             this.healthCheckInterval = null;
         }
 
-        if (this.restartInterval) {
-            clearTimeout(this.restartInterval);
-            this.restartInterval = null;
-        }
-
-        // Kill the process
-        if (this.chromaProcess) {
-            try {
-                this.chromaProcess.kill('SIGTERM');
-
-                // Give it a moment to terminate gracefully
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Force kill if still running
-                if (!this.chromaProcess.killed) {
-                    this.chromaProcess.kill('SIGKILL');
-                }
-            } catch (error) {
-                console.error('[CHROMA] Error stopping Chroma process:', error);
-            }
-
-            this.chromaProcess = null;
-        }
-
-        console.log('[CHROMA] Chroma process stopped');
-    }
-
-    /**
-     * Terminate any existing chroma_starter.exe processes
-     */
-    private async terminateExistingChromaProcesses(): Promise<void> {
-        console.log('[CHROMA] Checking for existing chroma_starter.exe processes...');
-
-        try {
-            const processes = await this.findChromaProcesses();
-
-            if (processes.length === 0) {
-                console.log('[CHROMA] No existing chroma_starter.exe processes found');
-                return;
-            }
-
-            console.log(`[CHROMA] Found ${processes.length} existing chroma_starter.exe process(es): ${processes.map(p => p.pid).join(', ')}`);
-
-            // Terminate each process
-            for (const process of processes) {
-                await this.terminateProcess(process.pid);
-            }
-
-            // Wait a moment for processes to terminate
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Verify all processes are terminated
-            const remainingProcesses = await this.findChromaProcesses();
-            if (remainingProcesses.length > 0) {
-                console.warn(`[CHROMA] Warning: ${remainingProcesses.length} chroma_starter.exe process(es) still running after termination attempt`);
-            } else {
-                console.log('[CHROMA] All existing chroma_starter.exe processes terminated successfully');
-            }
-
-        } catch (error) {
-            console.error('[CHROMA] Error while terminating existing processes:', error);
-            // Continue anyway - don't fail the startup
-        }
+        console.log('[CHROMA] Chroma manager stopped');
     }
 
     /**
@@ -188,50 +139,25 @@ export class ChromaManager {
     }
 
     /**
-     * Terminate a process by PID
+     * Check if there are any chroma_starter.exe processes running
      */
-    private async terminateProcess(pid: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const platform = process.platform;
-            let command: string;
-
-            if (platform === 'win32') {
-                // Windows: use taskkill
-                command = `taskkill /PID ${pid} /F`;
-            } else {
-                // Unix-like: use kill
-                command = `kill -9 ${pid}`;
-            }
-
-            exec(command, (error, stdout, stderr) => {
-                if (error) {
-                    console.warn(`[CHROMA] Warning: Failed to terminate process ${pid}:`, error.message);
-                    // Don't reject - just log the warning
-                } else {
-                    console.log(`[CHROMA] Successfully terminated process ${pid}`);
-                }
-                resolve();
-            });
-        });
+    public async isAlive(): Promise<boolean> {
+        try {
+            const processes = await this.findChromaProcesses();
+            return processes.length > 0;
+        } catch (error) {
+            console.error('[CHROMA] Error checking if Chroma is alive:', error);
+            return false;
+        }
     }
 
     /**
-     * Check if the Chroma process is alive
+     * Get the current status of the Chroma manager
      */
-    public isAlive(): boolean {
-        return this.chromaProcess !== null &&
-            !this.chromaProcess.killed &&
-            this.chromaProcess.exitCode === null;
-    }
-
-    /**
-     * Get the current status of the Chroma process
-     */
-    public getStatus(): { isRunning: boolean; isAlive: boolean; restartAttempts: number } {
+    public async getStatus(): Promise<{ isRunning: boolean; isAlive: boolean }> {
         return {
             isRunning: this.isRunning,
-            isAlive: this.isAlive(),
-            restartAttempts: this.restartAttempts
+            isAlive: await this.isAlive()
         };
     }
 
@@ -239,95 +165,62 @@ export class ChromaManager {
      * Spawn the Chroma process
      */
     private async spawnChromaProcess(): Promise<void> {
-        if (this.chromaProcess && !this.chromaProcess.killed) {
-            console.log('[CHROMA] Chroma process already exists, killing it first');
-            this.chromaProcess.kill('SIGTERM');
-        }
-
         console.log('[CHROMA] Spawning new Chroma process...');
 
         // Get the executable path from user's home directory
         const chromaExePath = await ChromaManager.getChromaExePath();
-        console.log(`[CHROMA] Executable command: ${chromaExePath} run --path ${this.chromaWorkingDir}`);
+        console.log(`[CHROMA] Executable command: ${chromaExePath} run --port 19801 --path ${this.chromaWorkingDir}`);
 
-        this.chromaProcess = spawn(chromaExePath, ['run', '--path', this.chromaWorkingDir], {
-            // cwd: this.chromaWorkingDir,
+        const chromaProcess = spawn(chromaExePath, ['run', '--port', '19801', '--path', this.chromaWorkingDir], {
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: false
         });
 
         // Handle process events
-        this.chromaProcess.on('error', (error) => {
+        chromaProcess.on('error', (error) => {
             console.error('[CHROMA] Process error:', error);
-            this.handleProcessDeath();
         });
 
-        this.chromaProcess.on('exit', (code, signal) => {
+        chromaProcess.on('exit', (code, signal) => {
             console.log(`[CHROMA] Process exited with code ${code} and signal ${signal}`);
-            this.handleProcessDeath();
         });
 
         // Handle stdout and stderr
-        if (this.chromaProcess.stdout) {
-            this.chromaProcess.stdout.on('data', (data) => {
+        if (chromaProcess.stdout) {
+            chromaProcess.stdout.on('data', (data) => {
                 console.log(`[CHROMA-STDOUT] ${data.toString().trim()}`);
             });
         }
 
-        if (this.chromaProcess.stderr) {
-            this.chromaProcess.stderr.on('data', (data) => {
+        if (chromaProcess.stderr) {
+            chromaProcess.stderr.on('data', (data) => {
                 console.error(`[CHROMA-STDERR] ${data.toString().trim()}`);
             });
         }
 
-        console.log(`[CHROMA] Process spawned with PID: ${this.chromaProcess.pid}`);
-    }
-
-    /**
-     * Handle process death and restart if needed
-     */
-    private handleProcessDeath(): void {
-        if (!this.isRunning) {
-            console.log('[CHROMA] Process died but manager is not running, not restarting');
-            return;
-        }
-
-        if (this.restartAttempts >= this.maxRestartAttempts) {
-            console.error(`[CHROMA] Max restart attempts (${this.maxRestartAttempts}) reached, not restarting`);
-            this.isRunning = false;
-            return;
-        }
-
-        this.restartAttempts++;
-        console.log(`[CHROMA] Process died, attempting restart ${this.restartAttempts}/${this.maxRestartAttempts} in ${this.restartDelay}ms`);
-
-        this.restartInterval = setTimeout(() => {
-            try {
-                this.spawnChromaProcess();
-                console.log('[CHROMA] Process restarted successfully');
-            } catch (error) {
-                console.error('[CHROMA] Failed to restart process:', error);
-                this.handleProcessDeath(); // Try again
-            }
-        }, this.restartDelay);
+        console.log(`[CHROMA] Process spawned with PID: ${chromaProcess.pid}`);
     }
 
     /**
      * Start periodic health check
      */
     private startHealthCheck(): void {
-        this.healthCheckInterval = setInterval(() => {
+        this.healthCheckInterval = setInterval(async () => {
             if (!this.isRunning) {
                 return;
             }
 
-            if (!this.isAlive()) {
-                console.log('[CHROMA] Health check failed - process is not alive');
-                this.handleProcessDeath();
+            const isAlive = await this.isAlive();
+            if (!isAlive) {
+                console.log('[CHROMA] Health check failed - no chroma_starter.exe process found, starting new one...');
+                try {
+                    await this.spawnChromaProcess();
+                    console.log('[CHROMA] New Chroma process started successfully');
+                } catch (error) {
+                    console.error('[CHROMA] Failed to start new Chroma process:', error);
+                }
             } else {
-                console.log('[CHROMA] Health check passed - process is alive');
-                // Reset restart attempts on successful health check
-                this.restartAttempts = 0;
+                console.log('[CHROMA] Health check passed - chroma_starter.exe process is running');
             }
         }, this.healthCheckIntervalMs);
     }
@@ -372,7 +265,7 @@ export class ChromaManager {
             throw new Error(`Failed to create directory ${targetDir}: ${error}`);
         }
 
-        let downloadUrl = `https://raw.githubusercontent.com/zhangsuosheng9/code-agent/refs/heads/master/chroma_starter/chroma_starter.exe`;
+        let downloadUrl = `https://github.com/tiantiaw/chroma_starter/releases/download/v1.0.0/chroma_starter.exe`;
 
         console.log(`[CHROMA] Downloading from: ${downloadUrl}`);
         console.log(`[CHROMA] Target path: ${targetPath}`);
@@ -390,7 +283,7 @@ export class ChromaManager {
      */
     private static async downloadFile(url: string, targetPath: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const fileStream = createWriteStream(targetPath);
+            const fileStream = fs.createWriteStream(targetPath);
 
             get(url, (response) => {
                 if (response.statusCode === 302 || response.statusCode === 301) {
