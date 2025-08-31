@@ -5,20 +5,22 @@
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
 
+import path from 'path';
+import os from 'os';
 import fs from 'fs';
-const logStream = fs.createWriteStream('d:/src/wangtt_log/mcp.log', { flags: 'a' });
 
-console.log = (...args: any[]) => {
-    const timestamp = new Date().toLocaleString();
-    logStream.write(`[${timestamp}] [LOG] ${args.join(' ')}\n`);
-    process.stderr.write(`[${timestamp}] [LOG] ${args.join(' ')}\n`);
-};
+let logPath = path.join(os.homedir(), '.context', 'mcp.log');
+const logStream = fs.createWriteStream(logPath, { flags: 'a' });
 
-console.warn = (...args: any[]) => {
-    const timestamp = new Date().toLocaleString();
-    logStream.write(`[${timestamp}] [WARN] ${args.join(' ')}\n`); 
-    process.stderr.write(`[${timestamp}] [WARN] ${args.join(' ')}\n`);
-};
+// console.log = (...args: any[]) => {
+//     logStream.write(`[LOG] ${args.join(' ')}\n`);
+//     process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+// };
+
+// console.warn = (...args: any[]) => {
+//     logStream.write(`[WARN] ${args.join(' ')}\n`);
+//     process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+// };
 
 // console.error already goes to stderr by default
 
