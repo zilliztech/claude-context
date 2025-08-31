@@ -391,10 +391,10 @@ export class Context {
 
     private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
         // Escape backslashes for Milvus query expression (Windows path compatibility)
-        const escapedPath = relativePath.replace(/\\/g, '\\\\');
+        // const escapedPath = relativePath.replace(/\\/g, '\\\\');
         const results = await this.vectorDatabase.query(
             collectionName,
-            JSON.stringify({ relativePath: escapedPath }),
+            JSON.stringify({ relativePath: relativePath }),
             ['id']
         );
 

@@ -132,11 +132,11 @@ export class SyncManager {
         }, 5000); // Initial sync after 5 seconds
 
         // Periodically check for file changes and update the index
-        console.log('[SYNC-DEBUG] Setting up periodic sync every 5 minutes (300000ms)');
+        console.log('[SYNC-DEBUG] Setting up periodic sync every 1 minutes (60000ms)');
         const syncInterval = setInterval(() => {
             console.log('[SYNC-DEBUG] Executing scheduled periodic sync');
             this.handleSyncIndex();
-        }, 5 * 60 * 1000); // every 5 minutes
+        }, 1 * 60 * 1000); // every 1 minutes
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
     }
