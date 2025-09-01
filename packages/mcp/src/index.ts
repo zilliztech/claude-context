@@ -9,7 +9,11 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 
-let logPath = path.join(os.homedir(), '.context', 'mcp.log');
+const contextDir = path.join(os.homedir(), '.context');
+if (!fs.existsSync(contextDir)) {
+    fs.mkdirSync(contextDir, { recursive: true });
+}
+let logPath = path.join(contextDir, 'mcp.log');
 const logStream = fs.createWriteStream(logPath, { flags: 'a' });
 
 function getTimePrefix() {
