@@ -23,7 +23,7 @@ export class SyncManager {
             newFileHashes.set(key, value);
         }
         console.log(`[SYNC-DEBUG] Converted new file hashes to Map with ${newFileHashes.size} entries`);
-        
+
         if (!oldFileHashes || !newFileHashes) {
             console.log('[SYNC-DEBUG] Missing file hashes for comparison');
             return;
@@ -31,12 +31,12 @@ export class SyncManager {
 
         // Convert oldFileHashes Map to array of entries for iteration
         const oldEntries = Array.from(oldFileHashes.entries());
-        
+
         for (let i = 0; i < oldEntries.length; i++) {
             const [relativePath, oldHash] = oldEntries[i];
             // Find matching file in new hashes
             const newHash = newFileHashes.get(relativePath);
-            
+
             // If hashes match, delete chunks since file is unchanged
             if (newHash && newHash === oldHash) {
                 await this.context.deleteFileChunks(`code_chunks_${gitRepoName}`, relativePath);
@@ -116,7 +116,7 @@ export class SyncManager {
                     }
 
                     // Fetch server snapshot
-                    const serverSnapshot = await checkServerSnapshot(gitRepoName);
+                    const serverSnapshot = await checkServerSnapshot(this.context.getCodeAgentEndpoint(), gitRepoName);
                     if (serverSnapshot.error) {
                         console.error(`[SYNC-DEBUG] Error fetching server snapshot for ${gitRepoName}:`, serverSnapshot.error);
                         continue;
@@ -134,7 +134,7 @@ export class SyncManager {
                     };
                     this.snapshotManager.setCodebaseIndexed(codebasePath, curCodebaseIndexStatus, serverSnapshotVersion);
                     this.snapshotManager.saveCodebaseSnapshot();
-                    
+
                     if (curSnapshotVersion !== serverSnapshotVersion) {
                         console.log(`[SYNC-DEBUG] Server snapshot version changed for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
                         await this.compareAndDelete(codebasePath, serverSnapshot.json, gitRepoName);

@@ -54,10 +54,10 @@ export function getGitRepoName(folderPath: string): { gitRoot: string; repoName:
     }
 }
 
-export async function checkServerSnapshot(codebasePath: string): Promise<{ json: any; error: boolean; version: string }> {
+export async function checkServerSnapshot(codeAgentEndpoint: string, codebasePath: string): Promise<{ json: any; error: boolean; version: string }> {
     try {
         console.log(`[SERVER-CHECK] 🔍 Checking server snapshot for codebase: ${codebasePath}`);
-        const response = await fetch(`http://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_snapshot?codebase=${codebasePath}`);
+        const response = await fetch(`${codeAgentEndpoint}/get_snapshot?codebase=${codebasePath}`);
 
         if (!response.ok) {
             console.error(`[SERVER-CHECK] ❌ Server request failed with status: ${response.status}`);

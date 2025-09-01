@@ -206,6 +206,13 @@ export class Context {
     }
 
     /**
+     * Get code agent endpoint
+     */
+    getCodeAgentEndpoint(): string {
+        return this.codeAgentEndpoint;
+    }
+
+    /**
      * Get synchronizers map
      */
     getSynchronizers(): Map<string, FileSynchronizer> {
@@ -487,7 +494,7 @@ export class Context {
     /**
      * Merge search results from different sources, using server results as baseline
      */
-    private mergeSearchResults(clientResults: VectorSearchResult[], serverResults: VectorSearchResult[]): VectorSearchResult[] {
+    private mergeSearchResults(clientResults: VectorSearchResult[], serverResults: VectorSearchResult[]): VectorSearchResult[] { // TODO: update the return relative path
         // Create a map of client results by relativePath for quick lookup
         const clientResultsByPath = new Map<string, VectorSearchResult>();
         clientResults.forEach(result => {

@@ -162,7 +162,7 @@ export class ToolHandlers {
             let dryRun = true;
 
             // Check server snapshot first
-            const serverCheck = await checkServerSnapshot(gitRepoName);
+            const serverCheck = await checkServerSnapshot(this.context.getCodeAgentEndpoint(), gitRepoName);
             if (serverCheck.error) {
                 return {
                     content: [{
