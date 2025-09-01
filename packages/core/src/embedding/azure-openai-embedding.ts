@@ -127,7 +127,7 @@ export class AzureOpenAIEmbedding extends Embedding {
         // Send HTTP POST request to local embeddings endpoint
         await BatchSemaphore.acquire();
         try {
-            const response = await fetch(this.config.codeAgentEmbEndpoint, {
+            const response = await fetch(`${this.config.codeAgentEmbEndpoint}/get_embeddings`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -146,27 +146,27 @@ export class AzureOpenAIEmbedding extends Embedding {
             // Calculate the size of each embedding section
             const embeddingSize = 3072 * 4; // 3072 floats * 4 bytes per float
             const numEmbeddings = Math.floor(byteArray.length / embeddingSize);
-            
+
             if (numEmbeddings !== processedTexts.length) {
                 throw new Error(`Mismatch between expected embeddings (${processedTexts.length}) and received embeddings (${numEmbeddings})`);
             }
-            
+
             const processedEmbeddings: EmbeddingVector[] = [];
-            
+
             for (let i = 0; i < numEmbeddings; i++) {
                 const startIndex = i * embeddingSize;
                 const endIndex = startIndex + embeddingSize;
                 const embeddingBytes = byteArray.slice(startIndex, endIndex);
-                
+
                 const vector: number[] = [];
-                
+
                 // Convert every 4 bytes into a float
                 for (let j = 0; j < embeddingBytes.length; j += 4) {
                     const floatBytes = embeddingBytes.slice(j, j + 4);
                     const floatValue = floatBytes.readFloatLE(0); // Read as little-endian float
                     vector.push(floatValue);
                 }
-                
+
                 processedEmbeddings.push({
                     vector: vector,
                     dimension: 3072

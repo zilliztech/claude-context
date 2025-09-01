@@ -12,14 +12,20 @@ import fs from 'fs';
 let logPath = path.join(os.homedir(), '.context', 'mcp.log');
 const logStream = fs.createWriteStream(logPath, { flags: 'a' });
 
+function getTimePrefix() {
+    return new Date().toISOString();
+}
+
 // console.log = (...args: any[]) => {
-//     logStream.write(`[LOG] ${args.join(' ')}\n`);
-//     process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+//     const prefix = `[${getTimePrefix()}]`;
+//     logStream.write(`${prefix} [LOG] ${args.join(' ')}\n`);
+//     process.stderr.write(`${prefix} [LOG] ${args.join(' ')}\n`);
 // };
 
 // console.warn = (...args: any[]) => {
-//     logStream.write(`[WARN] ${args.join(' ')}\n`);
-//     process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+//     const prefix = `[${getTimePrefix()}]`;
+//     logStream.write(`${prefix} [WARN] ${args.join(' ')}\n`);
+//     process.stderr.write(`${prefix} [WARN] ${args.join(' ')}\n`);
 // };
 
 // console.error already goes to stderr by default
@@ -85,7 +91,8 @@ class ContextMcpServer {
         // Initialize Claude Context
         this.context = new Context({
             embedding,
-            vectorDatabase
+            vectorDatabase,
+            codeAgentEndpoint: config.codeAgentEmbEndpoint
         });
 
         // Initialize managers

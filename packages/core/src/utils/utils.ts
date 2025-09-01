@@ -13,7 +13,7 @@ export function getGitRepoName(folderPath: string): { gitRoot: string; repoName:
         let currentPath = folderPath;
         let gitDir = null;
         let gitRoot = '';
-        
+
         while (currentPath !== path.parse(currentPath).root) {
             const potentialGitDir = path.join(currentPath, '.git');
             if (fs.existsSync(potentialGitDir)) {
@@ -57,8 +57,8 @@ export function getGitRepoName(folderPath: string): { gitRoot: string; repoName:
 export async function checkServerSnapshot(codebasePath: string): Promise<{ json: any; error: boolean; version: string }> {
     try {
         console.log(`[SERVER-CHECK] 🔍 Checking server snapshot for codebase: ${codebasePath}`);
-        const response = await fetch(`http://localhost:8001/get_snapshot?codebase=${codebasePath}`);
-        
+        const response = await fetch(`http://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_snapshot?codebase=${codebasePath}`);
+
         if (!response.ok) {
             console.error(`[SERVER-CHECK] ❌ Server request failed with status: ${response.status}`);
             return {
@@ -69,7 +69,7 @@ export async function checkServerSnapshot(codebasePath: string): Promise<{ json:
         }
 
         const serverData = await response.json() as any;
-        
+
         if (serverData.error !== "success") {
             console.error(`[SERVER-CHECK] ❌ Code is not onboarded at server side: ${serverData.error}`);
             return {

@@ -156,7 +156,7 @@ export class ToolHandlers {
             const gitRoot = gitInfo.gitRoot;
             const gitRepoName = gitInfo.repoName;
             console.log(`[INDEX-CODEBASE] 🔍 Git repository name: ${gitRepoName}, Git root: ${gitRoot}, path: ${absolutePath}`);
-            
+
             codebasePath = gitRoot;
             absolutePath = gitRoot;
             let dryRun = true;
@@ -307,7 +307,7 @@ export class ToolHandlers {
             trackCodebasePath(absolutePath);
 
             // Start background indexing - now safe to proceed
-            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, dryRun, 
+            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, dryRun,
                 serverCheck.json, serverCheck.version);
 
             const pathInfo = codebasePath !== absolutePath
@@ -344,7 +344,7 @@ export class ToolHandlers {
         }
     }
 
-    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, 
+    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean,
         splitterType: string, dryRun: boolean = false, serverSnapshot: any = null, serverSnapshotVersion: string = "") {
         const absolutePath = codebasePath;
         let lastSaveTime = 0; // Track last save timestamp
@@ -618,7 +618,7 @@ export class ToolHandlers {
             const gitRoot = gitInfo.gitRoot;
             const gitRepoName = gitInfo.repoName;
             console.log(`[INDEX-CODEBASE] 🔍 Git repository name: ${gitRepoName}, Git root: ${gitRoot}, path: ${absolutePath}`);
-            
+
             codebasePath = gitRoot;
             absolutePath = gitRoot;
 
@@ -736,7 +736,7 @@ export class ToolHandlers {
             const gitRoot = gitInfo.gitRoot;
             const gitRepoName = gitInfo.repoName;
             console.log(`[INDEX-CODEBASE] 🔍 Git repository name: ${gitRepoName}, Git root: ${gitRoot}, path: ${absolutePath}`);
-            
+
             codebasePath = gitRoot;
             absolutePath = gitRoot;
 
@@ -768,6 +768,7 @@ export class ToolHandlers {
             const info = this.snapshotManager.getCodebaseInfo(absolutePath);
 
             let statusMessage = '';
+            console.log(`Checking indexing status for codebase: ${absolutePath}, status: ${status}, info: ${JSON.stringify(info)}`);
 
             switch (status) {
                 case 'indexed':

@@ -153,7 +153,7 @@ export function createMcpConfig(): ContextMcpConfig {
         chromaAddress: envManager.get('CHROMA_ADDRESS') || 'localhost',
         chromaPort: Number(envManager.get('CHROMA_PORT')) || 19801,
         chromaWorkingDir: envManager.get('CHROMA_WORKING_DIR') || path.join(os.homedir(), '.context', 'chromadb'),
-        codeAgentEmbEndpoint: envManager.get('CODE_AGENT_EMB_ENDPOINT') || 'http://localhost:8001/get_embeddings'
+        codeAgentEmbEndpoint: envManager.get('CODE_AGENT_EMB_ENDPOINT') || 'http://localhost:8001'
     };
 
     return config;

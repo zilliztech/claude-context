@@ -107,6 +107,7 @@ export interface ContextConfig {
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
+    codeAgentEndpoint?: string;
 }
 
 export class Context {
@@ -116,6 +117,7 @@ export class Context {
     private supportedExtensions: string[];
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
+    private codeAgentEndpoint: string;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -131,6 +133,7 @@ export class Context {
         this.vectorDatabase = config.vectorDatabase;
 
         this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
+        this.codeAgentEndpoint = config.codeAgentEndpoint || 'http://localhost:8001';
 
         // Load custom extensions from environment variables
         const envCustomExtensions = this.getCustomExtensionsFromEnv();
@@ -299,7 +302,8 @@ export class Context {
         const indexingRange = indexingEndPercentage - indexingStartPercentage;
 
         let result: { processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' } = {
-             processedFiles: codeFiles.length, totalChunks: 0, status: 'completed' };
+            processedFiles: codeFiles.length, totalChunks: 0, status: 'completed'
+        };
         if (!dryRun) {
             result = await this.processFileList(
                 codeFiles,
@@ -307,7 +311,7 @@ export class Context {
                 (filePath, fileIndex, totalFiles) => {
                     // Calculate progress percentage
                     const progressPercentage = indexingStartPercentage + (fileIndex / totalFiles) * indexingRange;
-    
+
                     // console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
                     progressCallback?.({
                         phase: `Processing files (${fileIndex}/${totalFiles})...`,
@@ -431,14 +435,14 @@ export class Context {
                 throw new Error('Git repository name is required');
             }
 
-            const url = `http://localhost:8001/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}`;
+            const url = `${this.codeAgentEndpoint}/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}`;
             console.log(`🔍 Fetching server-side results from: ${url}`);
-            
+
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const data = await response.json() as {
                 error: string;
                 retrieved_data?: Array<{
@@ -450,11 +454,11 @@ export class Context {
                     startLine: number;
                 }>;
             };
-            
+
             if (data.error !== "success") {
                 throw new Error(`Server error: ${data.error}`);
             }
-            
+
             // Convert server response to VectorSearchResult format
             const results: VectorSearchResult[] = (data.retrieved_data || []).map((item) => ({
                 document: {
@@ -471,7 +475,7 @@ export class Context {
                 },
                 score: item.score || 0
             }));
-            
+
             console.log(`✅ Server-side search returned ${results.length} results`);
             return results;
         } catch (error) {
@@ -489,34 +493,34 @@ export class Context {
         clientResults.forEach(result => {
             clientResultsByPath.set(result.document.relativePath, result);
         });
-        
+
         // Track which client results were used for replacement
         const usedClientPaths = new Set<string>();
-        
+
         // Start with server results as baseline, then replace with client results where paths match
         const mergedResults = serverResults.map(serverResult => {
             const clientResult = clientResultsByPath.get(serverResult.document.relativePath);
-            
+
             // If we have a client result for the same path, use it instead
             if (clientResult) {
                 usedClientPaths.add(serverResult.document.relativePath);
                 return clientResult;
             }
-            
+
             // Otherwise, keep the server result
             return serverResult;
         });
-        
+
         // Append client results that weren't used for replacement
-        const unusedClientResults = clientResults.filter(result => 
+        const unusedClientResults = clientResults.filter(result =>
             !usedClientPaths.has(result.document.relativePath)
         );
-        
+
         mergedResults.push(...unusedClientResults);
-        
+
         // Sort by score
         mergedResults.sort((a, b) => b.score - a.score);
-        
+
         console.log(`🔄 Merged ${clientResults.length} client + ${serverResults.length} server = ${mergedResults.length} results (server baseline with client replacements + ${unusedClientResults.length} unused client results)`);
         return mergedResults;
     }
@@ -528,7 +532,7 @@ export class Context {
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
-    async semanticSearch(codebasePath: string, query: string, topK: number = 5, 
+    async semanticSearch(codebasePath: string, query: string, topK: number = 5,
         threshold: number = 0.5, filterExpr?: string, gitRepoName?: string): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
