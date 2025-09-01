@@ -82,7 +82,8 @@ export class SnapshotManager {
                 indexedFiles: 0, // Unknown in v1 format
                 totalChunks: 0,  // Unknown in v1 format
                 indexStatus: 'completed', // Assume completed for v1 format
-                lastUpdated: now
+                lastUpdated: now,
+                serverSnapshotVersion: ""
             };
             this.codebaseInfoMap.set(codebasePath, info);
         }
@@ -244,7 +245,8 @@ export class SnapshotManager {
         const info: CodebaseInfoIndexing = {
             status: 'indexing',
             indexingPercentage: progress,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            serverSnapshotVersion: ""
         };
         this.codebaseInfoMap.set(codebasePath, info);
     }
@@ -260,7 +262,8 @@ export class SnapshotManager {
             const info: CodebaseInfoIndexing = {
                 status: 'indexing',
                 indexingPercentage: progress,
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                serverSnapshotVersion: ""
             };
             this.codebaseInfoMap.set(codebasePath, info);
         }
@@ -292,7 +295,8 @@ export class SnapshotManager {
             indexedFiles: fileCount || 0,
             totalChunks: 0, // Unknown in v1 method
             indexStatus: 'completed',
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            serverSnapshotVersion: ""
         };
         this.codebaseInfoMap.set(codebasePath, info);
     }
@@ -332,7 +336,7 @@ export class SnapshotManager {
     /**
      * Set codebase to indexing status
      */
-    public setCodebaseIndexing(codebasePath: string, progress: number = 0): void {
+    public setCodebaseIndexing(codebasePath: string, progress: number = 0, serverSnapshotVersion: string = ""): void {
         this.indexingCodebases.set(codebasePath, progress);
 
         // Remove from other states
@@ -343,7 +347,8 @@ export class SnapshotManager {
         const info: CodebaseInfoIndexing = {
             status: 'indexing',
             indexingPercentage: progress,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            serverSnapshotVersion: serverSnapshotVersion
         };
         this.codebaseInfoMap.set(codebasePath, info);
     }
@@ -353,7 +358,8 @@ export class SnapshotManager {
      */
     public setCodebaseIndexed(
         codebasePath: string,
-        stats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }
+        stats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' },
+        serverSnapshotVersion: string = ""
     ): void {
         // Add to indexed list if not already there
         if (!this.indexedCodebases.includes(codebasePath)) {
@@ -371,7 +377,8 @@ export class SnapshotManager {
             indexedFiles: stats.indexedFiles,
             totalChunks: stats.totalChunks,
             indexStatus: stats.status,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            serverSnapshotVersion: serverSnapshotVersion
         };
         this.codebaseInfoMap.set(codebasePath, info);
     }
@@ -382,7 +389,8 @@ export class SnapshotManager {
     public setCodebaseIndexFailed(
         codebasePath: string,
         errorMessage: string,
-        lastAttemptedPercentage?: number
+        lastAttemptedPercentage?: number,
+        serverSnapshotVersion: string = ""
     ): void {
         // Remove from other states
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
@@ -394,7 +402,8 @@ export class SnapshotManager {
             status: 'indexfailed',
             errorMessage: errorMessage,
             lastAttemptedPercentage: lastAttemptedPercentage,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            serverSnapshotVersion: serverSnapshotVersion
         };
         this.codebaseInfoMap.set(codebasePath, info);
     }

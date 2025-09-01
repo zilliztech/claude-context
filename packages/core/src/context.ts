@@ -23,6 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { FileSynchronizer } from './sync/synchronizer';
+import { getGitRepoName } from './utils/utils';
 
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
@@ -37,17 +38,21 @@ const DEFAULT_SUPPORTED_EXTENSIONS = [
 const DEFAULT_IGNORE_PATTERNS = [
     // Common build output and dependency directories
     'node_modules/**',
-    'dist/**',
-    'build/**',
-    'obj/**',
-    'objd/**',
-    'out/**',
-    'target/**',
-    'coverage/**',
-    '.nyc_output/**',
+    'dist/',
+    'build/',
+    'obj/',
+    'Logs/',
+    'QLogs/',
+    'QLocal/',
+    'objd/',
+    'out/',
+    'target/',
+    'coverage/',
+    'packages/',
+    '.corext/',
+    '**.nyc_output/**',
     '.azuredevops/**',
     '.config/**',
-    '.corext/**',
 
     // IDE and editor files
     '.vscode/**',
@@ -205,6 +210,16 @@ export class Context {
     }
 
     /**
+     * Get synchronizer for a codebase path
+     * @param codebasePath Path to codebase
+     * @returns FileSynchronizer instance for the codebase, or undefined if not found
+     */
+    getSynchronizer(codebasePath: string): FileSynchronizer | undefined {
+        const collectionName = this.getCollectionName(codebasePath);
+        return this.synchronizers.get(collectionName);
+    }
+
+    /**
      * Set synchronizer for a collection
      */
     setSynchronizer(collectionName: string, synchronizer: FileSynchronizer): void {
@@ -229,22 +244,17 @@ export class Context {
      * Get isHybrid setting from environment variable with default true
      */
     private getIsHybrid(): boolean {
-        const isHybridEnv = envManager.get('HYBRID_MODE');
-        if (isHybridEnv === undefined || isHybridEnv === null) {
-            return true; // Default to true
-        }
-        return isHybridEnv.toLowerCase() === 'true';
+        return false;
     }
 
     /**
      * Generate collection name based on codebase path and hybrid mode
      */
     public getCollectionName(codebasePath: string): string {
+        const gitRepoName = getGitRepoName(codebasePath);
         const isHybrid = this.getIsHybrid();
-        const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
         const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
-        return `${prefix}_${hash.substring(0, 8)}`;
+        return `${prefix}_${gitRepoName.repoName}`;
     }
 
     /**
@@ -257,7 +267,8 @@ export class Context {
     async indexCodebase(
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
-        forceReindex: boolean = false
+        forceReindex: boolean = false,
+        dryRun: boolean = false
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
@@ -287,22 +298,26 @@ export class Context {
         const indexingEndPercentage = 100;
         const indexingRange = indexingEndPercentage - indexingStartPercentage;
 
-        const result = await this.processFileList(
-            codeFiles,
-            codebasePath,
-            (filePath, fileIndex, totalFiles) => {
-                // Calculate progress percentage
-                const progressPercentage = indexingStartPercentage + (fileIndex / totalFiles) * indexingRange;
-
-                // console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
-                progressCallback?.({
-                    phase: `Processing files (${fileIndex}/${totalFiles})...`,
-                    current: fileIndex,
-                    total: totalFiles,
-                    percentage: Math.round(progressPercentage)
-                });
-            }
-        );
+        let result: { processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' } = {
+             processedFiles: codeFiles.length, totalChunks: 0, status: 'completed' };
+        if (!dryRun) {
+            result = await this.processFileList(
+                codeFiles,
+                codebasePath,
+                (filePath, fileIndex, totalFiles) => {
+                    // Calculate progress percentage
+                    const progressPercentage = indexingStartPercentage + (fileIndex / totalFiles) * indexingRange;
+    
+                    // console.log(`📊 Processed ${fileIndex}/${totalFiles} files`);
+                    progressCallback?.({
+                        phase: `Processing files (${fileIndex}/${totalFiles})...`,
+                        current: fileIndex,
+                        total: totalFiles,
+                        percentage: Math.round(progressPercentage)
+                    });
+                }
+            );
+        }
 
         console.log(`✅ Codebase indexing completed! Processed ${result.processedFiles} files in total, generated ${result.totalChunks} code chunks`);
 
@@ -389,7 +404,7 @@ export class Context {
         return { added: added.length, removed: removed.length, modified: modified.length };
     }
 
-    private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
+    public async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
         // Escape backslashes for Milvus query expression (Windows path compatibility)
         // const escapedPath = relativePath.replace(/\\/g, '\\\\');
         const results = await this.vectorDatabase.query(
@@ -408,13 +423,113 @@ export class Context {
     }
 
     /**
-     * Semantic search with unified implementation
-     * @param codebasePath Codebase path to search in
+     * Fetch search results from server-side API
+     */
+    private async fetchServerSearchResults(gitRepoName: string | undefined, query: string): Promise<VectorSearchResult[]> {
+        try {
+            if (!gitRepoName) {
+                throw new Error('Git repository name is required');
+            }
+
+            const url = `http://localhost:8001/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}`;
+            console.log(`🔍 Fetching server-side results from: ${url}`);
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json() as {
+                error: string;
+                retrieved_data?: Array<{
+                    content: string;
+                    endLine: number;
+                    language: string;
+                    relativePath: string;
+                    score: number;
+                    startLine: number;
+                }>;
+            };
+            
+            if (data.error !== "success") {
+                throw new Error(`Server error: ${data.error}`);
+            }
+            
+            // Convert server response to VectorSearchResult format
+            const results: VectorSearchResult[] = (data.retrieved_data || []).map((item) => ({
+                document: {
+                    id: `${item.relativePath}:${item.startLine}-${item.endLine}`,
+                    vector: [], // Server doesn't provide vector, will be empty
+                    content: item.content,
+                    relativePath: item.relativePath,
+                    startLine: item.startLine,
+                    endLine: item.endLine,
+                    fileExtension: path.extname(item.relativePath),
+                    metadata: {
+                        language: item.language || 'unknown'
+                    }
+                },
+                score: item.score || 0
+            }));
+            
+            console.log(`✅ Server-side search returned ${results.length} results`);
+            return results;
+        } catch (error) {
+            console.warn(`⚠️ Server-side search failed: ${error}`);
+            return [];
+        }
+    }
+
+    /**
+     * Merge search results from different sources, using server results as baseline
+     */
+    private mergeSearchResults(clientResults: VectorSearchResult[], serverResults: VectorSearchResult[]): VectorSearchResult[] {
+        // Create a map of client results by relativePath for quick lookup
+        const clientResultsByPath = new Map<string, VectorSearchResult>();
+        clientResults.forEach(result => {
+            clientResultsByPath.set(result.document.relativePath, result);
+        });
+        
+        // Track which client results were used for replacement
+        const usedClientPaths = new Set<string>();
+        
+        // Start with server results as baseline, then replace with client results where paths match
+        const mergedResults = serverResults.map(serverResult => {
+            const clientResult = clientResultsByPath.get(serverResult.document.relativePath);
+            
+            // If we have a client result for the same path, use it instead
+            if (clientResult) {
+                usedClientPaths.add(serverResult.document.relativePath);
+                return clientResult;
+            }
+            
+            // Otherwise, keep the server result
+            return serverResult;
+        });
+        
+        // Append client results that weren't used for replacement
+        const unusedClientResults = clientResults.filter(result => 
+            !usedClientPaths.has(result.document.relativePath)
+        );
+        
+        mergedResults.push(...unusedClientResults);
+        
+        // Sort by score
+        mergedResults.sort((a, b) => b.score - a.score);
+        
+        console.log(`🔄 Merged ${clientResults.length} client + ${serverResults.length} server = ${mergedResults.length} results (server baseline with client replacements + ${unusedClientResults.length} unused client results)`);
+        return mergedResults;
+    }
+
+    /**
+     * Perform semantic search in codebase
+     * @param codebasePath Codebase root path
      * @param query Search query
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
-    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string): Promise<SemanticSearchResult[]> {
+    async semanticSearch(codebasePath: string, query: string, topK: number = 5, 
+        threshold: number = 0.5, filterExpr?: string, gitRepoName?: string): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
@@ -501,15 +616,22 @@ export class Context {
             // 1. Generate query vector
             const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
 
-            // 2. Search in vector database
-            const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
-                collectionName,
-                queryEmbedding.vector,
-                { topK, threshold, filterExpr }
-            );
+            // 2. Search in vector database and fetch server results in parallel
+            const [searchResults, searchResultsFromServer] = await Promise.all([
+                this.vectorDatabase.search(
+                    collectionName,
+                    queryEmbedding.vector,
+                    { topK, threshold, filterExpr }
+                ),
+                this.fetchServerSearchResults(gitRepoName, query)
+            ]);
+
+            console.log(`🔍 Raw search results from client: ${searchResults.length}, server: ${searchResultsFromServer.length}`);
+            const mergedResults = this.mergeSearchResults(searchResults, searchResultsFromServer);
+            console.log(`🔄 Merged results: ${mergedResults.length}`);
 
             // 3. Convert to semantic search result format
-            const results: SemanticSearchResult[] = searchResults.map(result => ({
+            const results: SemanticSearchResult[] = mergedResults.map(result => ({
                 content: result.document.content,
                 relativePath: result.document.relativePath,
                 startLine: result.document.startLine,

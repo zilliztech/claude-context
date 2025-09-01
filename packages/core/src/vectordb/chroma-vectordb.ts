@@ -359,21 +359,17 @@ export class ChromaVectorDatabase implements VectorDatabase {
     async createHybridCollection(collectionName: string, dimension: number, description?: string): Promise<void> {
         // Chroma doesn't support hybrid collections with sparse vectors like Milvus
         // We'll create a regular collection and log a warning
-        console.log('⚠️  Chroma does not support hybrid collections with sparse vectors. Creating regular collection.');
         await this.createCollection(collectionName, dimension, description);
     }
 
     async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
         // Chroma doesn't support hybrid collections, so we'll use regular insert
-        console.log('⚠️  Chroma does not support hybrid collections. Using regular insert.');
         await this.insert(collectionName, documents);
     }
 
     async hybridSearch(collectionName: string, searchRequests: HybridSearchRequest[], options?: HybridSearchOptions): Promise<HybridSearchResult[]> {
         // Chroma doesn't support hybrid search like Milvus
         // We'll use the first search request (dense vector) and log a warning
-        console.log('⚠️  Chroma does not support hybrid search. Using dense vector search only.');
-
         if (searchRequests.length === 0) {
             throw new Error('No search requests provided');
         }

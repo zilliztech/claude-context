@@ -8,6 +8,7 @@ const originalConsoleWarn = console.warn;
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+
 let logPath = path.join(os.homedir(), '.context', 'mcp.log');
 const logStream = fs.createWriteStream(logPath, { flags: 'a' });
 
@@ -320,16 +321,14 @@ This tool is versatile and can be used before completing various tasks to retrie
      * Handle get_chroma_status tool
      */
     private async handleGetChromaStatus(args: any): Promise<any> {
-        const status = this.chromaManager.getStatus();
+        const status = await this.chromaManager.getStatus();
         return {
             content: [
                 {
                     type: "text",
                     text: `Chroma Process Status:
 - Running: ${status.isRunning}
-- Alive: ${status.isAlive}
-- Restart Attempts: ${status.restartAttempts}
-- PID: ${this.chromaManager['chromaProcess']?.pid || 'N/A'}`
+- Alive: ${status.isAlive}`
                 }
             ]
         };

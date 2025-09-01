@@ -34,6 +34,7 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
                 apiKey: config.azureOpenAIApiKey,
                 endpoint: config.azureOpenAIEndpoint,
                 model: config.embeddingModel,
+                codeAgentEmbEndpoint: config.codeAgentEmbEndpoint,
                 ...(config.azureOpenAIApiVersion && { apiVersion: config.azureOpenAIApiVersion }),
                 ...(config.azureOpenAIDeploymentName && { deploymentName: config.azureOpenAIDeploymentName })
             });

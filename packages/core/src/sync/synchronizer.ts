@@ -40,7 +40,6 @@ export class FileSynchronizer {
         // Combine size and mtime for a quick "hash"
         const quickHash = crypto.createHash('md5')
             .update(stat.size.toString())
-            .update(stat.mtimeMs.toString())
             .digest('hex');
 
         return quickHash;
@@ -224,9 +223,9 @@ export class FileSynchronizer {
         return dag;
     }
 
-    public async initialize() {
-        console.log(`[${new Date().toLocaleString()}] Initializing file synchronizer for ${this.rootDir}`);
-        await this.loadSnapshot();
+    public async initialize(serverSnapshot: any = null) {
+        console.log(`[${new Date().toLocaleString()}] Initializing file synchronizer for ${this.rootDir}, serverSnapshot: ${serverSnapshot}`);
+        await this.loadSnapshot(serverSnapshot);
         this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
         console.log(`[${new Date().toLocaleString()}] File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
     }
@@ -287,6 +286,10 @@ export class FileSynchronizer {
         return this.fileHashes.get(filePath);
     }
 
+    public getFileHashes(): Map<string, string> {
+        return this.fileHashes;
+    }
+
     private async saveSnapshot(): Promise<void> {
         const merkleDir = path.dirname(this.snapshotPath);
         await fs.mkdir(merkleDir, { recursive: true });
@@ -306,10 +309,17 @@ export class FileSynchronizer {
         console.log(`Saved snapshot to ${this.snapshotPath}`);
     }
 
-    private async loadSnapshot(): Promise<void> {
+    private async loadSnapshot(serverSnapshot: any = null): Promise<void> {
         try {
-            const data = await fs.readFile(this.snapshotPath, 'utf-8');
-            const obj = JSON.parse(data);
+            let obj = null;
+            if (serverSnapshot) {
+                console.log(`Loaded snapshot from server`);
+                obj = serverSnapshot;
+            } else {
+                console.log(`Loaded snapshot from ${this.snapshotPath}`);
+                const data = await fs.readFile(this.snapshotPath, 'utf-8');
+                obj = JSON.parse(data);
+            }
 
             // Reconstruct Map without using constructor with iterator
             this.fileHashes = new Map();
@@ -319,6 +329,11 @@ export class FileSynchronizer {
 
             if (obj.merkleDAG) {
                 this.merkleDAG = MerkleDAG.deserialize(obj.merkleDAG);
+            }
+
+            if (serverSnapshot) {
+                console.log(`Save server snapshot to ${this.snapshotPath}`);
+                await this.saveSnapshot();
             }
             console.log(`Loaded snapshot from ${this.snapshotPath}`);
         } catch (error: any) {

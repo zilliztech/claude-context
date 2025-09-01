@@ -4,6 +4,7 @@ import * as crypto from "crypto";
 import { Context, COLLECTION_LIMIT_MESSAGE } from "@suoshengzhang/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
+import { getGitRepoName, checkServerSnapshot } from "@suoshengzhang/claude-context-core";
 
 export class ToolHandlers {
     private context: Context;
@@ -142,13 +143,36 @@ export class ToolHandlers {
     }
 
     public async handleIndexCodebase(args: any) {
-        const { path: codebasePath, force, splitter, customExtensions, ignorePatterns } = args;
+        let { path: codebasePath, force, splitter, customExtensions, ignorePatterns } = args;
         const forceReindex = force || false;
         const splitterType = splitter || 'ast'; // Default to AST
         const customFileExtensions = customExtensions || [];
         const customIgnorePatterns = ignorePatterns || [];
 
         try {
+            // Force absolute path resolution - warn if relative path provided
+            let absolutePath = ensureAbsolutePath(codebasePath);
+            const gitInfo = await getGitRepoName(absolutePath);
+            const gitRoot = gitInfo.gitRoot;
+            const gitRepoName = gitInfo.repoName;
+            console.log(`[INDEX-CODEBASE] 🔍 Git repository name: ${gitRepoName}, Git root: ${gitRoot}, path: ${absolutePath}`);
+            
+            codebasePath = gitRoot;
+            absolutePath = gitRoot;
+            let dryRun = true;
+
+            // Check server snapshot first
+            const serverCheck = await checkServerSnapshot(gitRepoName);
+            if (serverCheck.error) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: serverCheck.json.error
+                    }],
+                    isError: true
+                };
+            }
+
             // Sync indexed codebases from cloud first
             // await this.syncIndexedCodebasesFromCloud();
 
@@ -162,8 +186,6 @@ export class ToolHandlers {
                     isError: true
                 };
             }
-            // Force absolute path resolution - warn if relative path provided
-            const absolutePath = ensureAbsolutePath(codebasePath);
 
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
@@ -285,7 +307,8 @@ export class ToolHandlers {
             trackCodebasePath(absolutePath);
 
             // Start background indexing - now safe to proceed
-            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType);
+            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, dryRun, 
+                serverCheck.json, serverCheck.version);
 
             const pathInfo = codebasePath !== absolutePath
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
@@ -321,7 +344,8 @@ export class ToolHandlers {
         }
     }
 
-    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string) {
+    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, 
+        splitterType: string, dryRun: boolean = false, serverSnapshot: any = null, serverSnapshotVersion: string = "") {
         const absolutePath = codebasePath;
         let lastSaveTime = 0; // Track last save timestamp
 
@@ -347,7 +371,7 @@ export class ToolHandlers {
             const ignorePatterns = this.context.getIgnorePatterns() || [];
             console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
-            await synchronizer.initialize();
+            await synchronizer.initialize(serverSnapshot);
             console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Finished initializing file synchronizer`);
 
             // Store synchronizer in the context (let context manage collection names)
@@ -368,7 +392,7 @@ export class ToolHandlers {
             console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] 🚀 Beginning codebase indexing process...`);
             const stats = await contextForThisTask.indexCodebase(absolutePath, (progress) => {
                 // Update progress in snapshot manager using new method
-                this.snapshotManager.setCodebaseIndexing(absolutePath, progress.percentage);
+                this.snapshotManager.setCodebaseIndexing(absolutePath, progress.percentage, serverSnapshotVersion);
 
                 // Save snapshot periodically (every 2 seconds to avoid too frequent saves)
                 const currentTime = Date.now();
@@ -379,11 +403,11 @@ export class ToolHandlers {
                 }
 
                 console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
-            });
+            }, false, dryRun);
             console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics
-            this.snapshotManager.setCodebaseIndexed(absolutePath, stats);
+            this.snapshotManager.setCodebaseIndexed(absolutePath, stats, serverSnapshotVersion);
             this.indexingStats = { indexedFiles: stats.indexedFiles, totalChunks: stats.totalChunks };
 
             // Save snapshot after updating codebase lists
@@ -404,7 +428,7 @@ export class ToolHandlers {
 
             // Set codebase to failed status with error information
             const errorMessage = error.message || String(error);
-            this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress);
+            this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress, serverSnapshotVersion);
             this.snapshotManager.saveCodebaseSnapshot();
 
             // Log error but don't crash MCP service - indexing errors are handled gracefully
@@ -413,7 +437,7 @@ export class ToolHandlers {
     }
 
     public async handleSearchCode(args: any) {
-        const { path: codebasePath, query, limit = 10, extensionFilter } = args;
+        let { path: codebasePath, query, limit = 10, extensionFilter } = args;
         const resultLimit = limit || 10;
 
         try {
@@ -421,7 +445,12 @@ export class ToolHandlers {
             // await this.syncIndexedCodebasesFromCloud();
 
             // Force absolute path resolution - warn if relative path provided
-            const absolutePath = ensureAbsolutePath(codebasePath);
+            let absolutePath = ensureAbsolutePath(codebasePath);
+            const gitInfo = await getGitRepoName(absolutePath);
+            const gitRoot = gitInfo.gitRoot;
+            const gitRepoName = gitInfo.repoName;
+            codebasePath = gitRoot;
+            absolutePath = gitRoot;
 
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
@@ -501,7 +530,8 @@ export class ToolHandlers {
                 query,
                 Math.min(resultLimit, 50),
                 0.3,
-                filterExpr
+                filterExpr,
+                gitRepoName
             );
 
             console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
@@ -570,7 +600,7 @@ export class ToolHandlers {
     }
 
     public async handleClearIndex(args: any) {
-        const { path: codebasePath } = args;
+        let { path: codebasePath } = args;
 
         if (this.snapshotManager.getIndexedCodebases().length === 0 && this.snapshotManager.getIndexingCodebases().length === 0) {
             return {
@@ -583,7 +613,14 @@ export class ToolHandlers {
 
         try {
             // Force absolute path resolution - warn if relative path provided
-            const absolutePath = ensureAbsolutePath(codebasePath);
+            let absolutePath = ensureAbsolutePath(codebasePath);
+            const gitInfo = await getGitRepoName(absolutePath);
+            const gitRoot = gitInfo.gitRoot;
+            const gitRepoName = gitInfo.repoName;
+            console.log(`[INDEX-CODEBASE] 🔍 Git repository name: ${gitRepoName}, Git root: ${gitRoot}, path: ${absolutePath}`);
+            
+            codebasePath = gitRoot;
+            absolutePath = gitRoot;
 
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
@@ -690,11 +727,18 @@ export class ToolHandlers {
     }
 
     public async handleGetIndexingStatus(args: any) {
-        const { path: codebasePath } = args;
+        let { path: codebasePath } = args;
 
         try {
             // Force absolute path resolution
-            const absolutePath = ensureAbsolutePath(codebasePath);
+            let absolutePath = ensureAbsolutePath(codebasePath);
+            const gitInfo = await getGitRepoName(absolutePath);
+            const gitRoot = gitInfo.gitRoot;
+            const gitRepoName = gitInfo.repoName;
+            console.log(`[INDEX-CODEBASE] 🔍 Git repository name: ${gitRepoName}, Git root: ${gitRoot}, path: ${absolutePath}`);
+            
+            codebasePath = gitRoot;
+            absolutePath = gitRoot;
 
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {

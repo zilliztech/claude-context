@@ -27,6 +27,7 @@ export interface ContextMcpConfig {
     chromaAddress?: string;
     chromaPort?: number;
     chromaWorkingDir?: string;
+    codeAgentEmbEndpoint: string;
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -47,6 +48,7 @@ interface CodebaseInfoBase {
 export interface CodebaseInfoIndexing extends CodebaseInfoBase {
     status: 'indexing';
     indexingPercentage: number;  // Current progress percentage
+    serverSnapshotVersion: string;
 }
 
 // Indexed state - when indexing completed successfully
@@ -55,6 +57,7 @@ export interface CodebaseInfoIndexed extends CodebaseInfoBase {
     indexedFiles: number;        // Number of files indexed
     totalChunks: number;         // Total number of chunks generated
     indexStatus: 'completed' | 'limit_reached';  // Status from indexing result
+    serverSnapshotVersion: string;
 }
 
 // Index failed state - when indexing failed
@@ -62,6 +65,7 @@ export interface CodebaseInfoIndexFailed extends CodebaseInfoBase {
     status: 'indexfailed';
     errorMessage: string;        // Error message from the failure
     lastAttemptedPercentage?: number;  // Progress when failure occurred
+    serverSnapshotVersion: string;
 }
 
 // Union type for all codebase information states
@@ -147,8 +151,9 @@ export function createMcpConfig(): ContextMcpConfig {
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
         chromaAddress: envManager.get('CHROMA_ADDRESS') || 'localhost',
-        chromaPort: Number(envManager.get('CHROMA_PORT')) || 19800,
-        chromaWorkingDir: envManager.get('CHROMA_WORKING_DIR') || path.join(os.homedir(), '.context', 'chromadb')
+        chromaPort: Number(envManager.get('CHROMA_PORT')) || 19801,
+        chromaWorkingDir: envManager.get('CHROMA_WORKING_DIR') || path.join(os.homedir(), '.context', 'chromadb'),
+        codeAgentEmbEndpoint: envManager.get('CODE_AGENT_EMB_ENDPOINT') || 'http://localhost:8001/get_embeddings'
     };
 
     return config;

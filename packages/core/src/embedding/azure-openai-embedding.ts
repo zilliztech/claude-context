@@ -7,6 +7,7 @@ export interface AzureOpenAIEmbeddingConfig {
     endpoint: string; // Azure OpenAI endpoint URL
     apiVersion?: string; // Azure OpenAI API version
     deploymentName?: string; // Azure OpenAI deployment name (optional, can use model name)
+    codeAgentEmbEndpoint: string; // CodeAgent embedding endpoint
 }
 
 class BatchSemaphore {
@@ -126,7 +127,7 @@ export class AzureOpenAIEmbedding extends Embedding {
         // Send HTTP POST request to local embeddings endpoint
         await BatchSemaphore.acquire();
         try {
-            const response = await fetch('https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/get_embeddings', {
+            const response = await fetch(this.config.codeAgentEmbEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -140,7 +141,6 @@ export class AzureOpenAIEmbedding extends Embedding {
 
             // Get the base64 response string
             const base64Response = await response.text();
-            
             // Decode base64 string to byte array
             const byteArray = Buffer.from(base64Response, 'base64');
             // Calculate the size of each embedding section
