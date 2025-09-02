@@ -3,8 +3,8 @@ import { Embedding, EmbeddingVector } from './base-embedding';
 
 export interface AzureOpenAIEmbeddingConfig {
     model: string;
-    apiKey: string;
-    endpoint: string; // Azure OpenAI endpoint URL
+    apiKey?: string;
+    endpoint?: string; // Azure OpenAI endpoint URL
     apiVersion?: string; // Azure OpenAI API version
     deploymentName?: string; // Azure OpenAI deployment name (optional, can use model name)
     codeAgentEmbEndpoint: string; // CodeAgent embedding endpoint
@@ -37,13 +37,18 @@ export class AzureOpenAIEmbedding extends Embedding {
         // Construct the base URL for Azure OpenAI
         const baseURL = `${config.endpoint}/openai/deployments/${config.deploymentName || config.model}`;
 
-        this.client = new OpenAI({
-            apiKey: config.apiKey,
-            baseURL: baseURL,
-            defaultQuery: {
-                'api-version': config.apiVersion || '2024-02-15-preview'
-            }
-        });
+        if (config.apiKey) {
+            this.client = new OpenAI({
+                apiKey: config.apiKey,
+                baseURL: baseURL,
+                defaultQuery: {
+                    'api-version': config.apiVersion || '2024-02-15-preview'
+                }
+            });
+        } else {
+            // set empty apiKey explicitly to avoid OpenAI client error
+            this.client = new OpenAI({ apiKey: "" });
+        }
     }
 
     async detectDimension(testText: string = "test"): Promise<number> {
@@ -241,13 +246,18 @@ export class AzureOpenAIEmbedding extends Embedding {
         this.config.deploymentName = deploymentName;
         // Recreate client with new deployment name
         const baseURL = `${this.config.endpoint}/openai/deployments/${deploymentName}`;
-        this.client = new OpenAI({
-            apiKey: this.config.apiKey,
-            baseURL: baseURL,
-            defaultQuery: {
-                'api-version': this.config.apiVersion || '2024-02-15-preview'
-            }
-        });
+        if (this.config.apiKey) {
+            this.client = new OpenAI({
+                apiKey: this.config.apiKey,
+                baseURL: baseURL,
+                defaultQuery: {
+                    'api-version': this.config.apiVersion || '2024-02-15-preview'
+                }
+            });
+        } else {
+            // set empty apiKey explicitly to avoid OpenAI client error
+            this.client = new OpenAI({ apiKey: "" });
+        }
     }
 
     /**
