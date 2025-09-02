@@ -89,18 +89,28 @@ export class AzureOpenAIEmbedding extends Embedding {
         }
 
         try {
-            const response = await this.client.embeddings.create({
-                model: model,
-                input: processedText,
-                encoding_format: 'float',
+            const response = await fetch(`${this.config.codeAgentEmbEndpoint}/get_embeddings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify([{ code: processedText }])
             });
 
-            // Update dimension from actual response
-            this.dimension = response.data[0].embedding.length;
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+            }
+
+            const base64Response = await response.text();
+            const processedEmbeddings = this.getEmbeddingVector(base64Response);
+
+            if (processedEmbeddings.length !== 1) {
+                throw new Error(`Mismatch between expected embeddings (1) and received embeddings (${processedEmbeddings.length})`);
+            }
 
             return {
-                vector: response.data[0].embedding,
-                dimension: this.dimension
+                vector: processedEmbeddings[0].vector,
+                dimension: processedEmbeddings[0].dimension
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -141,36 +151,9 @@ export class AzureOpenAIEmbedding extends Embedding {
 
             // Get the base64 response string
             const base64Response = await response.text();
-            // Decode base64 string to byte array
-            const byteArray = Buffer.from(base64Response, 'base64');
-            // Calculate the size of each embedding section
-            const embeddingSize = 3072 * 4; // 3072 floats * 4 bytes per float
-            const numEmbeddings = Math.floor(byteArray.length / embeddingSize);
-
-            if (numEmbeddings !== processedTexts.length) {
-                throw new Error(`Mismatch between expected embeddings (${processedTexts.length}) and received embeddings (${numEmbeddings})`);
-            }
-
-            const processedEmbeddings: EmbeddingVector[] = [];
-
-            for (let i = 0; i < numEmbeddings; i++) {
-                const startIndex = i * embeddingSize;
-                const endIndex = startIndex + embeddingSize;
-                const embeddingBytes = byteArray.slice(startIndex, endIndex);
-
-                const vector: number[] = [];
-
-                // Convert every 4 bytes into a float
-                for (let j = 0; j < embeddingBytes.length; j += 4) {
-                    const floatBytes = embeddingBytes.slice(j, j + 4);
-                    const floatValue = floatBytes.readFloatLE(0); // Read as little-endian float
-                    vector.push(floatValue);
-                }
-
-                processedEmbeddings.push({
-                    vector: vector,
-                    dimension: 3072
-                });
+            const processedEmbeddings = this.getEmbeddingVector(base64Response);
+            if (processedEmbeddings.length !== processedTexts.length) {
+                throw new Error(`Mismatch between expected embeddings (${processedTexts.length}) and received embeddings (${processedEmbeddings.length})`);
             }
 
             // console.log(`[embedBatch][${new Date().toLocaleString()}] Processed Embeddings: ${JSON.stringify(processedEmbeddings[0])}`);
@@ -181,6 +164,39 @@ export class AzureOpenAIEmbedding extends Embedding {
         } finally {
             BatchSemaphore.release();
         }
+    }
+
+    getEmbeddingVector(base64Response: string): EmbeddingVector[] {
+        // Decode base64 string to byte array
+        const byteArray = Buffer.from(base64Response, 'base64');
+        // Calculate the size of each embedding section
+        const embeddingSize = 3072 * 4; // 3072 floats * 4 bytes per float
+        const numEmbeddings = Math.floor(byteArray.length / embeddingSize);
+
+
+
+        const processedEmbeddings: EmbeddingVector[] = [];
+
+        for (let i = 0; i < numEmbeddings; i++) {
+            const startIndex = i * embeddingSize;
+            const endIndex = startIndex + embeddingSize;
+            const embeddingBytes = byteArray.slice(startIndex, endIndex);
+
+            const vector: number[] = [];
+
+            // Convert every 4 bytes into a float
+            for (let j = 0; j < embeddingBytes.length; j += 4) {
+                const floatBytes = embeddingBytes.slice(j, j + 4);
+                const floatValue = floatBytes.readFloatLE(0); // Read as little-endian float
+                vector.push(floatValue);
+            }
+
+            processedEmbeddings.push({
+                vector: vector,
+                dimension: 3072
+            });
+        }
+        return processedEmbeddings;
     }
 
     getDimension(): number {
