@@ -491,14 +491,42 @@ export class Context {
         }
     }
 
+    // Convert server result's relativePath to cwd-relative
+    private trimOverlap(A: string, B: string): string {
+        let overlap = '';
+        const maxLen = Math.min(A.length, B.length);
+
+        for (let len = 1; len <= maxLen; len++) {
+            const aSuffix = A.slice(-len);
+            const bPrefix = B.slice(0, len);
+            if (aSuffix === bPrefix) {
+                overlap = aSuffix;
+            }
+        }
+
+        let result = overlap ? B.slice(overlap.length) : B;
+        if (result.startsWith('\\')) {
+            result = result.slice(1);
+        }
+
+        return result;
+    }
+
     /**
-     * Merge search results from different sources, using server results as baseline
+     * Merge search results from different sources, using server results as baseline.
+     * For the relativePath, convert it to be relative to the current working directory (process.cwd()).
      */
-    private mergeSearchResults(clientResults: VectorSearchResult[], serverResults: VectorSearchResult[]): VectorSearchResult[] { // TODO: update the return relative path
-        // Create a map of client results by relativePath for quick lookup
+    private mergeSearchResults(clientResults: VectorSearchResult[], serverResults: VectorSearchResult[]): VectorSearchResult[] {
+        const path = require('path');
+        const cwd = process.cwd();
+
+        // Create a map of client results by cwd-relative path for quick lookup
         const clientResultsByPath = new Map<string, VectorSearchResult>();
         clientResults.forEach(result => {
-            clientResultsByPath.set(result.document.relativePath, result);
+            const relPath = this.trimOverlap(cwd, result.document.relativePath);
+            result.document.relativePath = relPath;
+
+            clientResultsByPath.set(relPath, result);
         });
 
         // Track which client results were used for replacement
@@ -506,11 +534,13 @@ export class Context {
 
         // Start with server results as baseline, then replace with client results where paths match
         const mergedResults = serverResults.map(serverResult => {
-            const clientResult = clientResultsByPath.get(serverResult.document.relativePath);
+            const relPath = this.trimOverlap(cwd, serverResult.document.relativePath);
+            serverResult.document.relativePath = relPath;
 
             // If we have a client result for the same path, use it instead
+            const clientResult = clientResultsByPath.get(relPath);
             if (clientResult) {
-                usedClientPaths.add(serverResult.document.relativePath);
+                usedClientPaths.add(relPath);
                 return clientResult;
             }
 
@@ -527,6 +557,12 @@ export class Context {
 
         // Sort by score
         mergedResults.sort((a, b) => b.score - a.score);
+
+        // Log the merged results' relative paths to verify correctness
+        console.log('🔎 Verifying merged result relative paths:');
+        mergedResults.forEach((result, idx) => {
+            console.log(`  [${idx}] ${result.document.relativePath}`);
+        });
 
         console.log(`🔄 Merged ${clientResults.length} client + ${serverResults.length} server = ${mergedResults.length} results (server baseline with client replacements + ${unusedClientResults.length} unused client results)`);
         return mergedResults;
