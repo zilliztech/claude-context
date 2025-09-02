@@ -776,6 +776,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
+    async listFilePaths(collectionName: string, batchSize: number): Promise<Set<string>> {
+        throw new Error('listFilePaths not implemented for REST API');
+    }
+
     /**
      * Check collection limit
      * Returns true if collection can be created, false if limit exceeded

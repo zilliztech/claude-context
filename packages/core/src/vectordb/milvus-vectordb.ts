@@ -714,6 +714,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
     }
 
+    async listFilePaths(collectionName: string, batchSize: number): Promise<Set<string>> {
+        throw new Error('listFilePaths not implemented for REST API');
+    }
+
     /**
      * Wrapper method to handle collection creation with limit detection for gRPC client
      * Returns true if collection can be created, false if limit exceeded

@@ -2,6 +2,7 @@ import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSpli
 import { envManager } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
 import { ChromaClient } from "chromadb";
+import * as fs from 'fs';
 
 // Try to load .env file
 try {
@@ -9,6 +10,70 @@ try {
 } catch (error) {
     // dotenv is not required, skip if not installed
 }
+
+const DEFAULT_IGNORE_PATTERNS = [
+    // Common build output and dependency directories
+    'node_modules/**',
+    'dist/',
+    'build/',
+    'obj/',
+    'Logs/',
+    'QLogs/',
+    'QLocal/',
+    'objd/',
+    'out/',
+    'target/',
+    'coverage/',
+    'packages/',
+    '.corext/',
+    '**.nyc_output/**',
+    '.azuredevops/**',
+    '.config/**',
+
+    // IDE and editor files
+    '.vscode/**',
+    '.idea/**',
+    '*.swp',
+    '*.swo',
+
+    // Version control
+    '.git/**',
+    '.svn/**',
+    '.hg/**',
+
+    // Cache directories
+    '.cache/**',
+    '__pycache__/**',
+    '.pytest_cache/**',
+
+    // Logs and temporary files
+    'logs/**',
+    'tmp/**',
+    'temp/**',
+    '*.log',
+
+    // Environment and config files
+    '.env',
+    '.env.*',
+    '*.local',
+
+    // Minified and bundled files
+    '*.min.js',
+    '*.min.css',
+    '*.min.map',
+    '*.bundle.js',
+    '*.bundle.css',
+    '*.chunk.js',
+    '*.vendor.js',
+    '*.polyfills.js',
+    '*.runtime.js',
+    '*.map', // source map files
+    'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
+    'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
+    'coverage', '.nyc_output', 'logs', 'tmp', 'temp',
+    '.editorconfig',
+    '.gitattributes'
+];
 
 /**
  * Generate a snapshot file for the given codebase directory
@@ -88,47 +153,84 @@ async function getGitRepoName(folderPath: string): Promise<string | null> {
     }
 }
 
+/**
+ * Monitor file changes in a given folder, ignoring files that match ignore patterns
+ * @param folderPath Path to the folder to monitor
+ * @param ignorePatterns Array of glob patterns to ignore
+ * @param recursive Whether to monitor subdirectories recursively
+ */
+function monitorFileChanges(folderPath: string, ignorePatterns: string[] = [], recursive: boolean = true): void {
+    console.log(`🔍 Starting file monitoring for: ${folderPath}`);
+    console.log(`📝 Ignore patterns: ${ignorePatterns.join(', ')}`);
+    console.log(`🔄 Recursive monitoring: ${recursive ? 'enabled' : 'disabled'}`);
+    console.log('⏳ Waiting for file changes... (Press Ctrl+C to stop)\n');
 
-async function indexCodePathForAdsSnr() {
-    let codebasePath = "D:/src2/AdsSnR";
-    let host = 'localhost';
-    let port = 19802;
-
-    let vectorDatabase = new ChromaVectorDatabase({
-        host: host,
-        port: port
-    });
-
-    let context = new Context({
-        vectorDatabase,
-        codeSplitter: new LangChainCodeSplitter(1000, 200),
-        supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h'],
-        ignorePatterns: [
-            // for AdsSnR Test
-            'AdsSnR_RocksDB/',
-            'AdsSnR_PClick/',
-            'AdsSnR_FeatureExtraction/',
-            'AdsSnR_Selection/',
-            'AdsSnR_Common/',
-            'AdsSnR_IdHash/',
-            'packages/',
-            '.github/',
-            'AI/**',
-        ]
-    });
-
-    const hasExistingIndex = await context.hasIndex(codebasePath);
-    if (hasExistingIndex) {
-        console.log('🗑️  Existing index found, clearing it first...');
-        await context.clearIndex(codebasePath);
+    // Function to check if a file should be ignored
+    function shouldIgnoreFile(filePath: string): boolean {
+        const relativePath = path.relative(folderPath, filePath);
+        const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
+        
+        for (const pattern of ignorePatterns) {
+            if (isPatternMatch(normalizedPath, pattern)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    // // Index with progress tracking
-    const indexStats = await context.indexCodebase(codebasePath);
-    console.log(`🔍 Indexed ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
+    // Function to handle file change events
+    function handleFileChange(eventType: string, filename: string | null, filePath?: string) {
+        if (!filename) return;
+        
+        const fullPath = filePath || path.join(folderPath, filename);
+        
+        // Check if file should be ignored
+        if (shouldIgnoreFile(fullPath)) {
+            return; // Skip ignored files
+        }
 
-    await generateSnapshot(codebasePath, context.getIgnorePatterns());
-    console.log('✅ Snapshot generated successfully');
+        // Get file stats to determine if it's a file or directory
+        try {
+            const stats = fs.statSync(fullPath);
+            const isDirectory = stats.isDirectory();
+            const fileType = isDirectory ? '📁 Directory' : '📄 File';
+            
+            console.log(`[${new Date().toLocaleTimeString()}] ${eventType.toUpperCase()}: ${fileType}`);
+            console.log(`   Path: ${fullPath}`);
+            console.log(`   Size: ${isDirectory ? 'N/A' : `${(stats.size / 1024).toFixed(2)} KB`}`);
+            console.log(`   Modified: ${stats.mtime.toLocaleString()}`);
+            console.log(''); // Empty line for readability
+        } catch (error) {
+            // File might have been deleted or moved
+            console.log(`[${new Date().toLocaleTimeString()}] ${eventType.toUpperCase()}: ${fullPath}`);
+            console.log(`   Status: File may have been deleted or moved`);
+            console.log(''); // Empty line for readability
+        }
+    }
+
+    try {
+        // Start watching the main directory
+        const watcher = fs.watch(folderPath, { recursive }, (eventType, filename) => {
+            handleFileChange(eventType, filename);
+        });
+
+        // Handle watcher errors
+        watcher.on('error', (error) => {
+            console.error('❌ File watcher error:', error);
+        });
+
+        // Handle process termination
+        process.on('SIGINT', () => {
+            console.log('\n🛑 Stopping file monitoring...');
+            watcher.close();
+            process.exit(0);
+        });
+
+        console.log('✅ File monitoring started successfully');
+        
+    } catch (error) {
+        console.error('❌ Failed to start file monitoring:', error);
+    }
 }
 
 async function searchCodePath(codebasePath: string, queries: string[]) {
@@ -194,7 +296,6 @@ function simpleGlobMatch(text: string, pattern: string): boolean {
         .replace(/\*/g, '.*'); // Convert * to .*
 
     const regex = new RegExp(`^${regexPattern}$`);
-    console.log(regex);
     return regex.test(text);
 }
 
@@ -225,6 +326,148 @@ function testMatch() {
     }
 }
 
+/**
+ * Iterate through all records in ChromaDB and measure total time
+ * @param host ChromaDB host (default: localhost)
+ * @param port ChromaDB port (default: 19801)
+ * @returns Promise that resolves when iteration is complete
+ */
+async function iterateAllChromaRecords(host: string = 'localhost', port: number = 19801): Promise<string[]> {
+    const startTime = Date.now();
+    let relativeFilePaths: Set<string> = new Set();
+    
+    try {
+        // Create ChromaDB client directly to access ChromaDB API
+        const client = new ChromaClient({
+            host: host,
+            port: port
+        });
+
+        // Get all collections - ChromaDB doesn't have a direct listCollections method
+        // We'll need to work with known collection names or create a workaround
+        console.log('📚 Attempting to fetch collections...');
+        
+        let totalRecords = 0;
+        let collectionName = 'code_chunks_AdsSnR';
+        const collectionStartTime = Date.now();
+        
+        try {
+            // Try to get the collection
+            const collection = await client.getCollection({
+                name: collectionName,
+            });
+
+            if (!collection) {
+                console.log(`⚠️ Collection ${collectionName} not found, skipping...`);
+                return [];
+            }
+
+            // Get collection count
+            const count = await collection.count();
+            console.log(`📊 Collection size: ${count} records`);
+
+            if (count === 0) {
+                console.log(`⚠️ Collection ${collectionName} has no records, skipping...`);
+                return [];
+            }
+
+            // Iterate through all records in batches
+            const batchSize = 1024;
+            let processedRecords = 0;
+            let offset = 0;
+
+            while (processedRecords < count) {
+                const batch = await collection.get({
+                    limit: batchSize,
+                    include: ['documents', 'metadatas'] as any,
+                    offset: offset
+                });
+
+                const records = batch.rows();
+                records.forEach((record: any) => {
+                    let relativePath = record.metadata?.relativePath;
+                    if (relativePath && !relativeFilePaths.has(relativePath)) {
+                        relativeFilePaths.add(relativePath);
+                    }
+                });
+
+                if (batch && batch.ids && batch.ids.length > 0) {
+                    processedRecords += batch.ids.length;
+                    offset += batch.ids.length;
+                } else {
+                    break; // No more records
+                }
+            }
+
+            totalRecords += count;
+
+            const collectionTime = Date.now() - collectionStartTime;
+            console.log(`   ✅ Collection ${collectionName} processed in ${collectionTime}ms`);
+
+        } catch (error) {
+            console.log(`   ⚠️  Collection ${collectionName} not found or not accessible:`, error.message);
+        }
+
+        
+        const totalTime = Date.now() - startTime;
+        console.log(`\n🎉 ChromaDB iteration completed!`);
+        console.log(`📊 Summary:`);
+        console.log(`   Total records: ${totalRecords}`);
+        console.log(`   Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+        
+        // Convert Set to array and return all collected file paths
+        const filePaths = Array.from(relativeFilePaths);
+        return filePaths;
+
+    } catch (error) {
+        const totalTime = Date.now() - startTime;
+        console.error(`❌ Error during ChromaDB iteration after ${totalTime}ms:`, error);
+        throw error;
+    }
+}
+
+
+async function indexCodePathForAdsSnr() {
+    let codebasePath = "D:/src/simple_repo";
+    let host = 'localhost';
+    let port = 19802;
+
+    let vectorDatabase = new ChromaVectorDatabase({
+        host: host,
+        port: port
+    });
+
+    let context = new Context({
+        vectorDatabase,
+        codeSplitter: new LangChainCodeSplitter(1000, 200),
+        supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h'],
+        ignorePatterns: [
+            // for AdsSnR Test
+            'AdsSnR_RocksDB/',
+            'AdsSnR_PClick/',
+            'AdsSnR_FeatureExtraction/',
+            'AdsSnR_Selection/',
+            'AdsSnR_Common/',
+            'AdsSnR_IdHash/',
+            'packages/',
+            '.github/',
+            'AI/**',
+        ]
+    });
+
+    const hasExistingIndex = await context.hasIndex(codebasePath);
+    if (hasExistingIndex) {
+        console.log('🗑️  Existing index found, clearing it first...');
+        await context.clearIndex(codebasePath);
+    }
+
+    // // Index with progress tracking
+    const indexStats = await context.indexCodebase(codebasePath);
+    console.log(`🔍 Indexed ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
+
+    await generateSnapshot(codebasePath, context.getIgnorePatterns());
+    console.log('✅ Snapshot generated successfully');
+}
 
 async function main() {
     console.log('🚀 Context Real Usage Example');
@@ -232,6 +475,14 @@ async function main() {
 
     try {
 
+        // Uncomment the line below to test ChromaDB iteration
+        // let paths = await iterateAllChromaRecords('localhost', 19802);
+        // console.log(paths);
+
+        // monitorFileChanges("D:/src/simple_repo", DEFAULT_IGNORE_PATTERNS, true);
+
+        // Keep process running to allow file monitoring
+        // await new Promise(() => {}); // Never resolves, keeps process alive
         // testMatch();
         // return;
 

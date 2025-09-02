@@ -399,6 +399,89 @@ export class ChromaVectorDatabase implements VectorDatabase {
         return true;
     }
 
+    async listFilePaths(collectionName: string, batchSize: number = 1024): Promise<Set<string>> {
+        // Chroma doesn't support listing file paths directly like Zilliz Cloud
+        // We'll return an empty array
+        await this.ensureInitialized();
+
+        if (!this.client) {
+            throw new Error('ChromaClient is not initialized after ensureInitialized().');
+        }
+
+        const startTime = Date.now();
+        let relativeFilePaths: Set<string> = new Set();
+        
+        try {
+            let totalRecords = 0;
+            
+            try {
+                // Try to get the collection
+                const collection = await this.client.getCollection({
+                    name: collectionName,
+                });
+
+                if (!collection) {
+                    console.log(`⚠️ Collection ${collectionName} not found, skipping...`);
+                    return relativeFilePaths;
+                }
+
+                // Get collection count
+                const count = await collection.count();
+                console.log(`📊 Collection size: ${count} records`);
+
+                if (count === 0) {
+                    console.log(`⚠️ Collection ${collectionName} has no records, skipping...`);
+                    return relativeFilePaths;
+                }
+
+                // Iterate through all records in batches
+                let processedRecords = 0;
+                let offset = 0;
+
+                while (processedRecords < count) {
+                    const batch = await collection.get({
+                        limit: batchSize,
+                        include: ['documents', 'metadatas'] as any,
+                        offset: offset
+                    });
+
+                    const records = batch.rows();
+                    records.forEach((record: any) => {
+                        let relativePath = record.metadata?.relativePath;
+                        if (relativePath && !relativeFilePaths.has(relativePath)) {
+                            relativeFilePaths.add(relativePath);
+                        }
+                    });
+
+                    if (batch && batch.ids && batch.ids.length > 0) {
+                        processedRecords += batch.ids.length;
+                        offset += batch.ids.length;
+                    } else {
+                        break; // No more records
+                    }
+                }
+
+                totalRecords += count;
+            } catch (error) {
+                console.log(`⚠️ Collection ${collectionName} not found or not accessible:`, error);
+            }
+
+            const totalTime = Date.now() - startTime;
+            console.log(`\n🎉 ChromaDB iteration completed!`);
+            console.log(`📊 Summary:`);
+            console.log(`   Total records: ${totalRecords}`);
+            console.log(`   Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+            
+            return relativeFilePaths;
+
+        } catch (error) {
+            const totalTime = Date.now() - startTime;
+            console.error(`❌ Error during ChromaDB iteration after ${totalTime}ms:`, error);
+        }
+
+        return relativeFilePaths;
+    }
+
     /**
      * Convert filter object to Chroma Where format
      */
