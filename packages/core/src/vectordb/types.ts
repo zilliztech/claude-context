@@ -127,6 +127,14 @@ export interface VectorDatabase {
     query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
 
     /**
+     * List all file paths in collection metadata
+     * @param collectionName Collection name
+     * @param batchSize Batch size
+     * @returns Array of relative file paths
+     */
+    listFilePaths(collectionName: string, batchSize: number): Promise<Set<string>>;
+
+    /**
      * Check collection limit
      * Returns true if collection can be created, false if limit exceeded
      */

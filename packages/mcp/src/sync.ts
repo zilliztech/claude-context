@@ -15,6 +15,7 @@ export class SyncManager {
     }
 
     private async compareAndDelete(codebasePath: string, serverSnapshot: any, gitRepoName: string): Promise<void> {
+        const relativeFilePaths = await this.context.getVectorDatabase().listFilePaths(this.context.getCollectionName(codebasePath), 1024);
         const oldFileHashes = this.context.getSynchronizer(codebasePath)?.getFileHashes();
         // Convert array of file hash entries to Map
         const newFileHashes = new Map<string, string>();
@@ -32,16 +33,22 @@ export class SyncManager {
         // Convert oldFileHashes Map to array of entries for iteration
         const oldEntries = Array.from(oldFileHashes.entries());
 
+        let totalDeleted = 0;
         for (let i = 0; i < oldEntries.length; i++) {
             const [relativePath, oldHash] = oldEntries[i];
+            if (!relativeFilePaths.has(relativePath)) {
+                continue;
+            }
             // Find matching file in new hashes
             const newHash = newFileHashes.get(relativePath);
 
             // If hashes match, delete chunks since file is unchanged
             if (newHash && newHash === oldHash) {
                 await this.context.deleteFileChunks(`code_chunks_${gitRepoName}`, relativePath);
+                totalDeleted++;
             }
         }
+        console.log(`[SYNC-DEBUG] Total deleted chunks: ${totalDeleted}`);
     }
 
     public async handleSyncIndex(): Promise<void> {
