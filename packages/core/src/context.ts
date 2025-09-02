@@ -133,7 +133,7 @@ export class Context {
         this.vectorDatabase = config.vectorDatabase;
 
         this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
-        this.codeAgentEndpoint = config.codeAgentEndpoint || 'http://localhost:8001';
+        this.codeAgentEndpoint = config.codeAgentEndpoint || 'http://localhost:8000';
 
         // Load custom extensions from environment variables
         const envCustomExtensions = this.getCustomExtensionsFromEnv();
@@ -1102,6 +1102,11 @@ export class Context {
             const globalIgnorePatterns = await this.loadGlobalIgnoreFile();
             fileBasedPatterns.push(...globalIgnorePatterns);
 
+            // Load server ignore patterns
+            const gitRepoName = getGitRepoName(codebasePath);
+            const serverIgnorePatterns = await this.getServerRepoIgnorePattern(gitRepoName.repoName);
+            fileBasedPatterns.push(...serverIgnorePatterns);
+
             // Merge file-based patterns with existing patterns (which may include custom MCP patterns)
             if (fileBasedPatterns.length > 0) {
                 this.addCustomIgnorePatterns(fileBasedPatterns);
@@ -1112,6 +1117,24 @@ export class Context {
         } catch (error) {
             console.warn(`⚠️ Failed to load ignore patterns: ${error}`);
             // Continue with existing patterns on error - don't reset them
+        }
+    }
+
+    private async getServerRepoIgnorePattern(gitRepoName: string): Promise<string[]> {
+        try {
+            const response = await fetch(`${this.codeAgentEndpoint}/get_ignore_patterns?codebase=${gitRepoName}`);
+    
+            if (!response.ok) {
+                console.error(`[IGNORE-PATTERN] ❌ Server request failed with status: ${response.status}`);
+                return [];
+            }
+    
+            const serverData = await response.json() as any;
+            console.log(`[IGNORE-PATTERN] ✅ Successfully retrieved ignore patterns for codebase: ${gitRepoName}, ignore patterns: ${serverData.ignore_patterns.join(', ')}`);
+            return serverData.ignore_patterns || [];
+        } catch (error: any) {
+            console.error(`[IGNORE-PATTERN] ❌ Error getting ignore patterns:`, error.message || error);
+            return [];
         }
     }
 

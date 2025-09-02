@@ -173,9 +173,6 @@ export class ToolHandlers {
                 };
             }
 
-            // Sync indexed codebases from cloud first
-            // await this.syncIndexedCodebasesFromCloud();
-
             // Validate splitter parameter
             if (splitterType !== 'ast' && splitterType !== 'langchain') {
                 return {
