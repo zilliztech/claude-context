@@ -59,6 +59,14 @@ const embedding = new OpenAIEmbedding({
   model: 'text-embedding-3-small'
 });
 
+// OAPI Forwarding: Use OpenAI provider with Ollama models
+const ollamaEmbedding = new OpenAIEmbedding({
+  apiKey: 'ollama-key',
+  baseURL: 'http://localhost:8080/v1',
+  model: 'nomic-embed-text',
+  useOllamaModel: true  // Enable OAPI forwarding for Ollama models
+});
+
 // Initialize vector database
 const vectorDatabase = new MilvusVectorDatabase({
   address: process.env.MILVUS_ADDRESS || 'localhost:19530',
