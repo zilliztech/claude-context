@@ -1,4 +1,4 @@
-import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, ChromaConfig, ChromaVectorDatabase } from '@suoshengzhang/claude-context-core';
+import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, ChromaConfig, ChromaVectorDatabase, AzureOpenAIEmbedding } from '@suoshengzhang/claude-context-core';
 import { envManager } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
 import { ChromaClient } from "chromadb";
