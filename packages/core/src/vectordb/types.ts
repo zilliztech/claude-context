@@ -14,7 +14,7 @@ export interface SearchOptions {
     topK?: number;
     filter?: Record<string, any>;
     threshold?: number;
-    filterExpr?: string;
+    filterExpr?: any; // Accept both strings (Milvus) and objects (Qdrant)
 }
 
 // New interfaces for hybrid search
@@ -28,7 +28,7 @@ export interface HybridSearchRequest {
 export interface HybridSearchOptions {
     rerank?: RerankStrategy;
     limit?: number;
-    filterExpr?: string;
+    filterExpr?: any; // Accept both strings (Milvus) and objects (Qdrant)
 }
 
 export interface RerankStrategy {
@@ -124,13 +124,34 @@ export interface VectorDatabase {
      * @param outputFields Fields to return
      * @param limit Maximum number of results
      */
-    query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
+    query(collectionName: string, filter: any, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
 
     /**
      * Check collection limit
      * Returns true if collection can be created, false if limit exceeded
      */
     checkCollectionLimit(): Promise<boolean>;
+
+    /**
+     * Generate a valid ID for the vector database
+     * Different databases have different ID requirements (e.g., Qdrant requires UUIDs, others allow strings)
+     * @param originalId Original ID to convert/validate
+     */
+    generateId(originalId: string): string;
+
+    /**
+     * Build a database-specific filter for file extensions
+     * @param extensions Array of file extensions (e.g., ['.ts', '.py'])
+     * @returns Database-native filter format
+     */
+    buildExtensionFilter(extensions: string[]): any;
+
+    /**
+     * Build a database-specific filter for exact path matching
+     * @param relativePath Relative path to match exactly (e.g., 'src/utils.ts')
+     * @returns Database-native filter format
+     */
+    buildPathFilter(relativePath: string): any;
 }
 
 /**
