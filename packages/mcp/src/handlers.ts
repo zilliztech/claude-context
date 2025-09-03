@@ -477,7 +477,7 @@ export class ToolHandlers {
             console.log(`[SEARCH] 🔍 Generating embeddings for query using ${embeddingProvider.getProvider()}...`);
 
             // Build filter expression from extensionFilter list
-            let filterExpr: string | undefined = undefined;
+            let filterExpr: any = undefined;
             if (Array.isArray(extensionFilter) && extensionFilter.length > 0) {
                 const cleaned = extensionFilter
                     .filter((v: any) => typeof v === 'string')
@@ -490,8 +490,11 @@ export class ToolHandlers {
                         isError: true
                     };
                 }
-                const quoted = cleaned.map((e: string) => `'${e}'`).join(', ');
-                filterExpr = `fileExtension in [${quoted}]`;
+
+                // Let the database build its own native filter format
+                const vectorDatabase = this.context.getVectorDatabase();
+                filterExpr = vectorDatabase.buildExtensionFilter(cleaned);
+                console.log(`[SEARCH] 🔍 Using database-specific filter:`, typeof filterExpr === 'string' ? filterExpr : JSON.stringify(filterExpr));
             }
 
             // Search in the specified codebase
