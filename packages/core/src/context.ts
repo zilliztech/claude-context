@@ -382,11 +382,11 @@ export class Context {
     }
 
     private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
-        // Escape backslashes for Milvus query expression (Windows path compatibility)
-        const escapedPath = relativePath.replace(/\\/g, '\\\\');
+        // Use database-specific path filter instead of hardcoded expression
+        const pathFilter = this.vectorDatabase.buildPathFilter(relativePath);
         const results = await this.vectorDatabase.query(
             collectionName,
-            `relativePath == "${escapedPath}"`,
+            pathFilter,
             ['id']
         );
 
@@ -406,7 +406,7 @@ export class Context {
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
-    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string): Promise<SemanticSearchResult[]> {
+    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: any): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
@@ -909,17 +909,16 @@ export class Context {
     }
 
     /**
-     * Generate unique ID based on chunk content and location
+     * Generate database-specific ID based on chunk content and location
      * @param relativePath Relative path to the file
      * @param startLine Start line number
      * @param endLine End line number
      * @param content Chunk content
-     * @returns Hash-based unique ID
+     * @returns Database-specific ID
      */
     private generateId(relativePath: string, startLine: number, endLine: number, content: string): string {
         const combinedString = `${relativePath}:${startLine}:${endLine}:${content}`;
-        const hash = crypto.createHash('sha256').update(combinedString, 'utf-8').digest('hex');
-        return `chunk_${hash.substring(0, 16)}`;
+        return this.vectorDatabase.generateId(combinedString);
     }
 
     /**
