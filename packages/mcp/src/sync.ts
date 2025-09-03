@@ -51,26 +51,25 @@ export class SyncManager {
         console.log(`[SYNC-DEBUG] Total deleted chunks: ${totalDeleted}`);
     }
 
-    public async handleSyncIndex(): Promise<void> {
+    public async handleSyncIndex(logId: string): Promise<void> {
+        if (this.isSyncing) {
+            console.log(`[SYNC-DEBUG][${logId}] Index sync already in progress. Skipping.`);
+            return;
+        }
+        this.isSyncing = true;
+
         const syncStartTime = Date.now();
-        console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
+        console.log(`[SYNC-DEBUG][${logId}] handleSyncIndex() called at ${new Date().toISOString()}`);
 
         const indexedCodebases = this.snapshotManager.getIndexedCodebases();
 
         if (indexedCodebases.length === 0) {
-            console.log('[SYNC-DEBUG] No codebases indexed. Skipping sync.');
+            console.log(`[SYNC-DEBUG][${logId}] No codebases indexed. Skipping sync.`);
             return;
         }
 
-        console.log(`[SYNC-DEBUG] Found ${indexedCodebases.length} indexed codebases:`, indexedCodebases);
-
-        if (this.isSyncing) {
-            console.log('[SYNC-DEBUG] Index sync already in progress. Skipping.');
-            return;
-        }
-
-        this.isSyncing = true;
-        console.log(`[SYNC-DEBUG] Starting index sync for all ${indexedCodebases.length} codebases...`);
+        console.log(`[SYNC-DEBUG][${logId}] Found ${indexedCodebases.length} indexed codebases:`, indexedCodebases);
+        console.log(`[SYNC-DEBUG][${logId}] Starting index sync for all ${indexedCodebases.length} codebases...`);
 
         try {
             let totalStats = { added: 0, removed: 0, modified: 0 };
@@ -79,29 +78,29 @@ export class SyncManager {
                 const codebasePath = indexedCodebases[i];
                 const codebaseStartTime = Date.now();
 
-                console.log(`[SYNC-DEBUG] [${i + 1}/${indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
+                console.log(`[SYNC-DEBUG][${logId}] [${i + 1}/${indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
 
                 // Check if codebase path still exists
                 try {
                     const pathExists = fs.existsSync(codebasePath);
-                    console.log(`[SYNC-DEBUG] Codebase path exists: ${pathExists}`);
+                    console.log(`[SYNC-DEBUG][${logId}] Codebase path exists: ${pathExists}`);
 
                     if (!pathExists) {
-                        console.warn(`[SYNC-DEBUG] Codebase path '${codebasePath}' no longer exists. Skipping sync.`);
+                        console.warn(`[SYNC-DEBUG][${logId}] Codebase path '${codebasePath}' no longer exists. Skipping sync.`);
                         continue;
                     }
                 } catch (pathError: any) {
-                    console.error(`[SYNC-DEBUG] Error checking codebase path '${codebasePath}':`, pathError);
+                    console.error(`[SYNC-DEBUG][${logId}] Error checking codebase path '${codebasePath}':`, pathError);
                     continue;
                 }
 
                 try {
-                    console.log(`[SYNC-DEBUG] Calling context.reindexByChange() for '${codebasePath}'`);
+                    console.log(`[SYNC-DEBUG][${logId}] Calling context.reindexByChange() for '${codebasePath}'`);
                     const stats = await this.context.reindexByChange(codebasePath);
                     const codebaseElapsed = Date.now() - codebaseStartTime;
 
-                    console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
-                    console.log(`[SYNC-DEBUG] Codebase sync completed in ${codebaseElapsed}ms`);
+                    console.log(`[SYNC-DEBUG][${logId}] Reindex stats for '${codebasePath}':`, stats);
+                    console.log(`[SYNC-DEBUG][${logId}] Codebase sync completed in ${codebaseElapsed}ms`);
 
                     // Accumulate total stats
                     totalStats.added += stats.added;
@@ -109,30 +108,30 @@ export class SyncManager {
                     totalStats.modified += stats.modified;
 
                     if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
-                        console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
+                        console.log(`[SYNC-DEBUG][${logId}] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
                     } else {
-                        console.log(`[SYNC] No changes detected for '${codebasePath}' (${codebaseElapsed}ms)`);
+                        console.log(`[SYNC-DEBUG][${logId}] No changes detected for '${codebasePath}' (${codebaseElapsed}ms)`);
                     }
 
                     // Get git repository name for server snapshot
                     const gitInfo = await getGitRepoName(codebasePath);
                     const gitRepoName = gitInfo.repoName;
                     if (!gitRepoName) {
-                        console.log(`[SYNC-DEBUG] No git repository found for ${codebasePath}, skipping server snapshot comparison`);
+                        console.log(`[SYNC-DEBUG][${logId}] No git repository found for ${codebasePath}, skipping server snapshot comparison`);
                         continue;
                     }
 
                     // Fetch server snapshot
                     const serverSnapshot = await checkServerSnapshot(this.context.getCodeAgentEndpoint(), gitRepoName);
                     if (serverSnapshot.error) {
-                        console.error(`[SYNC-DEBUG] Error fetching server snapshot for ${gitRepoName}:`, serverSnapshot.error);
+                        console.error(`[SYNC-DEBUG][${logId}] Error fetching server snapshot for ${gitRepoName}:`, serverSnapshot.error);
                         continue;
                     }
 
                     const serverSnapshotVersion = serverSnapshot.version;
                     let codebaseInfo = this.snapshotManager.getCodebaseInfo(codebasePath) as CodebaseInfoIndexed;
                     const curSnapshotVersion = codebaseInfo?.serverSnapshotVersion;
-                    console.log(`[SYNC-DEBUG] Current vs Server snapshot version for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
+                    console.log(`[SYNC-DEBUG][${logId}] Current vs Server snapshot version for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
 
                     let curCodebaseIndexStatus = {
                         indexedFiles: codebaseInfo?.indexedFiles || 0,
@@ -143,13 +142,13 @@ export class SyncManager {
                     this.snapshotManager.saveCodebaseSnapshot();
 
                     if (curSnapshotVersion !== serverSnapshotVersion) {
-                        console.log(`[SYNC-DEBUG] Server snapshot version changed for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
+                        console.log(`[SYNC-DEBUG][${logId}] Server snapshot version changed for ${gitRepoName}: ${curSnapshotVersion} -> ${serverSnapshotVersion}`);
                         await this.compareAndDelete(codebasePath, serverSnapshot.json, gitRepoName);
                     }
                 } catch (error: any) {
                     const codebaseElapsed = Date.now() - codebaseStartTime;
-                    console.error(`[SYNC-DEBUG] Error syncing codebase '${codebasePath}' after ${codebaseElapsed}ms:`, error);
-                    console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
+                    console.error(`[SYNC-DEBUG][${logId}] Error syncing codebase '${codebasePath}' after ${codebaseElapsed}ms:`, error);
+                    console.error(`[SYNC-DEBUG][${logId}] Error stack:`, error.stack);
 
                     if (error.message.includes('Failed to query Milvus')) {
                         // Collection maybe deleted manually, delete the snapshot file
@@ -158,10 +157,10 @@ export class SyncManager {
 
                     // Log additional error details
                     if (error.code) {
-                        console.error(`[SYNC-DEBUG] Error code: ${error.code}`);
+                        console.error(`[SYNC-DEBUG][${logId}] Error code: ${error.code}`);
                     }
                     if (error.errno) {
-                        console.error(`[SYNC-DEBUG] Error errno: ${error.errno}`);
+                        console.error(`[SYNC-DEBUG][${logId}] Error errno: ${error.errno}`);
                     }
 
                     // Continue with next codebase even if one fails
@@ -169,17 +168,15 @@ export class SyncManager {
             }
 
             const totalElapsed = Date.now() - syncStartTime;
-            console.log(`[SYNC-DEBUG] Total sync stats across all codebases: Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
-            console.log(`[SYNC-DEBUG] Index sync completed for all codebases in ${totalElapsed}ms`);
-            console.log(`[SYNC] Index sync completed for all codebases. Total changes - Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
+            console.log(`[SYNC-DEBUG][${logId}] Index sync completed for all codebases in ${totalElapsed}ms. Total changes - Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
         } catch (error: any) {
             const totalElapsed = Date.now() - syncStartTime;
-            console.error(`[SYNC-DEBUG] Error during index sync after ${totalElapsed}ms:`, error);
-            console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
+            console.error(`[SYNC-DEBUG][${logId}] Error during index sync after ${totalElapsed}ms:`, error);
+            console.error(`[SYNC-DEBUG][${logId}] Error stack:`, error.stack);
         } finally {
             this.isSyncing = false;
             const totalElapsed = Date.now() - syncStartTime;
-            console.log(`[SYNC-DEBUG] handleSyncIndex() finished at ${new Date().toISOString()}, total duration: ${totalElapsed}ms`);
+            console.log(`[SYNC-DEBUG][${logId}] handleSyncIndex() finished at ${new Date().toISOString()}, total duration: ${totalElapsed}ms`);
         }
     }
 
@@ -189,15 +186,16 @@ export class SyncManager {
         // Execute initial sync immediately after a short delay to let server initialize
         console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
         setTimeout(async () => {
-            console.log('[SYNC-DEBUG] Executing initial sync after server startup');
+            const logId = String(Date.now());
+            console.log(`[SYNC-DEBUG][${logId}] Executing initial sync after server startup`);
             try {
-                await this.handleSyncIndex();
+                await this.handleSyncIndex(logId);
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 if (errorMessage.includes('Failed to query collection')) {
-                    console.log('[SYNC-DEBUG] Collection not yet established, this is expected for new cluster users. Will retry on next sync cycle.');
+                    console.log(`[SYNC-DEBUG][${logId}] Collection not yet established, this is expected for new cluster users. Will retry on next sync cycle.`);
                 } else {
-                    console.error('[SYNC-DEBUG] Initial sync failed with unexpected error:', error);
+                    console.error(`[SYNC-DEBUG][${logId}] Initial sync failed with unexpected error:`, error);
                     throw error;
                 }
             }
@@ -206,8 +204,9 @@ export class SyncManager {
         // Periodically check for file changes and update the index
         console.log('[SYNC-DEBUG] Setting up periodic sync every 1 minutes (60000ms)');
         const syncInterval = setInterval(() => {
-            console.log('[SYNC-DEBUG] Executing scheduled periodic sync');
-            this.handleSyncIndex();
+            const logId = String(Date.now());
+            console.log(`[SYNC-DEBUG][${logId}] Executing scheduled periodic sync`);
+            this.handleSyncIndex(logId);
         }, 1 * 60 * 1000); // every 1 minutes
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
