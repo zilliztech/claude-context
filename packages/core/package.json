@@ -10,7 +10,13 @@
         "clean": "rimraf dist",
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "jest",
+        "test:milvus": "jest src/__tests__/vectordb/milvus.test.ts",
+        "test:qdrant": "jest src/__tests__/vectordb/qdrant.test.ts",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:ci": "jest --ci --coverage --watchAll=false"
     },
     "dependencies": {
         "@google/genai": "^1.9.0",
