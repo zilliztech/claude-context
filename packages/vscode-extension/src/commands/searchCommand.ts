@@ -74,16 +74,17 @@ export class SearchCommand {
                     .filter(Boolean);
 
                 // Validate extensions strictly and build filter expression
-                let filterExpr: string | undefined = undefined;
+                let filterExpr: any = undefined;
                 if (fileExtensions.length > 0) {
                     const invalid = fileExtensions.filter(e => !(e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
                     if (invalid.length > 0) {
                         vscode.window.showErrorMessage(`Invalid extensions: ${invalid.join(', ')}. Use proper extensions like '.ts', '.py'.`);
                         return;
                     }
-                    const quoted = fileExtensions.map(e => `'${e}'`).join(',');
 
-                    filterExpr = `fileExtension in [${quoted}]`;
+                    // Let the database build its own native filter format
+                    const vectorDatabase = this.context.getVectorDatabase();
+                    filterExpr = vectorDatabase.buildExtensionFilter(fileExtensions);
                 }
 
                 // Use semantic search
@@ -183,14 +184,16 @@ export class SearchCommand {
         console.log('🔍 Using semantic search for webview...');
 
         // Validate extensions strictly and build filter expression
-        let filterExpr: string | undefined = undefined;
+        let filterExpr: any = undefined;
         if (fileExtensions && fileExtensions.length > 0) {
             const invalid = fileExtensions.filter(e => !(typeof e === 'string' && e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
             if (invalid.length > 0) {
                 throw new Error(`Invalid extensions: ${invalid.join(', ')}. Use proper extensions like '.ts', '.py'.`);
             }
-            const quoted = fileExtensions.map(e => `'${e}'`).join(',');
-            filterExpr = `fileExtension in [${quoted}]`;
+
+            // Let the database build its own native filter format
+            const vectorDatabase = this.context.getVectorDatabase();
+            filterExpr = vectorDatabase.buildExtensionFilter(fileExtensions);
         }
 
         let results = await this.context.semanticSearch(
