@@ -20,6 +20,7 @@ import {
     COLLECTION_LIMIT_MESSAGE
 } from './types';
 import { ClusterManager } from './zilliz-utils';
+import * as crypto from 'crypto';
 
 export interface MilvusRestfulConfig {
     address?: string;
@@ -797,5 +798,42 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         // For now, always return true to maintain compatibility
         console.warn('[MilvusRestfulDB] ⚠️  checkCollectionLimit not implemented for REST API - returning true');
         return true;
+    }
+
+    /**
+     * Generate a valid ID for Milvus
+     * Creates a hash-based ID in chunk_<hash> format
+     * @param originalId Combined string from Context (path:startLine:endLine:content)
+     */
+    generateId(originalId: string): string {
+        const hash = crypto.createHash('sha256').update(originalId, 'utf-8').digest('hex');
+        return `chunk_${hash.substring(0, 16)}`;
+    }
+
+    /**
+     * Build a Milvus-specific filter for file extensions
+     * @param extensions Array of file extensions (e.g., ['.ts', '.py'])
+     * @returns Milvus SQL-like filter string
+     */
+    buildExtensionFilter(extensions: string[]): string {
+        if (!extensions || extensions.length === 0) {
+            return '';
+        }
+        const quoted = extensions.map(e => `'${e}'`).join(', ');
+        return `fileExtension in [${quoted}]`;
+    }
+
+    /**
+     * Build a Milvus-specific filter for exact path matching
+     * @param relativePath Relative path to match exactly (e.g., 'src/utils.ts')
+     * @returns Milvus SQL-like filter string
+     */
+    buildPathFilter(relativePath: string): string {
+        if (!relativePath) {
+            return '';
+        }
+        // Escape backslashes for Milvus query expression (Windows path compatibility)
+        const escapedPath = relativePath.replace(/\\/g, '\\\\');
+        return `relativePath == "${escapedPath}"`;
     }
 }
