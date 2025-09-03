@@ -1,6 +1,6 @@
 {
     "name": "@suoshengzhang/claude-context-mcp",
-    "version": "1.0.15",
+    "version": "1.0.16",
     "description": "Model Context Protocol integration for AdsDE code agent",
     "type": "module",
     "main": "dist/index.js",
@@ -18,7 +18,7 @@
         "prepublishOnly": "pnpm build"
     },
     "dependencies": {
-        "@suoshengzhang/claude-context-core": "0.1.6",
+        "@suoshengzhang/claude-context-core": "0.1.7",
         "@modelcontextprotocol/sdk": "^1.12.1",
         "zod": "^3.25.55"
     },
