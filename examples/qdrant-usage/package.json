@@ -1,0 +1,30 @@
+{
+  "name": "qdrant-usage-example",
+  "version": "1.0.0",
+  "description": "Example usage of Claude Context with Qdrant vector database",
+  "main": "index.ts",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc index.ts --outDir dist --target es2020 --module commonjs --moduleResolution node --esModuleInterop true",
+    "dev": "ts-node --watch index.ts"
+  },
+  "dependencies": {
+    "@zilliz/claude-context-core": "workspace:*",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "qdrant",
+    "vector-database",
+    "embedding",
+    "search",
+    "ai",
+    "claude-context"
+  ],
+  "author": "Claude Context Team",
+  "license": "MIT"
+}
