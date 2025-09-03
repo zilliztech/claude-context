@@ -1,4 +1,4 @@
-import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
+import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, QdrantVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
 import { envManager } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
@@ -15,29 +15,45 @@ async function main() {
 
     try {
         // 1. Choose Vector Database implementation
-        // Set to true to use RESTful API (for environments without gRPC support)
-        // Set to false to use gRPC (default, more efficient)
-        const useRestfulApi = false;
-        const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
-        const milvusToken = envManager.get('MILVUS_TOKEN');
+        const vectorDbType = envManager.get('VECTOR_DB_TYPE')?.toLowerCase() || 'milvus';
         const splitterType = envManager.get('SPLITTER_TYPE')?.toLowerCase() || 'ast';
 
-        console.log(`🔧 Using ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
-        console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);
-
         let vectorDatabase;
-        if (useRestfulApi) {
-            // Use RESTful implementation (for environments without gRPC support)
-            vectorDatabase = new MilvusRestfulVectorDatabase({
-                address: milvusAddress,
-                ...(milvusToken && { token: milvusToken })
+        
+        if (vectorDbType === 'qdrant') {
+            // Use Qdrant implementation (simple deployment)
+            const qdrantUrl = envManager.get('QDRANT_URL') || 'http://localhost:6333';
+            const qdrantApiKey = envManager.get('QDRANT_API_KEY');
+            
+            console.log(`🔧 Using Qdrant vector database`);
+            console.log(`🔌 Connecting to Qdrant at: ${qdrantUrl}`);
+            
+            vectorDatabase = new QdrantVectorDatabase({
+                url: qdrantUrl,
+                ...(qdrantApiKey && { apiKey: qdrantApiKey })
             });
         } else {
-            // Use gRPC implementation (default, more efficient)
-            vectorDatabase = new MilvusVectorDatabase({
-                address: milvusAddress,
-                ...(milvusToken && { token: milvusToken })
-            });
+            // Use Milvus implementation (default)
+            const useRestfulApi = envManager.get('MILVUS_USE_RESTFUL')?.toLowerCase() === 'true';
+            const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
+            const milvusToken = envManager.get('MILVUS_TOKEN');
+            
+            console.log(`🔧 Using Milvus ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
+            console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);
+
+            if (useRestfulApi) {
+                // Use RESTful implementation (for environments without gRPC support)
+                vectorDatabase = new MilvusRestfulVectorDatabase({
+                    address: milvusAddress,
+                    ...(milvusToken && { token: milvusToken })
+                });
+            } else {
+                // Use gRPC implementation (default, more efficient)
+                vectorDatabase = new MilvusVectorDatabase({
+                    address: milvusAddress,
+                    ...(milvusToken && { token: milvusToken })
+                });
+            }
         }
 
         // 2. Create Context instance
@@ -107,20 +123,25 @@ async function main() {
             if (error.message.includes('API key')) {
                 console.log('\n💡 Please make sure to set the correct OPENAI_API_KEY environment variable');
                 console.log('   Example: export OPENAI_API_KEY="your-actual-api-key"');
-            } else if (error.message.includes('Milvus') || error.message.includes('connect')) {
-                console.log('\n💡 Please make sure Milvus service is running');
+            } else if (error.message.includes('Milvus') || error.message.includes('Qdrant') || error.message.includes('connect')) {
+                console.log('\n💡 Please make sure your vector database service is running');
+                console.log('   Milvus:');
                 console.log('   - Default address: localhost:19530');
-                console.log('   - Can be modified via MILVUS_ADDRESS environment variable');
-                console.log('   - For RESTful API: set MILVUS_USE_RESTFUL=true');
-                console.log('   - For gRPC (default): set MILVUS_USE_RESTFUL=false or leave unset');
-                console.log('   - Start Milvus: docker run -p 19530:19530 milvusdb/milvus:latest');
+                console.log('   - Start: docker run -p 19530:19530 milvusdb/milvus:latest');
+                console.log('   Qdrant:');
+                console.log('   - Default address: http://localhost:6333');
+                console.log('   - Start: docker run -p 6333:6333 qdrant/qdrant:latest');
             }
 
             console.log('\n💡 Environment Variables:');
             console.log('   - OPENAI_API_KEY: Your OpenAI API key (required)');
             console.log('   - OPENAI_BASE_URL: Custom OpenAI API endpoint (optional)');
+            console.log('   - VECTOR_DB_TYPE: Vector database type - "milvus" or "qdrant" (default: milvus)');
             console.log('   - MILVUS_ADDRESS: Milvus server address (default: localhost:19530)');
             console.log('   - MILVUS_TOKEN: Milvus authentication token (optional)');
+            console.log('   - MILVUS_USE_RESTFUL: Use Milvus REST API instead of gRPC (default: false)');
+            console.log('   - QDRANT_URL: Qdrant server URL (default: http://localhost:6333)');
+            console.log('   - QDRANT_API_KEY: Qdrant API key (optional)');
             console.log('   - SPLITTER_TYPE: Code splitter type - "ast" or "langchain" (default: ast)');
         }
 
