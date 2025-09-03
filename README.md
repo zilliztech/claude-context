@@ -32,9 +32,12 @@ Model Context Protocol (MCP) allows you to integrate Claude Context with your fa
 ### Prerequisites
 
 <details>
-<summary>Get a free vector database on Zilliz Cloud 👈</summary>
+<summary>Get a vector database (Zilliz Cloud or Qdrant) 👈</summary>
 
-Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
+Claude Context needs a vector database. You can:
+- [Sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud for Milvus (managed)
+- Use Qdrant locally with Docker: `docker run -p 6333:6333 qdrant/qdrant:latest`
+- Or use [Qdrant Cloud](https://cloud.qdrant.io/) for managed Qdrant
 
 ![](assets/signup_and_get_apikey.png)
 
@@ -63,10 +66,20 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 Use the command line interface to add the Claude Context MCP server:
 
+**With Milvus/Zilliz Cloud (Default):**
 ```bash
 claude mcp add claude-context \
   -e OPENAI_API_KEY=sk-your-openai-api-key \
   -e MILVUS_TOKEN=your-zilliz-cloud-api-key \
+  -- npx @zilliz/claude-context-mcp@latest
+```
+
+**With Qdrant:**
+```bash
+claude mcp add claude-context \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e VECTOR_DB_TYPE=qdrant \
+  -e QDRANT_URL=http://localhost:6333 \
   -- npx @zilliz/claude-context-mcp@latest
 ```
 
@@ -511,7 +524,7 @@ Claude Context is a monorepo containing three main packages:
 ### Supported Technologies
 
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
-- **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
+- **Vector Databases**: [Milvus](https://milvus.io), [Zilliz Cloud](https://zilliz.com/cloud) (fully managed), [Qdrant](https://qdrant.tech) (simple & fast)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
 - **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
 - **Development Tools**: VSCode, Model Context Protocol
@@ -527,7 +540,7 @@ While MCP is the recommended way to use Claude Context with AI assistants, you c
 The `@zilliz/claude-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
 ```typescript
-import { Context, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
+import { Context, MilvusVectorDatabase, QdrantVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -535,16 +548,23 @@ const embedding = new OpenAIEmbedding({
     model: 'text-embedding-3-small'
 });
 
-// Initialize vector database
-const vectorDatabase = new MilvusVectorDatabase({
+// Choose your vector database
+// Option 1: Milvus/Zilliz Cloud (for large scale)
+const milvusVectorDatabase = new MilvusVectorDatabase({
     address: process.env.MILVUS_ADDRESS || 'your-zilliz-cloud-public-endpoint',
     token: process.env.MILVUS_TOKEN || 'your-zilliz-cloud-api-key'
+});
+
+// Option 2: Qdrant (for simplicity and speed)
+const qdrantVectorDatabase = new QdrantVectorDatabase({
+    url: process.env.QDRANT_URL || 'http://localhost:6333',
+    apiKey: process.env.QDRANT_API_KEY // optional
 });
 
 // Create context instance
 const context = new Context({
     embedding,
-    vectorDatabase
+    vectorDatabase: qdrantVectorDatabase // or milvusVectorDatabase
 });
 
 // Index your codebase with progress tracking
@@ -651,9 +671,13 @@ pnpm benchmark
 ### Running Examples
 
 ```bash
-# Development with file watching
+# Basic usage example (supports both Milvus and Qdrant)
 cd examples/basic-usage
 pnpm dev
+
+# Qdrant-specific example
+cd examples/qdrant-usage
+pnpm start
 ```
 
 ---
@@ -662,7 +686,8 @@ pnpm dev
 
 Check the `/examples` directory for complete usage examples:
 
-- **Basic Usage**: Simple indexing and search example
+- **[Basic Usage](examples/basic-usage/)**: General example with both Milvus and Qdrant support
+- **[Qdrant Usage](examples/qdrant-usage/)**: Qdrant-specific example with performance optimization tips
 
 ---
 
