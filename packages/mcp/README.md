@@ -191,8 +191,11 @@ These settings work in combination with tool parameters - patterns from both sou
 Use the command line interface to add the Claude Context MCP server:
 
 ```bash
-# Add the Claude Context MCP server
+# Add the Claude Context MCP server with Milvus (default)
 claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- npx @zilliz/claude-context-mcp@latest
+
+# Add the Claude Context MCP server with Qdrant
+claude mcp add claude-context -e OPENAI_API_KEY=your-openai-api-key -e VECTOR_DB_TYPE=qdrant -e QDRANT_URL=http://localhost:6333 -- npx @zilliz/claude-context-mcp@latest
 
 ```
 
@@ -209,6 +212,7 @@ Gemini CLI requires manual configuration through a JSON file:
 
 2. Add the following configuration:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -224,6 +228,24 @@ Gemini CLI requires manual configuration through a JSON file:
 }
 ```
 
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
+      }
+    }
+  }
+}
+```
+
 3. Save the file and restart Gemini CLI to apply the changes.
 
 </details>
@@ -233,6 +255,7 @@ Gemini CLI requires manual configuration through a JSON file:
 
 Create or edit the `~/.qwen/settings.json` file and add the following configuration:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -242,6 +265,24 @@ Create or edit the `~/.qwen/settings.json` file and add the following configurat
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
       }
     }
   }
@@ -331,6 +372,28 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 }
 ```
 
+**With Qdrant Vector Database:**
+
+For any of the above embedding providers, you can also use Qdrant instead of Milvus by adding these environment variables:
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "OpenAI",
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
+      }
+    }
+  }
+}
+```
+
 </details>
 
 <details>
@@ -340,6 +403,7 @@ Go to: `Settings` -> `MCP` -> `Add MCP Server`
 
 Add the following configuration to your Void MCP settings:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -356,6 +420,24 @@ Add the following configuration to your Void MCP settings:
 }
 ```
 
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
+      }
+    }
+  }
+}
+```
+
 </details>
 
 <details>
@@ -363,6 +445,7 @@ Add the following configuration to your Void MCP settings:
 
 Add to your Claude Desktop configuration:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -378,6 +461,24 @@ Add to your Claude Desktop configuration:
 }
 ```
 
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
+      }
+    }
+  }
+}
+```
+
 </details>
 
 <details>
@@ -385,6 +486,7 @@ Add to your Claude Desktop configuration:
 
 Windsurf supports MCP configuration through a JSON file. Add the following configuration to your Windsurf MCP settings:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -400,6 +502,24 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 }
 ```
 
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
+      }
+    }
+  }
+}
+```
+
 </details>
 
 <details>
@@ -407,6 +527,7 @@ Windsurf supports MCP configuration through a JSON file. Add the following confi
 
 The Claude Context MCP server can be used with VS Code through MCP-compatible extensions. Add the following configuration to your VS Code MCP settings:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -416,6 +537,24 @@ The Claude Context MCP server can be used with VS Code through MCP-compatible ex
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
       }
     }
   }
@@ -435,9 +574,17 @@ Cherry Studio allows for visual MCP server configuration through its settings in
    - **Type**: `STDIO`
    - **Command**: `npx`
    - **Arguments**: `["@zilliz/claude-context-mcp@latest"]`
-   - **Environment Variables**:
+   - **Environment Variables** (choose one):
+     
+     **For Milvus (Default):**
      - `OPENAI_API_KEY`: `your-openai-api-key`
      - `MILVUS_TOKEN`: `your-zilliz-cloud-api-key`
+     
+     **For Qdrant:**
+     - `OPENAI_API_KEY`: `your-openai-api-key`
+     - `VECTOR_DB_TYPE`: `qdrant`
+     - `QDRANT_URL`: `http://localhost:6333`
+     - `QDRANT_API_KEY`: `your-qdrant-api-key`
 3. Save the configuration to activate the server.
 
 </details>
@@ -453,6 +600,7 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
 
 3. In the `cline_mcp_settings.json` file, add the following configuration:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -462,6 +610,24 @@ Cline uses a JSON configuration file to manage MCP servers. To integrate the pro
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
       }
     }
   }
@@ -506,13 +672,37 @@ To configure Claude Context MCP in Augment Code, you can use either the graphica
 3. Under Advanced, click Edit in settings.json
 4. Add the server configuration to the `mcpServers` array in the `augment.advanced` object
 
+**Milvus Configuration (Default):**
 ```json
 "augment.advanced": { 
   "mcpServers": [ 
     { 
       "name": "claude-context", 
       "command": "npx", 
-      "args": ["-y", "@zilliz/claude-context-mcp@latest"] 
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    } 
+  ] 
+}
+```
+
+**Qdrant Configuration:**
+```json
+"augment.advanced": { 
+  "mcpServers": [ 
+    { 
+      "name": "claude-context", 
+      "command": "npx", 
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
+      }
     } 
   ] 
 }
@@ -529,6 +719,7 @@ Roo Code utilizes a JSON configuration file for MCP servers:
 
 2. In the `mcp_settings.json` file, add the following configuration:
 
+**Milvus Configuration (Default):**
 ```json
 {
   "mcpServers": {
@@ -538,6 +729,24 @@ Roo Code utilizes a JSON configuration file for MCP servers:
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**Qdrant Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "VECTOR_DB_TYPE": "qdrant",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "your-qdrant-api-key"
       }
     }
   }
@@ -558,6 +767,7 @@ Zencoder offers support for MCP tools and servers in both its JetBrains and VS C
 3. Click on the `Add Custom MCP`
 4. Add the name (i.e. `Claude Context` and server configuration from below, and make sure to hit the `Install` button
 
+**Milvus Configuration (Default):**
 ```json
 {
     "command": "npx",
@@ -568,8 +778,22 @@ Zencoder offers support for MCP tools and servers in both its JetBrains and VS C
       "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
     }
 }
-
 ```
+
+**Qdrant Configuration:**
+```json
+{
+    "command": "npx",
+    "args": ["@zilliz/claude-context-mcp@latest"],
+    "env": {
+      "OPENAI_API_KEY": "your-openai-api-key",
+      "VECTOR_DB_TYPE": "qdrant",
+      "QDRANT_URL": "http://localhost:6333",
+      "QDRANT_API_KEY": "your-qdrant-api-key"
+    }
+}
+```
+
 
 5. Save the server by hitting the `Install` button.
 
