@@ -50,6 +50,9 @@ importers:
 
   examples/basic-usage:
     dependencies:
+      '@chroma-core/default-embed':
+        specifier: ^0.1.8
+        version: 0.1.8
       '@suoshengzhang/claude-context-core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -59,6 +62,9 @@ importers:
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
+      chromadb:
+        specifier: ^3.0.14
+        version: 3.0.14
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
