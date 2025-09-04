@@ -436,13 +436,13 @@ export class Context {
     /**
      * Fetch search results from server-side API
      */
-    private async fetchServerSearchResults(gitRepoName: string | undefined, query: string, limit: number, path: string): Promise<VectorSearchResult[]> {
+    private async fetchServerSearchResults(gitRepoName: string | undefined, query: string, limit: number, codebasePath: string): Promise<VectorSearchResult[]> {
         try {
             if (!gitRepoName) {
                 throw new Error('Git repository name is required');
             }
 
-            const url = `${this.codeAgentEndpoint}/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}&limit=${limit}&path=${encodeURIComponent(path)}`;
+            const url = `${this.codeAgentEndpoint}/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}&limit=${limit}&path=${encodeURIComponent(codebasePath)}`;
             console.log(`🔍 Fetching server-side results from: ${url}`);
 
             const response = await fetch(url);
