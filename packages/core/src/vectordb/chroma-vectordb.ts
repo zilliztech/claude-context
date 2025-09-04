@@ -271,7 +271,7 @@ export class ChromaVectorDatabase implements VectorDatabase {
                             fileExtension: metadata.fileExtension as string || '',
                             metadata: this.extractCustomMetadata(metadata),
                         },
-                        score: distance ? 1 - distance : 0, // Convert distance to similarity score
+                        score: distance || 0,
                     });
                 }
             }
@@ -410,10 +410,10 @@ export class ChromaVectorDatabase implements VectorDatabase {
 
         const startTime = Date.now();
         let relativeFilePaths: Set<string> = new Set();
-        
+
         try {
             let totalRecords = 0;
-            
+
             try {
                 // Try to get the collection
                 const collection = await this.client.getCollection({
@@ -471,7 +471,7 @@ export class ChromaVectorDatabase implements VectorDatabase {
             console.log(`📊 Summary:`);
             console.log(`   Total records: ${totalRecords}`);
             console.log(`   Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
-            
+
             return relativeFilePaths;
 
         } catch (error) {
