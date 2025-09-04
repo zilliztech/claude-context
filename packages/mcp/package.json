@@ -1,46 +1,46 @@
 {
-  "name": "@suoshengzhang/claude-context-mcp",
-  "version": "1.0.16",
-  "description": "Model Context Protocol integration for AdsDE code agent",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": "dist/index.js",
-  "scripts": {
-    "build": "pnpm clean && tsc --build --force",
-    "dev": "tsx --watch src/index.ts",
-    "clean": "dir",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
-    "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts",
-    "start:with-env": "OPENAI_API_KEY=${OPENAI_API_KEY:your-api-key-here} MILVUS_ADDRESS=${MILVUS_ADDRESS:localhost:19530} tsx src/index.ts",
-    "prepublishOnly": "pnpm build"
-  },
-  "dependencies": {
-    "@suoshengzhang/claude-context-core": "0.1.7",
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "zod": "^3.25.55",
-    "chromadb": "^3.0.14",
-    "@chroma-core/default-embed": "^0.1.8"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "tsx": "^4.19.4",
-    "typescript": "^5.0.0"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "*.zip"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/zhangsuosheng9/code-agent.git",
-    "directory": "packages/mcp"
-  },
-  "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  }
+    "name": "@suoshengzhang/claude-context-mcp",
+    "version": "1.0.17",
+    "description": "Model Context Protocol integration for AdsDE code agent",
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "bin": "dist/index.js",
+    "scripts": {
+        "build": "pnpm clean && tsc --build --force",
+        "dev": "tsx --watch src/index.ts",
+        "clean": "dir",
+        "lint": "eslint src --ext .ts",
+        "lint:fix": "eslint src --ext .ts --fix",
+        "typecheck": "tsc --noEmit",
+        "start": "tsx src/index.ts",
+        "start:with-env": "OPENAI_API_KEY=${OPENAI_API_KEY:your-api-key-here} MILVUS_ADDRESS=${MILVUS_ADDRESS:localhost:19530} tsx src/index.ts",
+        "prepublishOnly": "pnpm build"
+    },
+    "dependencies": {
+        "@suoshengzhang/claude-context-core": "0.1.7",
+        "@modelcontextprotocol/sdk": "^1.12.1",
+        "zod": "^3.25.55",
+        "chromadb": "^3.0.14",
+        "@chroma-core/default-embed": "^0.1.8"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "tsx": "^4.19.4",
+        "typescript": "^5.0.0"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "*.zip"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zhangsuosheng9/code-agent.git",
+        "directory": "packages/mcp"
+    },
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    }
 }
