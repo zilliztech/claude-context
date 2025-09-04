@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { get } from 'https';
+import { ChromaClient } from "chromadb";
 
 export class ChromaManager {
     private isRunning: boolean = false;
@@ -168,10 +169,11 @@ export class ChromaManager {
         console.log('[CHROMA] Spawning new Chroma process...');
 
         // Get the executable path from user's home directory
-        const chromaExePath = await ChromaManager.getChromaExePath();
-        console.log(`[CHROMA] Executable command: ${chromaExePath} run --port 19801 --path ${this.chromaWorkingDir}`);
+        const chromaExePath = await ChromaManager.getChromaExePath(this.chromaWorkingDir);
+        const chromaDataPath = path.join(this.chromaWorkingDir, 'data');
+        console.log(`[CHROMA] Executable command: ${chromaExePath} run --port 19801 --path ${chromaDataPath}`);
 
-        const chromaProcess = spawn(chromaExePath, ['run', '--port', '19801', '--path', this.chromaWorkingDir], {
+        const chromaProcess = spawn(chromaExePath, ['run', '--port', '19801', '--path', chromaDataPath], {
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: false
         });
@@ -196,6 +198,39 @@ export class ChromaManager {
             chromaProcess.stderr.on('data', (data) => {
                 console.error(`[CHROMA-STDERR] ${data.toString().trim()}`);
             });
+        }
+
+        // Test connection to ensure server is running
+        let retries = 0;
+        const maxRetries = 10;
+        const retryDelay = 5000; // 1 second
+
+        const testConnection = async () => {
+            try {
+                const client = new ChromaClient({
+                    host: 'localhost',
+                    port: 19801
+                });
+                await client.heartbeat();
+                console.log('[CHROMA] Connection test successful');
+                return true;
+            } catch (error) {
+                console.log('[CHROMA] Connection test failed, retrying...');
+                return false;
+            }
+        };
+
+        // Retry connection until successful or max retries reached
+        while (retries < maxRetries) {
+            if (await testConnection()) {
+                break;
+            }
+            retries++;
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+
+        if (retries >= maxRetries) {
+            throw new Error('[CHROMA] Failed to establish connection after maximum retries');
         }
 
         console.log(`[CHROMA] Process spawned with PID: ${chromaProcess.pid}`);
@@ -228,9 +263,9 @@ export class ChromaManager {
     /**
      * Get the Chroma executable path, downloading it if necessary
      */
-    public static async getChromaExePath(): Promise<string> {
+    public static async getChromaExePath(chromaWorkingDir: string): Promise<string> {
         // If not found in node_modules, check user's .context directory
-        const userContextDir = path.join(os.homedir(), '.context');
+        const userContextDir = chromaWorkingDir;
         const userContextExePath = path.join(userContextDir, 'chroma_starter.exe');
 
         try {
@@ -283,8 +318,6 @@ export class ChromaManager {
      */
     private static async downloadFile(url: string, targetPath: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const fileStream = fs.createWriteStream(targetPath);
-
             get(url, (response) => {
                 if (response.statusCode === 302 || response.statusCode === 301) {
                     // Handle redirects
@@ -300,7 +333,8 @@ export class ChromaManager {
                     reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
                     return;
                 }
-
+                
+                const fileStream = fs.createWriteStream(targetPath);
                 response.pipe(fileStream);
 
                 fileStream.on('finish', () => {
