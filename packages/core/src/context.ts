@@ -556,7 +556,7 @@ export class Context {
         mergedResults.push(...unusedClientResults);
 
         // Sort by score
-        mergedResults.sort((a, b) => b.score - a.score);
+        mergedResults.sort((a, b) => a.score - b.score);
 
         // Log the merged results' relative paths to verify correctness
         console.log('🔎 Verifying merged result relative paths:');
@@ -1159,12 +1159,12 @@ export class Context {
     private async getServerRepoIgnorePattern(gitRepoName: string): Promise<string[]> {
         try {
             const response = await fetch(`${this.codeAgentEndpoint}/get_ignore_patterns?codebase=${gitRepoName}`);
-    
+
             if (!response.ok) {
                 console.error(`[IGNORE-PATTERN] ❌ Server request failed with status: ${response.status}`);
                 return [];
             }
-    
+
             const serverData = await response.json() as any;
             console.log(`[IGNORE-PATTERN] ✅ Successfully retrieved ignore patterns for codebase: ${gitRepoName}, ignore patterns: ${serverData.ignore_patterns.join(', ')}`);
             return serverData.ignore_patterns || [];
