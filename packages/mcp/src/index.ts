@@ -190,13 +190,13 @@ This tool is versatile and can be used before completing various tasks to retrie
                         inputSchema: {
                             type: "object",
                             properties: {
-                                path: {
-                                    type: "string",
-                                    description: `ABSOLUTE path to the codebase directory to search in.`
-                                },
                                 query: {
                                     type: "string",
                                     description: "Natural language query to search for in the codebase"
+                                },
+                                path: {
+                                    type: "string",
+                                    description: `ABSOLUTE path to the codebase directory to search in.`
                                 },
                                 limit: {
                                     type: "number",
@@ -213,7 +213,7 @@ This tool is versatile and can be used before completing various tasks to retrie
                                     default: []
                                 }
                             },
-                            required: ["path", "query"]
+                            required: ["query"]
                         }
                     },
                     {
@@ -289,7 +289,7 @@ This tool is versatile and can be used before completing various tasks to retrie
 async function initializeConfigAndChroma(config: ContextMcpConfig) {
     // Initialize Chroma manager (will be done in start() method)
     const chromaManager = new ChromaManager(config.chromaWorkingDir || '');
-    
+
     // Initialize and start Chroma process
     console.log('[CHROMA] Initializing Chroma manager...');
     try {

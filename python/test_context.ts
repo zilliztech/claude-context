@@ -59,8 +59,8 @@ export async function testContextEndToEnd(config: {
         // 6. Execute semantic search
         console.log('🔎 Executing semantic search...');
         const searchResults = await context.semanticSearch(
-            config.codebasePath,
             config.searchQuery,
+            config.codebasePath,
             5, // topK
             0.5 // threshold
         );

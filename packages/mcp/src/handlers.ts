@@ -523,8 +523,8 @@ export class ToolHandlers {
 
             // Search in the specified codebase
             const searchResults = await this.context.semanticSearch(
-                absolutePath,
                 query,
+                absolutePath,
                 Math.min(resultLimit, 50),
                 0.3,
                 filterExpr,

@@ -539,7 +539,7 @@ const stats = await context.indexCodebase('./your-project', (progress) => {
 console.log(`Indexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks`);
 
 // Perform semantic search
-const results = await context.semanticSearch('./your-project', 'vector database operations', 5);
+const results = await context.semanticSearch('vector database operations', './your-project', 5);
 results.forEach(result => {
     console.log(`File: ${result.relativePath}:${result.startLine}-${result.endLine}`);
     console.log(`Score: ${(result.score * 100).toFixed(2)}%`);

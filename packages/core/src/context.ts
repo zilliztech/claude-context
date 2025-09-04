@@ -436,13 +436,13 @@ export class Context {
     /**
      * Fetch search results from server-side API
      */
-    private async fetchServerSearchResults(gitRepoName: string | undefined, query: string): Promise<VectorSearchResult[]> {
+    private async fetchServerSearchResults(gitRepoName: string | undefined, query: string, limit: number, path: string): Promise<VectorSearchResult[]> {
         try {
             if (!gitRepoName) {
                 throw new Error('Git repository name is required');
             }
 
-            const url = `${this.codeAgentEndpoint}/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}`;
+            const url = `${this.codeAgentEndpoint}/code_retrieve?codebase=${encodeURIComponent(gitRepoName)}&question=${encodeURIComponent(query)}&limit=${limit}&path=${encodeURIComponent(path)}`;
             console.log(`🔍 Fetching server-side results from: ${url}`);
 
             const response = await fetch(url);
@@ -575,12 +575,15 @@ export class Context {
      * @param topK Number of results to return
      * @param threshold Similarity threshold
      */
-    async semanticSearch(codebasePath: string, query: string, topK: number = 5,
+    async semanticSearch(query: string, codebasePath?: string, topK: number = 5,
         threshold: number = 0.5, filterExpr?: string, gitRepoName?: string): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
 
+        if (!codebasePath) {
+            codebasePath = process.cwd();
+        }
         const collectionName = this.getCollectionName(codebasePath);
         console.log(`🔍 Using collection: ${collectionName}`);
 
@@ -670,7 +673,7 @@ export class Context {
                     queryEmbedding.vector,
                     { topK, threshold, filterExpr }
                 ),
-                this.fetchServerSearchResults(gitRepoName, query)
+                this.fetchServerSearchResults(gitRepoName, query, topK, codebasePath)
             ]);
 
             console.log(`🔍 Raw search results from client: ${searchResults.length}, server: ${searchResultsFromServer.length}`);

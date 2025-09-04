@@ -84,7 +84,7 @@ const DEFAULT_IGNORE_PATTERNS = [
 async function generateSnapshot(rootDir: string, ignorePatterns: string[] = []): Promise<void> {
     try {
         console.log(`Generating snapshot for codebase: ${rootDir}`);
-        
+
         // Create synchronizer instance with provided ignore patterns
         const { FileSynchronizer } = await import('@suoshengzhang/claude-context-core');
         const synchronizer = new FileSynchronizer(rootDir, ignorePatterns);
@@ -113,7 +113,7 @@ async function getGitRepoName(folderPath: string): Promise<string | null> {
         // Walk up directory tree looking for .git folder
         let currentPath = folderPath;
         let gitDir = null;
-        
+
         while (currentPath !== path.parse(currentPath).root) {
             const potentialGitDir = path.join(currentPath, '.git');
             if (fs.existsSync(potentialGitDir)) {
@@ -169,7 +169,7 @@ function monitorFileChanges(folderPath: string, ignorePatterns: string[] = [], r
     function shouldIgnoreFile(filePath: string): boolean {
         const relativePath = path.relative(folderPath, filePath);
         const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
-        
+
         for (const pattern of ignorePatterns) {
             if (isPatternMatch(normalizedPath, pattern)) {
                 return true;
@@ -181,9 +181,9 @@ function monitorFileChanges(folderPath: string, ignorePatterns: string[] = [], r
     // Function to handle file change events
     function handleFileChange(eventType: string, filename: string | null, filePath?: string) {
         if (!filename) return;
-        
+
         const fullPath = filePath || path.join(folderPath, filename);
-        
+
         // Check if file should be ignored
         if (shouldIgnoreFile(fullPath)) {
             return; // Skip ignored files
@@ -194,7 +194,7 @@ function monitorFileChanges(folderPath: string, ignorePatterns: string[] = [], r
             const stats = fs.statSync(fullPath);
             const isDirectory = stats.isDirectory();
             const fileType = isDirectory ? '📁 Directory' : '📄 File';
-            
+
             console.log(`[${new Date().toLocaleTimeString()}] ${eventType.toUpperCase()}: ${fileType}`);
             console.log(`   Path: ${fullPath}`);
             console.log(`   Size: ${isDirectory ? 'N/A' : `${(stats.size / 1024).toFixed(2)} KB`}`);
@@ -227,7 +227,7 @@ function monitorFileChanges(folderPath: string, ignorePatterns: string[] = [], r
         });
 
         console.log('✅ File monitoring started successfully');
-        
+
     } catch (error) {
         console.error('❌ Failed to start file monitoring:', error);
     }
@@ -250,7 +250,7 @@ async function searchCodePath(codebasePath: string, queries: string[]) {
 
     for (const query of queries) {
         console.log(`\n🔎 Search: "${query}"`);
-        const results = await context.semanticSearch(codebasePath, query, 3, 0.3);
+        const results = await context.semanticSearch(query, codebasePath, 3, 0.3);
 
         if (results.length > 0) {
             results.forEach((result, index) => {
@@ -335,7 +335,7 @@ function testMatch() {
 async function iterateAllChromaRecords(host: string = 'localhost', port: number = 19801): Promise<string[]> {
     const startTime = Date.now();
     let relativeFilePaths: Set<string> = new Set();
-    
+
     try {
         // Create ChromaDB client directly to access ChromaDB API
         const client = new ChromaClient({
@@ -346,11 +346,11 @@ async function iterateAllChromaRecords(host: string = 'localhost', port: number 
         // Get all collections - ChromaDB doesn't have a direct listCollections method
         // We'll need to work with known collection names or create a workaround
         console.log('📚 Attempting to fetch collections...');
-        
+
         let totalRecords = 0;
         let collectionName = 'code_chunks_AdsSnR';
         const collectionStartTime = Date.now();
-        
+
         try {
             // Try to get the collection
             const collection = await client.getCollection({
@@ -408,13 +408,13 @@ async function iterateAllChromaRecords(host: string = 'localhost', port: number 
             console.log(`   ⚠️  Collection ${collectionName} not found or not accessible:`, error.message);
         }
 
-        
+
         const totalTime = Date.now() - startTime;
         console.log(`\n🎉 ChromaDB iteration completed!`);
         console.log(`📊 Summary:`);
         console.log(`   Total records: ${totalRecords}`);
         console.log(`   Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
-        
+
         // Convert Set to array and return all collected file paths
         const filePaths = Array.from(relativeFilePaths);
         return filePaths;

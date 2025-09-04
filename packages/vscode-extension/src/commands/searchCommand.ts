@@ -97,8 +97,8 @@ export class SearchCommand {
                 progress.report({ increment: 50, message: 'Executing semantic search...' });
 
                 let results = await this.context.semanticSearch(
-                    codebasePath,
                     query.term,
+                    codebasePath,
                     query.limit || 20,
                     0.3, // similarity threshold
                     filterExpr
@@ -194,8 +194,8 @@ export class SearchCommand {
         }
 
         let results = await this.context.semanticSearch(
-            codebasePath,
             searchTerm,
+            codebasePath,
             limit,
             0.3, // similarity threshold
             filterExpr

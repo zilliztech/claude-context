@@ -80,8 +80,8 @@ console.log(`Indexed ${stats.indexedFiles} files with ${stats.totalChunks} chunk
 
 // Search the codebase
 const results = await context.semanticSearch(
-  './my-project',
   'function that handles user authentication',
+  './my-project',
   5
 );
 
@@ -164,7 +164,7 @@ interface ContextConfig {
 
 - `indexCodebase(path, progressCallback?, forceReindex?)` - Index an entire codebase
 - `reindexByChange(path, progressCallback?)` - Incrementally re-index only changed files
-- `semanticSearch(path, query, topK?, threshold?, filterExpr?)` - Search indexed code semantically
+- `semanticSearch(query， path?, topK?, threshold?, filterExpr?)` - Search indexed code semantically
 - `hasIndex(path)` - Check if codebase is already indexed
 - `clearIndex(path, progressCallback?)` - Remove index for a codebase
 - `updateIgnorePatterns(patterns)` - Update ignore patterns
