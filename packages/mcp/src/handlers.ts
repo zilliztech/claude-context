@@ -214,7 +214,7 @@ export class ToolHandlers {
                         type: "text",
                         text: `Codebase '${absolutePath}' is already being indexed in the background. Please wait for completion.`
                     }],
-                    isError: true
+                    isError: false
                 };
             }
 
@@ -230,7 +230,7 @@ export class ToolHandlers {
                         type: "text",
                         text: `Codebase '${absolutePath}' is already indexed. Use force=true to re-index.`
                     }],
-                    isError: true
+                    isError: false
                 };
             }
 
