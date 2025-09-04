@@ -9,7 +9,7 @@
     "scripts": {
         "build": "pnpm clean && tsc --build --force",
         "dev": "tsx --watch src/index.ts",
-        "clean": "rm -rf dist",
+        "clean": "rimraf dist",
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
         "typecheck": "tsc --noEmit",

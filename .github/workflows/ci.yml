@@ -2,39 +2,61 @@ name: CI
 
 on:
   push:
-    branches: [ master, main, claude_context ]
+    branches: [master, main, claude_context]
   pull_request:
-    branches: [ master, main, claude_context ]
+    branches: [master, main, claude_context]
 
 jobs:
   lint_and_build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ${{ matrix.os }}
+
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20.x, 22.x]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10
-        
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-        
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-      
-    # - name: Lint code
-    #   run: pnpm lint
-      
-    - name: Build packages
-      run: pnpm build
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
+
+      - name: Configure Windows line endings
+        if: matrix.os == 'windows-latest'
+        run: git config --global core.autocrlf false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # - name: Lint code
+      #   run: pnpm lint
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Test clean command (Windows validation)
+        if: matrix.os == 'windows-latest'
+        run: |
+          pnpm clean
+          echo "Clean command executed successfully on Windows"
+
+      - name: Verify build outputs (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          ls -la packages/core/dist || echo "packages/core/dist not found"
+          ls -la packages/mcp/dist || echo "packages/mcp/dist not found"
+
+      - name: Verify build outputs (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Get-ChildItem packages/core/dist -ErrorAction SilentlyContinue | Format-Table -AutoSize || Write-Host "packages/core/dist not found"
+          Get-ChildItem packages/mcp/dist -ErrorAction SilentlyContinue | Format-Table -AutoSize || Write-Host "packages/mcp/dist not found"

@@ -167,7 +167,7 @@
         "webpack": "pnpm clean && webpack --mode production && node copy-assets.js",
         "webpack:dev": "webpack --mode development && node copy-assets.js",
         "watch": "tsc -watch -p ./",
-        "clean": "rm -rf dist",
+        "clean": "rimraf dist",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
         "typecheck": "tsc --noEmit",
