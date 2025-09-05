@@ -21,22 +21,9 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
             return openaiEmbedding;
 
         case 'Azure OpenAI':
-            // if (!config.azureOpenAIApiKey) {
-            //     console.error(`[EMBEDDING] ❌ Azure OpenAI API key is required but not provided`);
-            //     throw new Error('AZURE_OPENAI_API_KEY is required for Azure OpenAI embedding provider');
-            // }
-            // if (!config.azureOpenAIEndpoint) {
-            //     console.error(`[EMBEDDING] ❌ Azure OpenAI endpoint is required but not provided`);
-            //     throw new Error('AZURE_OPENAI_ENDPOINT is required for Azure OpenAI embedding provider');
-            // }
             console.log(`[EMBEDDING] 🔧 Configuring Azure OpenAI with model: ${config.embeddingModel}`);
             const azureOpenAIEmbedding = new AzureOpenAIEmbedding({
-                apiKey: config.azureOpenAIApiKey,
-                endpoint: config.azureOpenAIEndpoint,
-                model: config.embeddingModel,
                 codeAgentEmbEndpoint: config.codeAgentEmbEndpoint,
-                ...(config.azureOpenAIApiVersion && { apiVersion: config.azureOpenAIApiVersion }),
-                ...(config.azureOpenAIDeploymentName && { deploymentName: config.azureOpenAIDeploymentName })
             });
             console.log(`[EMBEDDING] ✅ Azure OpenAI embedding instance created successfully`);
             return azureOpenAIEmbedding;

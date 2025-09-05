@@ -367,7 +367,7 @@ export class ToolHandlers {
             const { FileSynchronizer } = await import("@suoshengzhang/claude-context-core");
             const ignorePatterns = this.context.getIgnorePatterns() || [];
             console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Using ignore patterns: ${ignorePatterns.join(', ')}`);
-            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
+            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, this.context.getSupportedExtensions());
             await synchronizer.initialize(serverSnapshot);
             console.log(`[BACKGROUND-INDEX][${new Date().toLocaleString()}] Finished initializing file synchronizer`);
 

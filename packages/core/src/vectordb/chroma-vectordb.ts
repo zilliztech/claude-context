@@ -271,7 +271,7 @@ export class ChromaVectorDatabase implements VectorDatabase {
                             fileExtension: metadata.fileExtension as string || '',
                             metadata: this.extractCustomMetadata(metadata),
                         },
-                        score: distance || 0,
+                        score: distance || 0
                     });
                 }
             }

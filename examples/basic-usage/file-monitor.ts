@@ -29,80 +29,84 @@ class ProjectFileMonitor {
   constructor(options: MonitorOptions) {
     this.options = {
       ignorePatterns: [
-        // Build and dependency directories
+        // Common build output and dependency directories
         '**/node_modules/**',
         '**/dist/**',
         '**/build/**',
-        '**/.next/**',
-        '**/.nuxt/**',
+        '**/obj/**',
+        '**/Logs/**',
+        '**/QLogs/**',
+        '**/QLocal/**',
+        '**/objd/**',
         '**/out/**',
         '**/target/**',
-        '**/bin/**',
-        '**/obj/**',
-        '**/.gradle/**',
-        '**/venv/**',
-        '**/__pycache__/**',
-        '**/.pytest_cache/**',
-        
+        '**/coverage/**',
+        '**/packages/',
+        '**/corext/**',
+        '**.nyc_output/**',
+        '**/azuredevops/**',
+        '.config/**',
+
         // IDE and editor files
-        '**/.vscode/**',
-        '**/.idea/**',
-        '**/*.swp',
-        '**/*.swo',
-        '**/*~',
-        '**/.DS_Store',
-        '**/Thumbs.db',
-        
-        // Log and temporary files
-        '**/*.log',
-        '**/*.tmp',
-        '**/*.temp',
-        '**/.tmp/**',
-        '**/.temp/**',
-        
-        // Git and version control
-        '**/.git/**',
-        '**/.svn/**',
-        '**/.hg/**',
-        
-        // Package manager files
-        '**/package-lock.json',
-        '**/yarn.lock',
-        '**/pnpm-lock.yaml',
-        '**/Cargo.lock',
-        '**/poetry.lock',
-        
-        // Environment and config files that change frequently
-        '**/.env*',
-        '**/.env.local',
-        '**/.env.development',
-        '**/.env.production',
-        
+        '.vscode/**',
+        '.idea/**',
+        '*.swp',
+        '*.swo',
+
+        // Version control
+        '.git/**',
+        '.svn/**',
+        '.hg/**',
+
         // Cache directories
-        '**/.cache/**',
-        '**/.parcel-cache/**',
-        '**/.eslintcache',
-        '**/.stylelintcache'
+        '.cache/**',
+        '__pycache__/**',
+        '.pytest_cache/**',
+
+        // Logs and temporary files
+        'logs/**',
+        'tmp/**',
+        'temp/**',
+        '*.log',
+
+        // Environment and config files
+        '.env',
+        '.env.*',
+        '*.local',
+
+        // Minified and bundled files
+        '*.min.js',
+        '*.min.css',
+        '*.min.map',
+        '*.bundle.js',
+        '*.bundle.css',
+        '*.chunk.js',
+        '*.vendor.js',
+        '*.polyfills.js',
+        '*.runtime.js',
+        '*.map', // source map files
+        'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
+        'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
+        'coverage', '.nyc_output', 'logs', 'tmp', 'temp',
+        '.editorconfig',
+        '.gitattributes',
+
+        // for AdsSnR Test
+        '**/AdsSnR_RocksDB/**',
+        '**/AdsSnR_PClick/**',
+        '**/AdsSnR_FeatureExtraction/**',
+        '**/AdsSnR_Selection/**',
+        '**/AdsSnR_Common/**',
+        '**/AdsSnR_IdHash/**',
+        '**/packages/**',
+        '.github/',
+        'AI/**',
       ],
       sourceExtensions: [
         // Source code files
-        '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
-        '.py', '.pyw', '.pyx', '.pxd',
-        '.java', '.kt', '.scala',
-        '.cpp', '.cc', '.cxx', '.c', '.h', '.hpp', '.hxx',
-        '.cs', '.vb',
-        '.go', '.rs', '.swift',
-        '.php', '.rb', '.pl', '.pm',
-        '.sh', '.bash', '.zsh', '.fish',
-        '.sql', '.r', '.m', '.scm', '.clj',
-        '.html', '.htm', '.css', '.scss', '.sass', '.less',
-        '.vue', '.svelte', '.astro',
-        '.json', '.xml', '.yaml', '.yml', '.toml', '.ini',
-        '.md', '.rst', '.txt', '.tex',
-        '.dockerfile', '.dockerignore',
-        '.gitignore', '.gitattributes',
-        '.editorconfig', '.prettierrc', '.eslintrc',
-        'Makefile', 'Dockerfile', 'docker-compose.yml'
+        '.js', '.py', '.java', '.cpp', '.cc', '.cxx', '.c', '.h', '.hpp', '.hxx',
+        '.cs', '.html', '.htm', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini',
+        '.md'
       ],
       debounceMs: 100,
       usePolling: false,
@@ -317,7 +321,7 @@ class ProjectFileMonitor {
  */
 async function main(): Promise<void> {
   // Configuration
-  const projectPath = "D:/src/AdsSnR/private";
+  const projectPath = "D:/src/AdsSnR";
 //   const projectPath = process.argv[2] || process.cwd();
   const options: MonitorOptions = {
     projectPath,

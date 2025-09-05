@@ -1,4 +1,4 @@
-import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, ChromaConfig, ChromaVectorDatabase, AzureOpenAIEmbedding } from '@suoshengzhang/claude-context-core';
+import { Context, AstCodeSplitter, LangChainCodeSplitter, ChromaConfig, ChromaVectorDatabase, AzureOpenAIEmbedding } from '@suoshengzhang/claude-context-core';
 import { envManager } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
 import { ChromaClient } from "chromadb";
@@ -9,228 +9,6 @@ try {
     require('dotenv').config();
 } catch (error) {
     // dotenv is not required, skip if not installed
-}
-
-const DEFAULT_IGNORE_PATTERNS = [
-    // Common build output and dependency directories
-    'node_modules/**',
-    'dist/',
-    'build/',
-    'obj/',
-    'Logs/',
-    'QLogs/',
-    'QLocal/',
-    'objd/',
-    'out/',
-    'target/',
-    'coverage/',
-    'packages/',
-    '.corext/',
-    '**.nyc_output/**',
-    '.azuredevops/**',
-    '.config/**',
-
-    // IDE and editor files
-    '.vscode/**',
-    '.idea/**',
-    '*.swp',
-    '*.swo',
-
-    // Version control
-    '.git/**',
-    '.svn/**',
-    '.hg/**',
-
-    // Cache directories
-    '.cache/**',
-    '__pycache__/**',
-    '.pytest_cache/**',
-
-    // Logs and temporary files
-    'logs/**',
-    'tmp/**',
-    'temp/**',
-    '*.log',
-
-    // Environment and config files
-    '.env',
-    '.env.*',
-    '*.local',
-
-    // Minified and bundled files
-    '*.min.js',
-    '*.min.css',
-    '*.min.map',
-    '*.bundle.js',
-    '*.bundle.css',
-    '*.chunk.js',
-    '*.vendor.js',
-    '*.polyfills.js',
-    '*.runtime.js',
-    '*.map', // source map files
-    'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
-    'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
-    'coverage', '.nyc_output', 'logs', 'tmp', 'temp',
-    '.editorconfig',
-    '.gitattributes'
-];
-
-/**
- * Generate a snapshot file for the given codebase directory
- * @param rootDir Absolute path to codebase directory
- * @param ignorePatterns Optional array of glob patterns to ignore
- * @returns Promise that resolves when snapshot is generated
- */
-async function generateSnapshot(rootDir: string, ignorePatterns: string[] = []): Promise<void> {
-    try {
-        console.log(`Generating snapshot for codebase: ${rootDir}`);
-
-        // Create synchronizer instance with provided ignore patterns
-        const { FileSynchronizer } = await import('@suoshengzhang/claude-context-core');
-        const synchronizer = new FileSynchronizer(rootDir, ignorePatterns);
-
-        // Initialize will generate initial hashes and save snapshot
-        await synchronizer.initialize();
-
-        console.log('✅ Snapshot generated successfully');
-    } catch (error: any) {
-        console.error('Failed to generate snapshot:', error.message);
-        throw error;
-    }
-}
-
-/**
- * Get the Git repository name from a folder path by looking for the .git directory
- * and reading the remote origin URL from the git config
- * @param folderPath Path to folder to check
- * @returns Repository name or null if not a git repo
- */
-async function getGitRepoName(folderPath: string): Promise<string | null> {
-    try {
-        const fs = require('fs');
-        const path = require('path');
-
-        // Walk up directory tree looking for .git folder
-        let currentPath = folderPath;
-        let gitDir = null;
-
-        while (currentPath !== path.parse(currentPath).root) {
-            const potentialGitDir = path.join(currentPath, '.git');
-            if (fs.existsSync(potentialGitDir)) {
-                gitDir = potentialGitDir;
-                break;
-            }
-            currentPath = path.dirname(currentPath);
-        }
-
-        if (!gitDir) {
-            return null;
-        }
-
-        // Read config file to get remote origin URL
-        const configPath = path.join(gitDir, 'config');
-        const config = fs.readFileSync(configPath, 'utf8');
-
-        // Extract remote origin URL using regex
-        const originUrlMatch = config.match(/\[remote "origin"\][\s\S]*?url = (.+)/);
-        if (!originUrlMatch) {
-            return null;
-        }
-
-        const originUrl = originUrlMatch[1].trim();
-
-        // Extract repo name from URL
-        const repoNameMatch = originUrl.match(/\/([^\/]+?)(\.git)?$/);
-        if (!repoNameMatch) {
-            return null;
-        }
-
-        return repoNameMatch[1];
-
-    } catch (error) {
-        console.error('Error getting git repo name:', error);
-        return null;
-    }
-}
-
-/**
- * Monitor file changes in a given folder, ignoring files that match ignore patterns
- * @param folderPath Path to the folder to monitor
- * @param ignorePatterns Array of glob patterns to ignore
- * @param recursive Whether to monitor subdirectories recursively
- */
-function monitorFileChanges(folderPath: string, ignorePatterns: string[] = [], recursive: boolean = true): void {
-    console.log(`🔍 Starting file monitoring for: ${folderPath}`);
-    console.log(`📝 Ignore patterns: ${ignorePatterns.join(', ')}`);
-    console.log(`🔄 Recursive monitoring: ${recursive ? 'enabled' : 'disabled'}`);
-    console.log('⏳ Waiting for file changes... (Press Ctrl+C to stop)\n');
-
-    // Function to check if a file should be ignored
-    function shouldIgnoreFile(filePath: string): boolean {
-        const relativePath = path.relative(folderPath, filePath);
-        const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
-
-        for (const pattern of ignorePatterns) {
-            if (isPatternMatch(normalizedPath, pattern)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Function to handle file change events
-    function handleFileChange(eventType: string, filename: string | null, filePath?: string) {
-        if (!filename) return;
-
-        const fullPath = filePath || path.join(folderPath, filename);
-
-        // Check if file should be ignored
-        if (shouldIgnoreFile(fullPath)) {
-            return; // Skip ignored files
-        }
-
-        // Get file stats to determine if it's a file or directory
-        try {
-            const stats = fs.statSync(fullPath);
-            const isDirectory = stats.isDirectory();
-            const fileType = isDirectory ? '📁 Directory' : '📄 File';
-
-            console.log(`[${new Date().toLocaleTimeString()}] ${eventType.toUpperCase()}: ${fileType}`);
-            console.log(`   Path: ${fullPath}`);
-            console.log(`   Size: ${isDirectory ? 'N/A' : `${(stats.size / 1024).toFixed(2)} KB`}`);
-            console.log(`   Modified: ${stats.mtime.toLocaleString()}`);
-            console.log(''); // Empty line for readability
-        } catch (error) {
-            // File might have been deleted or moved
-            console.log(`[${new Date().toLocaleTimeString()}] ${eventType.toUpperCase()}: ${fullPath}`);
-            console.log(`   Status: File may have been deleted or moved`);
-            console.log(''); // Empty line for readability
-        }
-    }
-
-    try {
-        // Start watching the main directory
-        const watcher = fs.watch(folderPath, { recursive }, (eventType, filename) => {
-            handleFileChange(eventType, filename);
-        });
-
-        // Handle watcher errors
-        watcher.on('error', (error) => {
-            console.error('❌ File watcher error:', error);
-        });
-
-        // Handle process termination
-        process.on('SIGINT', () => {
-            console.log('\n🛑 Stopping file monitoring...');
-            watcher.close();
-            process.exit(0);
-        });
-
-        console.log('✅ File monitoring started successfully');
-
-    } catch (error) {
-        console.error('❌ Failed to start file monitoring:', error);
-    }
 }
 
 async function searchCodePath(codebasePath: string, queries: string[]) {
@@ -426,54 +204,103 @@ async function iterateAllChromaRecords(host: string = 'localhost', port: number 
     }
 }
 
+function shouldIgnoreFile(filePath: string): boolean {
+    const relativePath = path.relative("D:/src/AdsSnR", filePath);
+    console.log(relativePath);
 
-async function indexCodePathForAdsSnr() {
-    let codebasePath = "D:/src/simple_repo";
+    // Check ignore patterns
+    // for (const pattern of this.options.ignorePatterns!) {
+    // }
+    if (matchesPattern(relativePath, "**/QLocal/**")) {
+        return true;
+    }
+
+    return false;
+}
+
+function matchesPattern(filePath: string, pattern: string): boolean {
+    // Convert pattern to regex
+    const regexPattern = pattern
+        .replace(/\./g, '\\.')
+        .replace(/\*\*/g, '.*')
+        .replace(/\*/g, '[^/]*')
+        .replace(/\?/g, '[^/]');
+
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(filePath);
+}
+
+async function testSemanticSearch(codebasePath: string, query: string) {
     let host = 'localhost';
-    let port = 19802;
+    let port = 19801;
 
     let vectorDatabase = new ChromaVectorDatabase({
         host: host,
         port: port
     });
 
-    let context = new Context({
-        vectorDatabase,
-        codeSplitter: new LangChainCodeSplitter(1000, 200),
-        supportedExtensions: ['.cs', '.js', '.py', '.cpp', '.h'],
-        ignorePatterns: [
-            // for AdsSnR Test
-            'AdsSnR_RocksDB/',
-            'AdsSnR_PClick/',
-            'AdsSnR_FeatureExtraction/',
-            'AdsSnR_Selection/',
-            'AdsSnR_Common/',
-            'AdsSnR_IdHash/',
-            'packages/',
-            '.github/',
-            'AI/**',
-        ]
+    let codeAgentEndpoint = 'https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/';
+    let embedding = new AzureOpenAIEmbedding({
+        codeAgentEmbEndpoint: codeAgentEndpoint
     });
 
-    const hasExistingIndex = await context.hasIndex(codebasePath);
-    if (hasExistingIndex) {
-        console.log('🗑️  Existing index found, clearing it first...');
-        await context.clearIndex(codebasePath);
-    }
+    let context = new Context({
+        embedding,
+        vectorDatabase,
+        codeAgentEndpoint: codeAgentEndpoint,
+        // codeSplitter: new LangChainCodeSplitter(1000, 200),
+    });
 
-    // // Index with progress tracking
-    const indexStats = await context.indexCodebase(codebasePath);
-    console.log(`🔍 Indexed ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
-
-    await generateSnapshot(codebasePath, context.getIgnorePatterns());
-    console.log('✅ Snapshot generated successfully');
+    let results = await context.semanticSearch(codebasePath, query, 3, 0.3, undefined, 'AdsSnR');
+    console.log(results);
 }
+
+
+async function processReIndex(codebasePath: string) {
+    let host = 'localhost';
+    let port = 19801;
+    let vectorDatabase = new ChromaVectorDatabase({
+        host: host,
+        port: port
+    });
+    let codeAgentEndpoint = 'https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/';
+    let embedding = new AzureOpenAIEmbedding({
+        codeAgentEmbEndpoint: codeAgentEndpoint
+    });
+    let context = new Context({
+        embedding,
+        vectorDatabase,
+        codeAgentEndpoint: codeAgentEndpoint,
+    });
+
+    const stats = await context.reindexByChange(codebasePath);
+    console.log(stats);
+}
+
+async function testSplitCode(codeFilePath: string) {
+    let codeSplitter = new AstCodeSplitter(2500, 300);
+    let code = fs.readFileSync(codeFilePath, 'utf8');
+    let language = "csharp";
+    let chunks = await codeSplitter.split(code, language, codeFilePath);
+    console.log(chunks);
+}
+
 
 async function main() {
     console.log('🚀 Context Real Usage Example');
     console.log('===============================');
 
     try {
+
+        await processReIndex("D:/src/AdsSnR");
+
+        // testSplitCode("D:/src/AdsSnR/private/De.Snr.Compass.Product/BackendWorker/Program.cs");
+
+        // testSemanticSearch("D:/src/AdsSnR", "LocalDebugMode");
+
+        // const filePath = "D:/src/AdsSnR/QLocal/cmd/z/CredScan_rolling.yaml";
+        // console.log(shouldIgnoreFile(filePath));
+
 
         // Uncomment the line below to test ChromaDB iteration
         // let paths = await iterateAllChromaRecords('localhost', 19802);
@@ -486,36 +313,13 @@ async function main() {
         // testMatch();
         // return;
 
-        await indexCodePathForAdsSnr();
+        // await indexCodePathForAdsSnr();
         // await searchCodePath(codebasePath, ["what is service override"]);
 
         console.log('\n🎉 Example completed successfully!');
 
     } catch (error) {
         console.error('❌ Error occurred:', error);
-
-        // Provide detailed error diagnostics
-        if (error instanceof Error) {
-            if (error.message.includes('API key')) {
-                console.log('\n💡 Please make sure to set the correct OPENAI_API_KEY environment variable');
-                console.log('   Example: export OPENAI_API_KEY="your-actual-api-key"');
-            } else if (error.message.includes('Milvus') || error.message.includes('connect')) {
-                console.log('\n💡 Please make sure Milvus service is running');
-                console.log('   - Default address: localhost:19530');
-                console.log('   - Can be modified via MILVUS_ADDRESS environment variable');
-                console.log('   - For RESTful API: set MILVUS_USE_RESTFUL=true');
-                console.log('   - For gRPC (default): set MILVUS_USE_RESTFUL=false or leave unset');
-                console.log('   - Start Milvus: docker run -p 19530:19530 milvusdb/milvus:latest');
-            }
-
-            console.log('\n💡 Environment Variables:');
-            console.log('   - OPENAI_API_KEY: Your OpenAI API key (required)');
-            console.log('   - OPENAI_BASE_URL: Custom OpenAI API endpoint (optional)');
-            console.log('   - MILVUS_ADDRESS: Milvus server address (default: localhost:19530)');
-            console.log('   - MILVUS_TOKEN: Milvus authentication token (optional)');
-            console.log('   - SPLITTER_TYPE: Code splitter type - "ast" or "langchain" (default: ast)');
-        }
-
         process.exit(1);
     }
 }
