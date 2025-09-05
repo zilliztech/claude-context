@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { MerkleDAG } from './merkle';
 import * as os from 'os';
+import { simpleGlobMatch } from '../utils';
 
 export class FileSynchronizer {
     private fileHashes: Map<string, string>;
@@ -95,7 +96,6 @@ export class FileSynchronizer {
                             const hash = await this.hashFile(fullPath);
                             fileHashes.set(relativePath, hash);
                         }
-
                     } catch (error: any) {
                         console.warn(`Cannot hash file ${fullPath}: ${error.message}`);
                         continue;
@@ -140,20 +140,20 @@ export class FileSynchronizer {
                 // Check directory patterns
                 if (pattern.endsWith('/')) {
                     const dirPattern = pattern.slice(0, -1);
-                    if (this.simpleGlobMatch(partialPath, dirPattern) ||
-                        this.simpleGlobMatch(normalizedPathParts[i], dirPattern)) {
+                    if (simpleGlobMatch(partialPath, dirPattern) ||
+                        simpleGlobMatch(normalizedPathParts[i], dirPattern)) {
                         return true;
                     }
                 }
                 // Check exact path patterns
                 else if (pattern.includes('/')) {
-                    if (this.simpleGlobMatch(partialPath, pattern)) {
+                    if (simpleGlobMatch(partialPath, pattern)) {
                         return true;
                     }
                 }
                 // Check filename patterns against any path component
                 else {
-                    if (this.simpleGlobMatch(normalizedPathParts[i], pattern)) {
+                    if (simpleGlobMatch(normalizedPathParts[i], pattern)) {
                         return true;
                     }
                 }
@@ -178,30 +178,18 @@ export class FileSynchronizer {
             const dirPattern = cleanPattern.slice(0, -1);
 
             // Direct match or any path component matches
-            return this.simpleGlobMatch(cleanPath, dirPattern) ||
-                cleanPath.split('/').some(part => this.simpleGlobMatch(part, dirPattern));
+            return simpleGlobMatch(cleanPath, dirPattern) ||
+                cleanPath.split('/').some(part => simpleGlobMatch(part, dirPattern));
         }
 
         // Handle path patterns (containing /)
         if (cleanPattern.includes('/')) {
-            return this.simpleGlobMatch(cleanPath, cleanPattern);
+            return simpleGlobMatch(cleanPath, cleanPattern);
         }
 
         // Handle filename patterns (no /) - match against basename
         const fileName = path.basename(cleanPath);
-        return this.simpleGlobMatch(fileName, cleanPattern);
-    }
-
-    private simpleGlobMatch(text: string, pattern: string): boolean {
-        if (!text || !pattern) return false;
-
-        // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-            .replace(/\*/g, '.*'); // Convert * to .*
-
-        const regex = new RegExp(`^${regexPattern}$`);
-        return regex.test(text);
+        return simpleGlobMatch(fileName, cleanPattern);
     }
 
     private buildMerkleDAG(fileHashes: Map<string, string>): MerkleDAG {
@@ -234,6 +222,31 @@ export class FileSynchronizer {
         await this.loadSnapshot(serverSnapshot);
         this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
         console.log(`[${new Date().toLocaleString()}] File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
+    }
+
+    /**
+     * Update file hashes for given file paths
+     * @param filePaths List of file paths to update hashes for
+     */
+    public async updateFileHashes(filePaths: string[]): Promise<void> {
+        console.log(`[${new Date().toLocaleString()}] Updating file hashes for ${filePaths.length} files`);
+        
+        for (const filePath of filePaths) {
+            try {
+                const hash = await this.hashFile(filePath);
+                this.fileHashes.set(filePath, hash);
+            } catch (error) {
+                console.warn(`Failed to hash file ${filePath}:`, error);
+            }
+        }
+
+        // Rebuild merkle DAG with updated hashes
+        this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
+        
+        // Save updated snapshot
+        await this.saveSnapshot();
+        
+        console.log(`[${new Date().toLocaleString()}] Finished updating file hashes`);
     }
 
     public async checkForChanges(): Promise<{ added: string[], removed: string[], modified: string[] }> {

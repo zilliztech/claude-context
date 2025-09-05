@@ -3,11 +3,13 @@ import { Context, FileSynchronizer } from "@suoshengzhang/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import { getGitRepoName, checkServerSnapshot } from "@suoshengzhang/claude-context-core";
 import { CodebaseInfoIndexed } from "./config.js";
+import { ProjectFileMonitor } from "./file-monitor.js";
 
 export class SyncManager {
     private context: Context;
     private snapshotManager: SnapshotManager;
     private isSyncing: boolean = false;
+    private fileWatcherMap: Map<string, ProjectFileMonitor> = new Map();
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
@@ -56,27 +58,39 @@ export class SyncManager {
             console.log(`[SYNC-DEBUG][${logId}] Index sync already in progress. Skipping.`);
             return;
         }
+
         this.isSyncing = true;
 
         const syncStartTime = Date.now();
         console.log(`[SYNC-DEBUG][${logId}] handleSyncIndex() called at ${new Date().toISOString()}`);
 
-        const indexedCodebases = this.snapshotManager.getIndexedCodebases();
-
-        if (indexedCodebases.length === 0) {
-            console.log(`[SYNC-DEBUG][${logId}] No codebases indexed. Skipping sync.`);
-            return;
-        }
-
-        console.log(`[SYNC-DEBUG][${logId}] Found ${indexedCodebases.length} indexed codebases:`, indexedCodebases);
-        console.log(`[SYNC-DEBUG][${logId}] Starting index sync for all ${indexedCodebases.length} codebases...`);
-
         try {
+            const indexedCodebases = this.snapshotManager.getIndexedCodebases();
+            if (indexedCodebases.length === 0) {
+                console.log(`[SYNC-DEBUG][${logId}] No codebases indexed. Skipping sync.`);
+                return;
+            }
+    
+            console.log(`[SYNC-DEBUG][${logId}] Found ${indexedCodebases.length} indexed codebases:`, indexedCodebases);
+            console.log(`[SYNC-DEBUG][${logId}] Starting index sync for all ${indexedCodebases.length} codebases...`);
+
             let totalStats = { added: 0, removed: 0, modified: 0 };
 
             for (let i = 0; i < indexedCodebases.length; i++) {
                 const codebasePath = indexedCodebases[i];
                 const codebaseStartTime = Date.now();
+
+                if (!this.fileWatcherMap.has(codebasePath)) {
+                    console.log(`[SYNC-DEBUG][${logId}] Starting file watcher for codebase: '${codebasePath}'`);
+                    const fileWatcher = new ProjectFileMonitor({
+                        usePolling: false,
+                        pollingInterval: 3000,
+                        queueProcessInterval: 3000,
+                    }, this.context, codebasePath);
+
+                    this.fileWatcherMap.set(codebasePath, fileWatcher);
+                    fileWatcher.start();
+                }
 
                 console.log(`[SYNC-DEBUG][${logId}] [${i + 1}/${indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
 
@@ -202,12 +216,12 @@ export class SyncManager {
         }, 5000); // Initial sync after 5 seconds
 
         // Periodically check for file changes and update the index
-        console.log('[SYNC-DEBUG] Setting up periodic sync every 1 minutes (60000ms)');
+        console.log('[SYNC-DEBUG] Setting up periodic sync every 5 minutes (300000ms)');
         const syncInterval = setInterval(() => {
             const logId = String(Date.now());
             console.log(`[SYNC-DEBUG][${logId}] Executing scheduled periodic sync`);
             this.handleSyncIndex(logId);
-        }, 1 * 60 * 1000); // every 1 minutes
+        }, 5 * 60 * 1000); // every 5 minutes
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
     }

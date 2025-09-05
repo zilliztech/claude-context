@@ -3,12 +3,91 @@ import { envManager } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
 import { ChromaClient } from "chromadb";
 import * as fs from 'fs';
+import { matchesIgnorePattern } from '@suoshengzhang/claude-context-core';
 
 // Try to load .env file
 try {
     require('dotenv').config();
 } catch (error) {
     // dotenv is not required, skip if not installed
+}
+
+/**
+ * Generate a snapshot file for the given codebase directory
+ * @param rootDir Absolute path to codebase directory
+ * @param ignorePatterns Optional array of glob patterns to ignore
+ * @returns Promise that resolves when snapshot is generated
+ */
+async function generateSnapshot(rootDir: string, ignorePatterns: string[] = []): Promise<void> {
+    try {
+        console.log(`Generating snapshot for codebase: ${rootDir}`);
+
+        // Create synchronizer instance with provided ignore patterns
+        const { FileSynchronizer } = await import('@suoshengzhang/claude-context-core');
+        const synchronizer = new FileSynchronizer(rootDir, ignorePatterns);
+
+        // Initialize will generate initial hashes and save snapshot
+        await synchronizer.initialize();
+
+        console.log('✅ Snapshot generated successfully');
+    } catch (error: any) {
+        console.error('Failed to generate snapshot:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * Get the Git repository name from a folder path by looking for the .git directory
+ * and reading the remote origin URL from the git config
+ * @param folderPath Path to folder to check
+ * @returns Repository name or null if not a git repo
+ */
+async function getGitRepoName(folderPath: string): Promise<string | null> {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+
+        // Walk up directory tree looking for .git folder
+        let currentPath = folderPath;
+        let gitDir = null;
+
+        while (currentPath !== path.parse(currentPath).root) {
+            const potentialGitDir = path.join(currentPath, '.git');
+            if (fs.existsSync(potentialGitDir)) {
+                gitDir = potentialGitDir;
+                break;
+            }
+            currentPath = path.dirname(currentPath);
+        }
+
+        if (!gitDir) {
+            return null;
+        }
+
+        // Read config file to get remote origin URL
+        const configPath = path.join(gitDir, 'config');
+        const config = fs.readFileSync(configPath, 'utf8');
+
+        // Extract remote origin URL using regex
+        const originUrlMatch = config.match(/\[remote "origin"\][\s\S]*?url = (.+)/);
+        if (!originUrlMatch) {
+            return null;
+        }
+
+        const originUrl = originUrlMatch[1].trim();
+
+        // Extract repo name from URL
+        const repoNameMatch = originUrl.match(/\/([^\/]+?)(\.git)?$/);
+        if (!repoNameMatch) {
+            return null;
+        }
+
+        return repoNameMatch[1];
+
+    } catch (error) {
+        console.error('Error getting git repo name:', error);
+        return null;
+    }
 }
 
 async function searchCodePath(codebasePath: string, queries: string[]) {
@@ -45,52 +124,6 @@ async function searchCodePath(codebasePath: string, queries: string[]) {
         console.log(results);
     }
 
-}
-
-
-function isPatternMatch(filePath: string, pattern: string): boolean {
-    // Handle directory patterns (ending with /)
-    if (pattern.endsWith('/')) {
-        const dirPattern = pattern.slice(0, -1);
-        const pathParts = filePath.split('/');
-        return pathParts.some(part => simpleGlobMatch(part, dirPattern));
-    }
-
-    // Handle file patterns
-    if (pattern.includes('/')) {
-        // Pattern with path separator - match exact path
-        return simpleGlobMatch(filePath, pattern);
-    } else {
-        // Pattern without path separator - match filename in any directory
-        const fileName = path.basename(filePath);
-        return simpleGlobMatch(fileName, pattern);
-    }
-}
-
-function simpleGlobMatch(text: string, pattern: string): boolean {
-    // Convert glob pattern to regex
-    const regexPattern = pattern
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-        .replace(/\*/g, '.*'); // Convert * to .*
-
-    const regex = new RegExp(`^${regexPattern}$`);
-    return regex.test(text);
-}
-
-function matchesIgnorePattern(filePath: string, basePath: string): boolean {
-    const relativePath = path.relative(basePath, filePath);
-    const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
-
-    let ignorePatterns = [
-        "obj/"
-    ];
-    for (const pattern of ignorePatterns) {
-        if (isPatternMatch(normalizedPath, pattern)) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 function testMatch() {
@@ -255,6 +288,44 @@ async function testSemanticSearch(codebasePath: string, query: string) {
     console.log(results);
 }
 
+function matchesPattern(filePath: string, pattern: string): boolean {
+    // Convert pattern to regex
+    const regexPattern = pattern
+        .replace(/\./g, '\\.')
+        .replace(/\*\*/g, '.*')
+        .replace(/\*/g, '[^/]*')
+        .replace(/\?/g, '[^/]');
+
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(filePath);
+}
+
+async function testSemanticSearch(codebasePath: string, query: string) {
+    let host = 'localhost';
+    let port = 19801;
+
+    let vectorDatabase = new ChromaVectorDatabase({
+        host: host,
+        port: port
+    });
+
+    let codeAgentEndpoint = 'https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/';
+    let embedding = new AzureOpenAIEmbedding({
+        codeAgentEmbEndpoint: codeAgentEndpoint,
+        model: 'text-embedding-3-large',
+    });
+
+    let context = new Context({
+        embedding,
+        vectorDatabase,
+        codeAgentEndpoint: codeAgentEndpoint,
+        // codeSplitter: new LangChainCodeSplitter(1000, 200),
+    });
+
+    let results = await context.semanticSearch(query, codebasePath, 3, 0.3, undefined, 'AdsSnR');
+    console.log(results);
+}
+
 
 async function processReIndex(codebasePath: string) {
     let host = 'localhost';
@@ -265,7 +336,8 @@ async function processReIndex(codebasePath: string) {
     });
     let codeAgentEndpoint = 'https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/';
     let embedding = new AzureOpenAIEmbedding({
-        codeAgentEmbEndpoint: codeAgentEndpoint
+        codeAgentEmbEndpoint: codeAgentEndpoint,
+        model: 'text-embedding-3-large',
     });
     let context = new Context({
         embedding,
@@ -285,18 +357,50 @@ async function testSplitCode(codeFilePath: string) {
     console.log(chunks);
 }
 
+async function testFileSynchronizer() {
+    let host = 'localhost';
+    let port = 19801;
+    let vectorDatabase = new ChromaVectorDatabase({
+        host: host,
+        port: port
+    });
+    let codeAgentEndpoint = 'https://cppcodeanalyzer-efaxdbfzc2auexad.eastasia-01.azurewebsites.net/';
+    let embedding = new AzureOpenAIEmbedding({
+        codeAgentEmbEndpoint: codeAgentEndpoint,
+        model: 'text-embedding-3-large',
+    });
+    let context = new Context({
+        embedding,
+        vectorDatabase,
+        codeAgentEndpoint: codeAgentEndpoint,
+    });
 
-async function main() {
+    let synchronizer = new ProjectFileMonitor({
+        debounceMs: 100,
+        usePolling: false,
+        pollingInterval: 1000,
+    }, context, "D:/src/simple_repo");
+
+    synchronizer.start();
+}
+
+async function main(): Promise<void> {
     console.log('🚀 Context Real Usage Example');
     console.log('===============================');
 
     try {
 
-        await processReIndex("D:/src/AdsSnR");
+        // await testFileSynchronizer();
+
+        // await new Promise(  resolve => setTimeout(resolve, 1000000));
+
+
+        // Keep the process running
+        // await processReIndex("D:/src/AdsSnR");
 
         // testSplitCode("D:/src/AdsSnR/private/De.Snr.Compass.Product/BackendWorker/Program.cs");
 
-        // testSemanticSearch("D:/src/AdsSnR", "LocalDebugMode");
+        testSemanticSearch("D:/src/adssnr", "submitWangttTest");
 
         // const filePath = "D:/src/AdsSnR/QLocal/cmd/z/CredScan_rolling.yaml";
         // console.log(shouldIgnoreFile(filePath));

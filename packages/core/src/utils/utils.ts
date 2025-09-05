@@ -94,3 +94,52 @@ export async function checkServerSnapshot(codeAgentEndpoint: string, codebasePat
         };
     }
 }
+
+export function simpleGlobMatch(text: string, pattern: string): boolean {
+    if (!text || !pattern) return false;
+
+    // Convert glob pattern to regex
+    const regexPattern = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
+        .replace(/\*/g, '.*'); // Convert * to .*
+
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(text);
+}
+
+
+export function isPatternMatch(filePath: string, pattern: string): boolean {
+    // Handle directory patterns (ending with /)
+    if (pattern.endsWith('/')) {
+        const dirPattern = pattern.slice(0, -1);
+        const pathParts = filePath.split('/');
+        return pathParts.some(part => simpleGlobMatch(part, dirPattern));
+    }
+
+    // Handle file patterns
+    if (pattern.includes('/')) {
+        // Pattern with path separator - match exact path
+        return simpleGlobMatch(filePath, pattern);
+    } else {
+        // Pattern without path separator - match filename in any directory
+        const fileName = path.basename(filePath);
+        return simpleGlobMatch(fileName, pattern);
+    }
+}
+
+export function matchesIgnorePattern(filePath: string, basePath: string, ignorePatterns: string[] = []): boolean {
+    if (ignorePatterns.length === 0) {
+        return false;
+    }
+
+    const relativePath = path.relative(basePath, filePath);
+    const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
+
+    for (const pattern of ignorePatterns) {
+        if (isPatternMatch(normalizedPath, pattern)) {
+            return true;
+        }
+    }
+
+    return false;
+}
