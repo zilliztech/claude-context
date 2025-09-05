@@ -145,6 +145,56 @@ class ChromaDBClient:
         except Exception as e:
             print(f"Error getting top records from collection '{collection_name}': {e}")
             return {'error': str(e)}
+
+    def query_by_relative_path(self, collection_name: str, relative_path: str, 
+                              limit: int = 100, exact_match: bool = True) -> Dict[str, Any]:
+        """Query records by metadata.relativePath."""
+        try:
+            collection = self.client.get_collection(collection_name)
+           
+            # Build where condition for relativePath
+            if exact_match:
+                where_condition = {"relativePath": relative_path}
+            else:
+                # For partial matches, we'll need to get all records and filter
+                # This is less efficient but necessary for partial matching
+                where_condition = None
+           
+            # Build query parameters
+            query_params = {'limit': limit}
+            if where_condition:
+                query_params['where'] = where_condition
+           
+            results = collection.get(**query_params)
+           
+            records = []
+            for i in range(len(results['ids'])):
+                record = {
+                    'id': results['ids'][i],
+                    'document': results['documents'][i] if results.get('documents') else None,
+                    'metadata': results['metadatas'][i] if results.get('metadatas') else None,
+                    'embeddings': results['embeddings'][i] if results.get('embeddings') else None
+                }
+                
+                # If not exact match, filter by partial path match
+                if not exact_match and record['metadata']:
+                    record_relative_path = record['metadata'].get('relativePath', '')
+                    if relative_path.lower() in record_relative_path.lower():
+                        records.append(record)
+                elif exact_match:
+                    records.append(record)
+           
+            return {
+                'collection_name': collection_name,
+                'relative_path': relative_path,
+                'exact_match': exact_match,
+                'total_found': len(records),
+                'records': records
+            }
+           
+        except Exception as e:
+            print(f"Error querying by relative path '{relative_path}' in collection '{collection_name}': {e}")
+            return {'error': str(e)}
  
     def create_collection(self, collection_name: str, metadata: Optional[Dict] = None, 
                          embedding_function: Optional[str] = None) -> Dict[str, Any]:
@@ -260,7 +310,7 @@ def print_record_details(result: Dict[str, Any], format_output: str = 'table'):
         print(f"\nRecord {i}:")
         print(f"ID: {record['id']}")
         if record['document']:
-            doc_preview = record['document'][:100] + "..." if len(str(record['document'])) > 100 else record['document']
+            doc_preview = record['document'] + "..." if len(str(record['document'])) > 100 else record['document']
             print(f"Document: {doc_preview}")
         if record['metadata']:
             print(f"Metadata: {json.dumps(record['metadata'], indent=2)}")
@@ -309,6 +359,38 @@ def print_create_result(result: Dict[str, Any], format_output: str = 'table'):
             print(f"Metadata: {json.dumps(result['metadata'], indent=2)}")
     else:
         print(f"✗ Error: {result['error']}")
+
+
+def print_relative_path_results(result: Dict[str, Any], format_output: str = 'table'):
+    """Print relative path query results in specified format."""
+    if format_output == 'json':
+        print(json.dumps(result, indent=2))
+        return
+   
+    if 'error' in result:
+        print(f"Error: {result['error']}")
+        return
+   
+    match_type = "exact" if result['exact_match'] else "partial"
+    print(f"\nRecords with {match_type} relative path match '{result['relative_path']}' in collection '{result['collection_name']}':")
+    print("=" * 80)
+    print(f"Total records found: {result['total_found']}")
+    print("-" * 80)
+   
+    for i, record in enumerate(result['records'], 1):
+        print(f"\nRecord {i}:")
+        print(f"ID: {record['id']}")
+        if record['metadata'] and 'relativePath' in record['metadata']:
+            print(f"Relative Path: {record['metadata']['relativePath']}")
+        if record['document']:
+            doc_preview = record['document'][:100] + "..." if len(str(record['document'])) > 100 else record['document']
+            print(f"Document: {doc_preview}")
+        if record['metadata']:
+            # Don't show relativePath again since we already showed it
+            metadata_copy = {k: v for k, v in record['metadata'].items() if k != 'relativePath'}
+            if metadata_copy:
+                print(f"Other Metadata: {json.dumps(metadata_copy, indent=2)}")
+        print("-" * 40)
  
  
 def main():
@@ -326,6 +408,8 @@ Examples:
   %(prog)s query --collection my_collection --limit 10
   %(prog)s top --collection my_collection --limit 5
   %(prog)s top --collection my_collection --limit 20 --where '{"type": "code"}'
+  %(prog)s path --collection my_collection --path "src/main.py"
+  %(prog)s path --collection my_collection --path "src" --partial --limit 50
   %(prog)s delete --collection my_collection
         """
     )
@@ -358,6 +442,13 @@ Examples:
     top_parser.add_argument('--collection', required=True, help='Collection name')
     top_parser.add_argument('--limit', type=int, default=10, help='Number of records to return (default: 10)')
     top_parser.add_argument('--where', help='JSON filter condition')
+   
+    # Relative path query command
+    path_parser = subparsers.add_parser('path', help='Query records by metadata.relativePath')
+    path_parser.add_argument('--collection', required=True, help='Collection name')
+    path_parser.add_argument('--path', required=True, help='Relative path to search for')
+    path_parser.add_argument('--limit', type=int, default=100, help='Maximum number of records to return (default: 100)')
+    path_parser.add_argument('--partial', action='store_true', help='Enable partial path matching (case-insensitive)')
    
     # Delete command
     delete_parser = subparsers.add_parser('delete', help='Delete a collection')
@@ -431,6 +522,15 @@ Examples:
         result = client.get_top_records(args.collection, limit=args.limit, where=where)
         print_top_records(result, args.format)
    
+    elif args.command == 'path':
+        result = client.query_by_relative_path(
+            args.collection, 
+            args.path, 
+            limit=args.limit, 
+            exact_match=not args.partial
+        )
+        print_relative_path_results(result, args.format)
+   
     elif args.command == 'delete':
         if not args.confirm:
             # Ask for confirmation
@@ -455,6 +555,8 @@ Examples:
 # python chromadb_test.py query --collection code_chunks --ids chunk_001,chunk_002
 # python chromadb_test.py top --collection code_chunks --limit 5
 # python chromadb_test.py top --collection code_chunks --limit 10 --where '{"type": "documentation"}'
+# python chromadb_test.py path --collection code_chunks --path "src/main.py"
+# python chromadb_test.py path --collection code_chunks --path "src" --partial --limit 50
 # python chromadb_test.py delete --collection old_collection
 # python chromadb_test.py --host remote-server.com --port 19801 list
  

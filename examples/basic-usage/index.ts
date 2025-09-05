@@ -3,7 +3,6 @@ import { envManager } from '@suoshengzhang/claude-context-core';
 import * as path from 'path';
 import { ChromaClient } from "chromadb";
 import * as fs from 'fs';
-import { ProjectFileMonitor } from './file-monitor';
 import { matchesIgnorePattern } from '@suoshengzhang/claude-context-core';
 
 // Try to load .env file
@@ -323,7 +322,7 @@ async function testSemanticSearch(codebasePath: string, query: string) {
         // codeSplitter: new LangChainCodeSplitter(1000, 200),
     });
 
-    let results = await context.semanticSearch(query, codebasePath, 3, 0.3, undefined, 'simple_repo');
+    let results = await context.semanticSearch(query, codebasePath, 3, 0.3, undefined, 'AdsSnR');
     console.log(results);
 }
 
@@ -401,7 +400,7 @@ async function main(): Promise<void> {
 
         // testSplitCode("D:/src/AdsSnR/private/De.Snr.Compass.Product/BackendWorker/Program.cs");
 
-        testSemanticSearch("D:/src/simple_repo", "ResetItemData");
+        testSemanticSearch("D:/src/adssnr", "submitWangttTest");
 
         // const filePath = "D:/src/AdsSnR/QLocal/cmd/z/CredScan_rolling.yaml";
         // console.log(shouldIgnoreFile(filePath));

@@ -224,6 +224,31 @@ export class FileSynchronizer {
         console.log(`[${new Date().toLocaleString()}] File synchronizer initialized. Loaded ${this.fileHashes.size} file hashes.`);
     }
 
+    /**
+     * Update file hashes for given file paths
+     * @param filePaths List of file paths to update hashes for
+     */
+    public async updateFileHashes(filePaths: string[]): Promise<void> {
+        console.log(`[${new Date().toLocaleString()}] Updating file hashes for ${filePaths.length} files`);
+        
+        for (const filePath of filePaths) {
+            try {
+                const hash = await this.hashFile(filePath);
+                this.fileHashes.set(filePath, hash);
+            } catch (error) {
+                console.warn(`Failed to hash file ${filePath}:`, error);
+            }
+        }
+
+        // Rebuild merkle DAG with updated hashes
+        this.merkleDAG = this.buildMerkleDAG(this.fileHashes);
+        
+        // Save updated snapshot
+        await this.saveSnapshot();
+        
+        console.log(`[${new Date().toLocaleString()}] Finished updating file hashes`);
+    }
+
     public async checkForChanges(): Promise<{ added: string[], removed: string[], modified: string[] }> {
         console.log('Checking for file changes...');
 

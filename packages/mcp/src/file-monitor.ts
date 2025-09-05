@@ -92,7 +92,7 @@ export class ProjectFileMonitor {
     }
 
     this.isProcessRunning = true;
-    let tmpQueue = new Set<string>();
+    let changedFiles: string[] = [];
     await this.queueSemaphore.acquire();
     try {
       if (this.fileChangeQueue.size === 0) {
@@ -100,11 +100,7 @@ export class ProjectFileMonitor {
         return;
       }
 
-      const changedFiles = Array.from(this.fileChangeQueue);
-      changedFiles.forEach((filePath, index) => {
-        tmpQueue.add(filePath);
-      });
-
+      changedFiles = Array.from(this.fileChangeQueue);
       // Clear the queue after processing
       this.fileChangeQueue.clear();
       console.log(`[FileMonitor] Queue cleared. Processed ${changedFiles.length} files.`);
@@ -112,9 +108,16 @@ export class ProjectFileMonitor {
       this.queueSemaphore.release();
     }
 
-    if (tmpQueue.size === 0) {
+    if (changedFiles.length === 0) {
       this.isProcessRunning = false;
       return;
+    }
+
+    // update the file hash in snapshot manager to avoid re-indexing
+    try {
+      await this.context.getSynchronizer(this.codebasePath)?.updateFileHashes(changedFiles);
+    } catch (error) {
+      console.error(`[FileMonitor] Failed to update file hashes:`, error);
     }
 
     try {
@@ -124,7 +127,7 @@ export class ProjectFileMonitor {
         return;
       }
 
-      for (const filePath of tmpQueue) {
+      for (const filePath of changedFiles) {
         const relativePath = path.relative(this.codebasePath, filePath);
         const normalizedPath = relativePath.replace(/\//g, '\\');
         console.log(`[FileMonitor] Deleting file chunks for ${normalizedPath}`);
@@ -132,7 +135,7 @@ export class ProjectFileMonitor {
       }
 
       await this.context.processFileList(
-        Array.from(tmpQueue),
+        changedFiles,
         this.codebasePath,
         (filePath, fileIndex, totalFiles) => {
             console.log(`[FileMonitor] Indexed ${filePath} (${fileIndex}/${totalFiles})`);
