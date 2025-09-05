@@ -303,12 +303,18 @@ async function initializeConfigAndChroma(config: ContextMcpConfig) {
 
 // Main execution
 async function main() {
+    console.log('Sleeping for 10 seconds...');
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    console.log('Starting MCP server...');
+
     // Parse command line arguments
     const args = process.argv.slice(2);
+    console.log('Args:', args);
 
     // Show help if requested
     if (args.includes('--help') || args.includes('-h')) {
         showHelpMessage();
+        console.log('Showing help message, exiting...');
         process.exit(0);
     }
 

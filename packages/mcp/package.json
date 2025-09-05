@@ -1,6 +1,6 @@
 {
     "name": "@suoshengzhang/claude-context-mcp",
-    "version": "1.0.19",
+    "version": "1.0.20",
     "description": "Model Context Protocol integration for AdsDE code agent",
     "type": "module",
     "main": "dist/index.js",
