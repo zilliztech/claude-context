@@ -23,7 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { FileSynchronizer } from './sync/synchronizer';
-import { getGitRepoName } from './utils/utils';
+import { getGitRepoName, matchesIgnorePattern } from './utils/utils';
 
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
@@ -81,6 +81,7 @@ const DEFAULT_IGNORE_PATTERNS = [
     '.env',
     '.env.*',
     '*.local',
+    '*.bin',
 
     // Minified and bundled files
     '*.min.js',
@@ -850,7 +851,7 @@ export class Context {
                 const fullPath = path.join(currentPath, entry.name);
 
                 // Check if path matches ignore patterns
-                if (this.matchesIgnorePattern(fullPath, codebasePath)) {
+                if (matchesIgnorePattern(fullPath, codebasePath, this.ignorePatterns)) {
                     continue;
                 }
 
@@ -876,7 +877,7 @@ export class Context {
  * @param onFileProcessed Callback called when each file is processed
  * @returns Object with processed file count and total chunk count
  */
-    private async processFileList(
+    public async processFileList(
         filePaths: string[],
         codebasePath: string,
         onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void
@@ -1248,70 +1249,6 @@ export class Context {
             }
             return [];
         }
-    }
-
-    /**
-     * Check if a path matches any ignore pattern
-     * @param filePath Path to check
-     * @param basePath Base path for relative pattern matching
-     * @returns True if path should be ignored
-     */
-    private matchesIgnorePattern(filePath: string, basePath: string): boolean {
-        if (this.ignorePatterns.length === 0) {
-            return false;
-        }
-
-        const relativePath = path.relative(basePath, filePath);
-        const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
-
-        for (const pattern of this.ignorePatterns) {
-            if (this.isPatternMatch(normalizedPath, pattern)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Simple glob pattern matching
-     * @param filePath File path to test
-     * @param pattern Glob pattern
-     * @returns True if pattern matches
-     */
-    private isPatternMatch(filePath: string, pattern: string): boolean {
-        // Handle directory patterns (ending with /)
-        if (pattern.endsWith('/')) {
-            const dirPattern = pattern.slice(0, -1);
-            const pathParts = filePath.split('/');
-            return pathParts.some(part => this.simpleGlobMatch(part, dirPattern));
-        }
-
-        // Handle file patterns
-        if (pattern.includes('/')) {
-            // Pattern with path separator - match exact path
-            return this.simpleGlobMatch(filePath, pattern);
-        } else {
-            // Pattern without path separator - match filename in any directory
-            const fileName = path.basename(filePath);
-            return this.simpleGlobMatch(fileName, pattern);
-        }
-    }
-
-    /**
-     * Simple glob matching supporting * wildcard
-     * @param text Text to test
-     * @param pattern Pattern with * wildcards
-     * @returns True if pattern matches
-     */
-    private simpleGlobMatch(text: string, pattern: string): boolean {
-        // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-            .replace(/\*/g, '.*'); // Convert * to .*
-
-        const regex = new RegExp(`^${regexPattern}$`);
-        return regex.test(text);
     }
 
     /**

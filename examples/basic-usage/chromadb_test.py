@@ -146,6 +146,43 @@ class ChromaDBClient:
             print(f"Error getting top records from collection '{collection_name}': {e}")
             return {'error': str(e)}
  
+    def create_collection(self, collection_name: str, metadata: Optional[Dict] = None, 
+                         embedding_function: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new collection."""
+        try:
+            # Check if collection already exists
+            collections = self.client.list_collections()
+            collection_names = [c.name for c in collections]
+           
+            if collection_name in collection_names:
+                return {
+                    'success': False,
+                    'error': f"Collection '{collection_name}' already exists"
+                }
+           
+            # Create the collection
+            collection = self.client.create_collection(
+                name=collection_name,
+                metadata={
+                    'description': "Claude Context collection",
+                    'dimension': 3072
+                }
+            )
+           
+            return {
+                'success': True,
+                'collection_name': collection_name,
+                'metadata': collection.metadata or {},
+                'message': f"Collection '{collection_name}' created successfully"
+            }
+           
+        except Exception as e:
+            print(f"Error creating collection '{collection_name}': {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
     def delete_collection(self, collection_name: str) -> Dict[str, Any]:
         """Delete a collection by name."""
         try:
@@ -254,6 +291,24 @@ def print_top_records(result: Dict[str, Any], format_output: str = 'table'):
         if record['metadata']:
             print(f"Metadata: {json.dumps(record['metadata'], indent=2)}")
         print("-" * 40)
+
+
+def print_create_result(result: Dict[str, Any], format_output: str = 'table'):
+    """Print create collection result in specified format."""
+    if format_output == 'json':
+        print(json.dumps(result, indent=2))
+        return
+   
+    if 'error' in result:
+        print(f"✗ Error: {result['error']}")
+        return
+   
+    if result['success']:
+        print(f"✓ {result['message']}")
+        if result.get('metadata'):
+            print(f"Metadata: {json.dumps(result['metadata'], indent=2)}")
+    else:
+        print(f"✗ Error: {result['error']}")
  
  
 def main():
@@ -265,6 +320,8 @@ def main():
 Examples:
   %(prog)s list
   %(prog)s list --format json
+  %(prog)s create --collection my_collection
+  %(prog)s create --collection my_collection --metadata '{"description": "My collection"}'
   %(prog)s query --collection my_collection --ids id1,id2,id3
   %(prog)s query --collection my_collection --limit 10
   %(prog)s top --collection my_collection --limit 5
@@ -283,6 +340,11 @@ Examples:
    
     # List command
     list_parser = subparsers.add_parser('list', help='List all collections')
+   
+    # Create command
+    create_parser = subparsers.add_parser('create', help='Create a new collection')
+    create_parser.add_argument('--collection', required=True, help='Collection name')
+    create_parser.add_argument('--metadata', help='JSON metadata for the collection')
    
     # Query command
     query_parser = subparsers.add_parser('query', help='Query records from a collection')
@@ -314,6 +376,19 @@ Examples:
     if args.command == 'list':
         collections = client.list_collections()
         print_collections(collections, args.format)
+   
+    elif args.command == 'create':
+        # Parse metadata if provided
+        metadata = None
+        if args.metadata:
+            try:
+                metadata = json.loads(args.metadata)
+            except json.JSONDecodeError:
+                print("Error: Invalid JSON in --metadata parameter")
+                return
+       
+        result = client.create_collection(args.collection, metadata=metadata)
+        print_create_result(result, args.format)
    
     elif args.command == 'query':
         # Parse IDs if provided
@@ -375,6 +450,8 @@ Examples:
  
  
 # python chromadb_test.py list
+# python chromadb_test.py create --collection my_collection
+# python chromadb_test.py create --collection code_chunks_simple_repo --metadata '{"description": "My collection", "dimension": 3072}'
 # python chromadb_test.py query --collection code_chunks --ids chunk_001,chunk_002
 # python chromadb_test.py top --collection code_chunks --limit 5
 # python chromadb_test.py top --collection code_chunks --limit 10 --where '{"type": "documentation"}'
