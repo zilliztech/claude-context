@@ -20,17 +20,17 @@ function getTimePrefix() {
     return new Date().toISOString();
 }
 
-// console.log = (...args: any[]) => {
-//     const prefix = `[${getTimePrefix()}]`;
-//     logStream.write(`${prefix} [LOG] ${args.join(' ')}\n`);
-//     process.stderr.write(`${prefix} [LOG] ${args.join(' ')}\n`);
-// };
+console.log = (...args: any[]) => {
+    const prefix = `[${getTimePrefix()}]`;
+    logStream.write(`${prefix} [LOG] ${args.join(' ')}\n`);
+    process.stderr.write(`${prefix} [LOG] ${args.join(' ')}\n`);
+};
 
-// console.warn = (...args: any[]) => {
-//     const prefix = `[${getTimePrefix()}]`;
-//     logStream.write(`${prefix} [WARN] ${args.join(' ')}\n`);
-//     process.stderr.write(`${prefix} [WARN] ${args.join(' ')}\n`);
-// };
+console.warn = (...args: any[]) => {
+    const prefix = `[${getTimePrefix()}]`;
+    logStream.write(`${prefix} [WARN] ${args.join(' ')}\n`);
+    process.stderr.write(`${prefix} [WARN] ${args.join(' ')}\n`);
+};
 
 // console.error already goes to stderr by default
 
