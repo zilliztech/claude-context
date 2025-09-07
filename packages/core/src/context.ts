@@ -702,8 +702,9 @@ export class Context {
     ): Promise<{ processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(envManager.get('EMBEDDING_BATCH_SIZE') || '100', 10));
-        const CHUNK_LIMIT = 450000;
+        const CHUNK_LIMIT = Math.max(1000, parseInt(envManager.get('CHUNK_LIMIT') || '450000', 10));
         console.log(`[Context] 🔧 Using EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE}`);
+        console.log(`[Context] 🔧 Using CHUNK_LIMIT: ${CHUNK_LIMIT}`);
 
         let chunkBuffer: Array<{ chunk: CodeChunk; codebasePath: string }> = [];
         let processedFiles = 0;
