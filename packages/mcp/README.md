@@ -159,6 +159,10 @@ Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configurati
 
 ```bash
 MILVUS_TOKEN=your-zilliz-cloud-api-key
+
+# Optional: Specify Zilliz Cloud project name (defaults to 'Default Project')
+# Use this if you want to use a different project when auto-resolving address from token
+# ZILLIZ_PROJECT_NAME=My Custom Project
 ```
 
 #### Embedding Batch Size
