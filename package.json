@@ -45,5 +45,9 @@
         "url": "https://github.com/zilliztech/claude-context.git"
     },
     "license": "MIT",
-    "author": "Cheney Zhang <277584121@qq.com>"
+    "author": "Cheney Zhang <277584121@qq.com>",
+    "dependencies": {
+        "chromadb": "^3.0.14",
+        "pnpm": "^10.15.1"
+    }
 }

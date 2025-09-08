@@ -2,6 +2,9 @@
 node_modules/
 *.pnp
 .pnp.js
+*lock.json
+*lock.yaml
+
 
 # Production builds
 dist/
