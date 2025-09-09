@@ -9,12 +9,14 @@
         "dev": "tsx --watch index.ts"
     },
     "dependencies": {
-        "@zilliz/claude-context-core": "workspace:*"
+        "@zilliz/claude-context-core": "workspace:*",
+        "pg": "^8.11.3"
     },
     "devDependencies": {
         "tsx": "^4.0.0",
         "typescript": "^5.0.0",
         "@types/node": "^20.0.0",
+        "@types/pg": "^8.10.9",
         "dotenv": "^16.0.0"
     },
     "private": true

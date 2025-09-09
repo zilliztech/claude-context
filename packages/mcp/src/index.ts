@@ -21,8 +21,7 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { Context } from "@zilliz/claude-context-core";
-import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
+import { Context, MilvusVectorDatabase, PostgresVectorDatabase, VectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
@@ -59,11 +58,26 @@ class ContextMcpServer {
         const embedding = createEmbeddingInstance(config);
         logEmbeddingProviderInfo(config, embedding);
 
-        // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
-            address: config.milvusAddress,
-            ...(config.milvusToken && { token: config.milvusToken })
-        });
+        // Initialize vector database based on provider
+        let vectorDatabase: VectorDatabase;
+        if (config.vectorDatabaseProvider === 'postgres') {
+            console.log(`[VECTOR_DB] Initializing PostgreSQL vector database...`);
+            vectorDatabase = new PostgresVectorDatabase({
+                connectionString: config.postgresConnectionString,
+                host: config.postgresHost,
+                port: config.postgresPort,
+                database: config.postgresDatabase,
+                username: config.postgresUsername,
+                password: config.postgresPassword,
+                ssl: config.postgresSSL
+            });
+        } else {
+            console.log(`[VECTOR_DB] Initializing Milvus vector database...`);
+            vectorDatabase = new MilvusVectorDatabase({
+                address: config.milvusAddress,
+                ...(config.milvusToken && { token: config.milvusToken })
+            });
+        }
 
         // Initialize Claude Context
         this.context = new Context({
