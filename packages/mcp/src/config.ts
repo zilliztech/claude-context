@@ -253,13 +253,16 @@ Examples:
   # Start MCP server with OpenAI and specific model
   OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
-  # Start MCP server with VoyageAI and PostgreSQL
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx VECTOR_DATABASE_PROVIDER=postgres POSTGRES_HOST=localhost POSTGRES_DATABASE=vectordb POSTGRES_USERNAME=user POSTGRES_PASSWORD=pass npx @zilliz/claude-context-mcp@latest
+  # Start MCP server with VoyageAI and specific model
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with Gemini and specific model
   EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
-  # Start MCP server with Ollama and PostgreSQL
-  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large VECTOR_DATABASE_PROVIDER=postgres POSTGRES_CONNECTION_STRING=postgresql://localhost:5432/vectordb npx @zilliz/claude-context-mcp@latest
+  # Start MCP server with Ollama and specific model (using OLLAMA_MODEL)
+  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
         `);
 } 
