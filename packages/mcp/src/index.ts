@@ -2,18 +2,46 @@
 
 // CRITICAL: Redirect console outputs to stderr IMMEDIATELY to avoid interfering with MCP JSON protocol
 // Only MCP protocol messages should go to stdout
+import * as fs from 'fs';
+import * as path from 'path';
+
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
+
+// Create a log file for debugging (optional, controlled by environment variable)
+const enableFileLogging = process.env.MCP_LOG_FILE === 'true';
+const logFilePath = path.join(process.cwd(), 'claude_context_mcp.log');
+
+function writeToLogFile(level: string, message: string) {
+    if (enableFileLogging) {
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] ${level}: ${message}\n`;
+        try {
+            fs.appendFileSync(logFilePath, logEntry);
+        } catch (error) {
+            // Ignore file write errors to avoid breaking the server
+        }
+    }
+}
 
 console.log = (...args: any[]) => {
-    process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+    const message = args.join(' ');
+    process.stderr.write('[LOG] ' + message + '\n');
+    writeToLogFile('LOG', message);
 };
 
 console.warn = (...args: any[]) => {
-    process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+    const message = args.join(' ');
+    process.stderr.write('[WARN] ' + message + '\n');
+    writeToLogFile('WARN', message);
 };
 
-// console.error already goes to stderr by default
+console.error = (...args: any[]) => {
+    const message = args.join(' ');
+    originalConsoleError('[ERROR]', message);
+    writeToLogFile('ERROR', message);
+};
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
