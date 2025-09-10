@@ -9,6 +9,7 @@ import { MilvusRestfulVectorDatabase } from '../stubs/milvus-vectordb-stub';
 export interface CodeChunk {
     id: string;
     content: string;
+    branch: string;
     relativePath: string;
     startLine: number;
     endLine: number;
@@ -20,6 +21,7 @@ export interface CodeChunk {
 export interface SearchResult {
     id: string;
     content: string;
+    branch: string;
     relativePath: string;
     startLine: number;
     endLine: number;
@@ -113,6 +115,7 @@ export class ChromeMilvusAdapter {
             id: chunk.id,
             vector: chunk.vector || [],
             content: chunk.content,
+            branch: chunk.branch,
             relativePath: chunk.relativePath,
             startLine: chunk.startLine,
             endLine: chunk.endLine,
@@ -149,6 +152,7 @@ export class ChromeMilvusAdapter {
             const searchResults = results.map(result => ({
                 id: result.document.id,
                 content: result.document.content,
+                branch: result.document.branch,
                 relativePath: result.document.relativePath,
                 startLine: result.document.startLine,
                 endLine: result.document.endLine,
