@@ -63,6 +63,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `SPLITTER_TYPE` | Code splitter type: `ast`, `langchain` | `ast` |
 | `CUSTOM_EXTENSIONS` | Additional file extensions to include (comma-separated, e.g., `.vue,.svelte,.astro`) | None |
 | `CUSTOM_IGNORE_PATTERNS` | Additional ignore patterns (comma-separated, e.g., `temp/**,*.backup,private/**`) | None |
+| `CONTEXT_ENCRYPTION_KEY` | Encryption key for content encryption. Can be a 64-character hex string or any string (will be hashed). **Note: Only works in semantic search mode (`HYBRID_MODE=false`). Automatically disabled in hybrid mode as BM25 requires plain text.** | None (encryption disabled) |
 
 ## 🚀 Quick Setup
 
