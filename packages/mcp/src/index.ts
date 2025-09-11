@@ -2,18 +2,46 @@
 
 // CRITICAL: Redirect console outputs to stderr IMMEDIATELY to avoid interfering with MCP JSON protocol
 // Only MCP protocol messages should go to stdout
+import * as fs from 'fs';
+import * as path from 'path';
+
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
+
+// Create a log file for debugging (optional, controlled by environment variable)
+const enableFileLogging = process.env.MCP_LOG_FILE === 'true';
+const logFilePath = path.join(process.cwd(), 'claude_context_mcp.log');
+
+function writeToLogFile(level: string, message: string) {
+    if (enableFileLogging) {
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] ${level}: ${message}\n`;
+        try {
+            fs.appendFileSync(logFilePath, logEntry);
+        } catch (error) {
+            // Ignore file write errors to avoid breaking the server
+        }
+    }
+}
 
 console.log = (...args: any[]) => {
-    process.stderr.write('[LOG] ' + args.join(' ') + '\n');
+    const message = args.join(' ');
+    process.stderr.write('[LOG] ' + message + '\n');
+    writeToLogFile('LOG', message);
 };
 
 console.warn = (...args: any[]) => {
-    process.stderr.write('[WARN] ' + args.join(' ') + '\n');
+    const message = args.join(' ');
+    process.stderr.write('[WARN] ' + message + '\n');
+    writeToLogFile('WARN', message);
 };
 
-// console.error already goes to stderr by default
+console.error = (...args: any[]) => {
+    const message = args.join(' ');
+    originalConsoleError('[ERROR]', message);
+    writeToLogFile('ERROR', message);
+};
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -21,8 +49,7 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { Context } from "@zilliz/claude-context-core";
-import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
+import { Context, MilvusVectorDatabase, PostgresVectorDatabase, VectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
@@ -59,11 +86,26 @@ class ContextMcpServer {
         const embedding = createEmbeddingInstance(config);
         logEmbeddingProviderInfo(config, embedding);
 
-        // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
-            address: config.milvusAddress,
-            ...(config.milvusToken && { token: config.milvusToken })
-        });
+        // Initialize vector database based on provider
+        let vectorDatabase: VectorDatabase;
+        if (config.vectorDatabaseProvider === 'postgres') {
+            console.log(`[VECTOR_DB] Initializing PostgreSQL vector database...`);
+            vectorDatabase = new PostgresVectorDatabase({
+                connectionString: config.postgresConnectionString,
+                host: config.postgresHost,
+                port: config.postgresPort,
+                database: config.postgresDatabase,
+                username: config.postgresUsername,
+                password: config.postgresPassword,
+                ssl: config.postgresSSL
+            });
+        } else {
+            console.log(`[VECTOR_DB] Initializing Milvus vector database...`);
+            vectorDatabase = new MilvusVectorDatabase({
+                address: config.milvusAddress,
+                ...(config.milvusToken && { token: config.milvusToken })
+            });
+        }
 
         // Initialize Claude Context
         this.context = new Context({
