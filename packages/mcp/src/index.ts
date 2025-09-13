@@ -88,6 +88,12 @@ Index a codebase directory to enable semantic search using a configurable code s
 
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path to the target codebase.
+- If the path is a git repository with a remote URL, it will automatically use the git remote for consistent collection naming across different local paths.
+
+🔗 **Git Repository Support**:
+- Automatically detects git repositories and uses remote URL for collection naming
+- Same repository cloned to different paths will share the same collection
+- Ensures consistency across team members and machines
 
 ✨ **Usage Guidance**:
 - This tool is typically used when search fails due to an unindexed codebase.
@@ -100,6 +106,7 @@ Search the indexed codebase using natural language queries within a specified ab
 
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path.
+- If the path is a git repository, it will automatically use the correct collection based on the git remote URL.
 
 🎯 **When to Use**:
 This tool is versatile and can be used before completing various tasks to retrieve relevant context:
@@ -195,7 +202,7 @@ This tool is versatile and can be used before completing various tasks to retrie
                     },
                     {
                         name: "clear_index",
-                        description: `Clear the search index. IMPORTANT: You MUST provide an absolute path.`,
+                        description: `Clear the search index. IMPORTANT: You MUST provide an absolute path. Git repositories will be identified by their remote URL for accurate clearing.`,
                         inputSchema: {
                             type: "object",
                             properties: {
@@ -209,7 +216,7 @@ This tool is versatile and can be used before completing various tasks to retrie
                     },
                     {
                         name: "get_indexing_status",
-                        description: `Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.`,
+                        description: `Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases. Git repositories are identified by their remote URL.`,
                         inputSchema: {
                             type: "object",
                             properties: {
