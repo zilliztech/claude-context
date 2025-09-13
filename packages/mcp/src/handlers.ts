@@ -3,7 +3,12 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { Context, COLLECTION_LIMIT_MESSAGE } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
-import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
+import {
+    ensureAbsolutePath,
+    truncateContent,
+    trackCodebasePath,
+    getRepositoryIdentifier
+} from "./utils.js";
 
 export class ToolHandlers {
     private context: Context;
@@ -199,8 +204,14 @@ export class ToolHandlers {
                 };
             }
 
+            // Get git repository identifier for consistent collection naming
+            const gitRepoIdentifier = getRepositoryIdentifier(absolutePath);
+            if (gitRepoIdentifier) {
+                console.log(`[INDEX-VALIDATION] 🔗 Git repository detected: ${gitRepoIdentifier}`);
+            }
+
             //Check if the snapshot and cloud index are in sync
-            if (this.snapshotManager.getIndexedCodebases().includes(absolutePath) !== await this.context.hasIndex(absolutePath)) {
+            if (this.snapshotManager.getIndexedCodebases().includes(absolutePath) !== await this.context.hasIndex(absolutePath, gitRepoIdentifier)) {
                 console.warn(`[INDEX-VALIDATION] ❌ Snapshot and cloud index mismatch: ${absolutePath}`);
             }
 
@@ -221,9 +232,9 @@ export class ToolHandlers {
                     console.log(`[FORCE-REINDEX] 🔄 Removing '${absolutePath}' from indexed list for re-indexing`);
                     this.snapshotManager.removeIndexedCodebase(absolutePath);
                 }
-                if (await this.context.hasIndex(absolutePath)) {
+                if (await this.context.hasIndex(absolutePath, gitRepoIdentifier)) {
                     console.log(`[FORCE-REINDEX] 🔄 Clearing index for '${absolutePath}'`);
-                    await this.context.clearIndex(absolutePath);
+                    await this.context.clearIndex(absolutePath, undefined, gitRepoIdentifier);
                 }
             }
 
@@ -339,6 +350,14 @@ export class ToolHandlers {
                 console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
             }
 
+            // Get git repository identifier if available
+            const gitRepoIdentifier = getRepositoryIdentifier(absolutePath);
+            if (gitRepoIdentifier) {
+                console.log(`[BACKGROUND-INDEX] 🔗 Git repository detected: ${gitRepoIdentifier}`);
+            } else {
+                console.log(`[BACKGROUND-INDEX] 📁 Using path-based identification (not a git repository or no remote)`);
+            }
+
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
             await this.context.getLoadedIgnorePatterns(absolutePath);
 
@@ -350,8 +369,8 @@ export class ToolHandlers {
             await synchronizer.initialize();
 
             // Store synchronizer in the context (let context manage collection names)
-            await this.context.getPreparedCollection(absolutePath);
-            const collectionName = this.context.getCollectionName(absolutePath);
+            await this.context.getPreparedCollection(absolutePath, gitRepoIdentifier);
+            const collectionName = this.context.getCollectionName(absolutePath, gitRepoIdentifier);
             this.context.setSynchronizer(collectionName, synchronizer);
             if (contextForThisTask !== this.context) {
                 contextForThisTask.setSynchronizer(collectionName, synchronizer);
@@ -447,6 +466,12 @@ export class ToolHandlers {
 
             trackCodebasePath(absolutePath);
 
+            // Get git repository identifier if available for consistent collection naming
+            const gitRepoIdentifier = getRepositoryIdentifier(absolutePath);
+            if (gitRepoIdentifier) {
+                console.log(`[SEARCH] 🔗 Git repository detected: ${gitRepoIdentifier}`);
+            }
+
             // Check if this codebase is indexed or being indexed
             const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
             const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
@@ -500,7 +525,8 @@ export class ToolHandlers {
                 query,
                 Math.min(resultLimit, 50),
                 0.3,
-                filterExpr
+                filterExpr,
+                gitRepoIdentifier
             );
 
             console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
@@ -621,10 +647,16 @@ export class ToolHandlers {
                 };
             }
 
+            // Get git repository identifier for consistent collection naming
+            const gitRepoIdentifier = getRepositoryIdentifier(absolutePath);
+            if (gitRepoIdentifier) {
+                console.log(`[CLEAR] 🔗 Git repository detected: ${gitRepoIdentifier}`);
+            }
+
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
             try {
-                await this.context.clearIndex(absolutePath);
+                await this.context.clearIndex(absolutePath, undefined, gitRepoIdentifier);
                 console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
             } catch (error: any) {
                 const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;

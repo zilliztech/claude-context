@@ -213,8 +213,8 @@ export class Context {
     /**
      * Public wrapper for prepareCollection private method
      */
-    async getPreparedCollection(codebasePath: string): Promise<void> {
-        return this.prepareCollection(codebasePath);
+    async getPreparedCollection(codebasePath: string, gitRepoIdentifier?: string | null): Promise<void> {
+        return this.prepareCollection(codebasePath, false, gitRepoIdentifier);
     }
 
     /**
@@ -230,12 +230,31 @@ export class Context {
 
     /**
      * Generate collection name based on codebase path and hybrid mode
+     * Optionally accepts a git repository identifier for consistent naming across different local paths
      */
-    public getCollectionName(codebasePath: string): string {
+    public getCollectionName(codebasePath: string, gitRepoIdentifier?: string | null): string {
         const isHybrid = this.getIsHybrid();
+        const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
+
+        // If git repository identifier is provided, use it for collection naming
+        if (gitRepoIdentifier) {
+            // Create a clean identifier by replacing special characters
+            const cleanIdentifier = gitRepoIdentifier
+                .replace(/[^a-zA-Z0-9]/g, '_')  // Replace non-alphanumeric with underscore
+                .toLowerCase()
+                .substring(0, 32);  // Limit length for collection name
+
+            // Create hash from the git identifier for uniqueness
+            const hash = crypto.createHash('md5').update(gitRepoIdentifier).digest('hex');
+
+            console.log(`[Context] Using git-based collection naming for: ${gitRepoIdentifier}`);
+            return `${prefix}_git_${cleanIdentifier}_${hash.substring(0, 8)}`;
+        }
+
+        // Fallback to path-based naming (original behavior)
         const normalizedPath = path.resolve(codebasePath);
         const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-        const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
+        console.log(`[Context] Using path-based collection naming for: ${normalizedPath}`);
         return `${prefix}_${hash.substring(0, 8)}`;
     }
 
@@ -405,13 +424,15 @@ export class Context {
      * @param query Search query
      * @param topK Number of results to return
      * @param threshold Similarity threshold
+     * @param filterExpr Optional filter expression
+     * @param gitRepoIdentifier Optional git repository identifier for consistent collection naming
      */
-    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string): Promise<SemanticSearchResult[]> {
+    async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string, gitRepoIdentifier?: string | null): Promise<SemanticSearchResult[]> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
 
-        const collectionName = this.getCollectionName(codebasePath);
+        const collectionName = this.getCollectionName(codebasePath, gitRepoIdentifier);
         console.log(`[Context] 🔍 Using collection: ${collectionName}`);
 
         // Check if collection exists and has data
@@ -518,10 +539,11 @@ export class Context {
     /**
      * Check if index exists for codebase
      * @param codebasePath Codebase path to check
+     * @param gitRepoIdentifier Optional git repository identifier for consistent collection naming
      * @returns Whether index exists
      */
-    async hasIndex(codebasePath: string): Promise<boolean> {
-        const collectionName = this.getCollectionName(codebasePath);
+    async hasIndex(codebasePath: string, gitRepoIdentifier?: string | null): Promise<boolean> {
+        const collectionName = this.getCollectionName(codebasePath, gitRepoIdentifier);
         return await this.vectorDatabase.hasCollection(collectionName);
     }
 
@@ -529,16 +551,18 @@ export class Context {
      * Clear index
      * @param codebasePath Codebase path to clear index for
      * @param progressCallback Optional progress callback function
+     * @param gitRepoIdentifier Optional git repository identifier for consistent collection naming
      */
     async clearIndex(
         codebasePath: string,
-        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
+        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
+        gitRepoIdentifier?: string | null
     ): Promise<void> {
         console.log(`[Context] 🧹 Cleaning index data for ${codebasePath}...`);
 
         progressCallback?.({ phase: 'Checking existing index...', current: 0, total: 100, percentage: 0 });
 
-        const collectionName = this.getCollectionName(codebasePath);
+        const collectionName = this.getCollectionName(codebasePath, gitRepoIdentifier);
         const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
 
         progressCallback?.({ phase: 'Removing index data...', current: 50, total: 100, percentage: 50 });
@@ -622,11 +646,11 @@ export class Context {
     /**
      * Prepare vector collection
      */
-    private async prepareCollection(codebasePath: string, forceReindex: boolean = false): Promise<void> {
+    private async prepareCollection(codebasePath: string, forceReindex: boolean = false, gitRepoIdentifier?: string | null): Promise<void> {
         const isHybrid = this.getIsHybrid();
         const collectionType = isHybrid === true ? 'hybrid vector' : 'vector';
         console.log(`[Context] 🔧 Preparing ${collectionType} collection for codebase: ${codebasePath}${forceReindex ? ' (FORCE REINDEX)' : ''}`);
-        const collectionName = this.getCollectionName(codebasePath);
+        const collectionName = this.getCollectionName(codebasePath, gitRepoIdentifier);
 
         // Check if collection already exists
         const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
