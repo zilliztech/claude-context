@@ -124,6 +124,7 @@ class MilvusVectorDB {
             return results.map(result => ({
                 id: result.id,
                 content: result.content,
+                branch: result.branch, // Include branch name for frontend display
                 relativePath: result.relativePath,
                 startLine: result.startLine,
                 endLine: result.endLine,
@@ -310,6 +311,27 @@ async function handleRateLimit(response: Response): Promise<void> {
     }
 }
 
+async function fetchRepoBranch(owner: string, repo: string): Promise<string> {
+    const token = await getGitHubToken();
+
+    // First get the default branch
+    const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
+    const repoResponse = await fetch(repoInfoUrl, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    });
+
+    if (!repoResponse.ok) {
+        throw new Error(`GitHub API error: ${repoResponse.status} - ${await repoResponse.text()}`);
+    }
+
+    const repoData = await repoResponse.json();
+    return repoData.default_branch || 'main';
+}
+
 async function fetchRepoFiles(owner: string, repo: string): Promise<any[]> {
     const token = await getGitHubToken();
 
@@ -457,11 +479,14 @@ async function handleIndexRepo(request: any, sendResponse: Function) {
         const chunkOverlap = 200;  // Same as VSCode extension default
 
         // Fetch repository files
-        const files = await fetchRepoFiles(owner, repo);
+        const [branch, files] = await Promise.all([
+            fetchRepoBranch(owner, repo),
+            fetchRepoFiles(owner, repo),
+        ]);
         console.log(`Found ${files.length} files to index`);
 
         // Process files using core package approach
-        const result = await processFileList(files, owner, repo, repoId, vectorDB, chunkSize, chunkOverlap);
+        const result = await processFileList(files, owner, repo, branch, repoId, vectorDB, chunkSize, chunkOverlap);
 
         // Send completion message
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -499,6 +524,7 @@ async function processFileList(
     files: any[],
     owner: string,
     repo: string,
+    branch: string,
     repoId: string,
     vectorDB: MilvusVectorDB,
     chunkSize: number,
@@ -532,6 +558,7 @@ async function processFileList(
                     const codeChunk: CodeChunk = {
                         id: `${file.path}_chunk_${j}`,
                         content: chunk.content,
+                        branch: branch,
                         relativePath: file.path,
                         startLine: chunk.startLine,
                         endLine: chunk.endLine,

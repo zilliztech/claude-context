@@ -6,6 +6,7 @@ export interface VectorDocument {
     id: string;
     vector: number[];
     content: string;
+    branch: string;
     relativePath: string;
     startLine: number;
     endLine: number;
@@ -142,6 +143,13 @@ export class MilvusRestfulVectorDatabase {
                             }
                         },
                         {
+                            fieldName: "branch",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 512
+                            }
+                        },
+                        {
                             fieldName: "relativePath",
                             dataType: "VarChar",
                             elementTypeParams: {
@@ -247,6 +255,7 @@ export class MilvusRestfulVectorDatabase {
                 id: doc.id,
                 vector: doc.vector,
                 content: doc.content,
+                branch: doc.branch,
                 relativePath: doc.relativePath,
                 startLine: doc.startLine,
                 endLine: doc.endLine,
@@ -280,6 +289,7 @@ export class MilvusRestfulVectorDatabase {
                 limit: topK,
                 outputFields: [
                     "content",
+                    "branch",
                     "relativePath",
                     "startLine",
                     "endLine",
@@ -308,6 +318,7 @@ export class MilvusRestfulVectorDatabase {
                         id: item.id?.toString() || '',
                         vector: queryVector,
                         content: item.content || '',
+                        branch: item.branch || '',
                         relativePath: item.relativePath || '',
                         startLine: item.startLine || 0,
                         endLine: item.endLine || 0,
