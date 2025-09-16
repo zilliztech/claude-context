@@ -18,6 +18,7 @@ import {
 } from './vectordb';
 import { SemanticSearchResult } from './types';
 import { envManager } from './utils/env-manager';
+import { EncryptionManager } from './utils/encryption';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -103,12 +104,13 @@ export class Context {
     private supportedExtensions: string[];
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
+    private encryptionManager: EncryptionManager;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
-            model: 'text-embedding-3-small',
+            model: envManager.get('EMBEDDING_MODEL') || 'text-embedding-3-small',
             ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
         });
 
@@ -118,6 +120,15 @@ export class Context {
         this.vectorDatabase = config.vectorDatabase;
 
         this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
+
+        // Initialize encryption manager based on hybrid mode
+        const isHybrid = this.getIsHybrid();
+        const enableEncryption = !isHybrid; // Disable encryption if hybrid mode is enabled
+        this.encryptionManager = new EncryptionManager(enableEncryption);
+
+        if (isHybrid && envManager.get('CONTEXT_ENCRYPTION_KEY')) {
+            console.log('[Context] ⚠️  Content encryption disabled because hybrid mode is enabled (BM25 requires plain text)');
+        }
 
         // Load custom extensions from environment variables
         const envCustomExtensions = this.getCustomExtensionsFromEnv();
@@ -474,7 +485,7 @@ export class Context {
 
             // 4. Convert to semantic search result format
             const results: SemanticSearchResult[] = searchResults.map(result => ({
-                content: result.document.content,
+                content: this.encryptionManager.decrypt(result.document.content), // Decrypt content after retrieval
                 relativePath: result.document.relativePath,
                 startLine: result.document.startLine,
                 endLine: result.document.endLine,
@@ -502,7 +513,7 @@ export class Context {
 
             // 3. Convert to semantic search result format
             const results: SemanticSearchResult[] = searchResults.map(result => ({
-                content: result.document.content,
+                content: this.encryptionManager.decrypt(result.document.content), // Decrypt content after retrieval
                 relativePath: result.document.relativePath,
                 startLine: result.document.startLine,
                 endLine: result.document.endLine,
@@ -828,7 +839,7 @@ export class Context {
 
                 return {
                     id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
-                    content: chunk.content, // Full text content for BM25 and storage
+                    content: this.encryptionManager.encrypt(chunk.content), // Encrypt content before storage
                     vector: embeddings[index].vector, // Dense vector
                     relativePath,
                     startLine: chunk.metadata.startLine || 0,
@@ -859,7 +870,7 @@ export class Context {
                 return {
                     id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
                     vector: embeddings[index].vector,
-                    content: chunk.content,
+                    content: this.encryptionManager.encrypt(chunk.content), // Encrypt content before storage
                     relativePath,
                     startLine: chunk.metadata.startLine || 0,
                     endLine: chunk.metadata.endLine || 0,
@@ -967,6 +978,8 @@ export class Context {
             } else {
                 console.log('📄 No ignore files found, keeping existing patterns');
             }
+
+            console.log(`[Context] 🔍 Ignore patterns: ${this.ignorePatterns.join(', ')}`);
         } catch (error) {
             console.warn(`[Context] ⚠️ Failed to load ignore patterns: ${error}`);
             // Continue with existing patterns on error - don't reset them
