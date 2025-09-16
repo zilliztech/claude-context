@@ -34,7 +34,7 @@ Claude Context MCP supports multiple embedding providers. Choose the one that be
 > 📋 **Quick Reference**: For a complete list of environment variables and their descriptions, see the [Environment Variables Guide](../../docs/getting-started/environment-variables.md).
 
 ```bash
-# Supported providers: OpenAI, VoyageAI, Gemini, Ollama
+# Supported providers: OpenAI, AzureOpenAI, VoyageAI, Gemini, Ollama
 EMBEDDING_PROVIDER=OpenAI
 ```
 
@@ -67,7 +67,36 @@ See `getSupportedModels` in [`openai-embedding.ts`](https://github.com/zilliztec
 </details>
 
 <details>
-<summary><strong>2. VoyageAI Configuration</strong></summary>
+<summary><strong>2. Azure OpenAI Configuration</strong></summary>
+
+Azure OpenAI provides the same high-quality embeddings as OpenAI through your Azure infrastructure.
+
+```bash
+# Required: Your Azure OpenAI configuration
+EMBEDDING_PROVIDER=AzureOpenAI
+AZURE_OPENAI_API_KEY=your-azure-api-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_DEPLOYMENT_NAME=text-embedding-3-small-deployment
+
+# Optional: API version (default: 2024-02-01)
+AZURE_OPENAI_API_VERSION=2024-02-01
+```
+
+**Configuration Requirements:**
+- `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI resource endpoint
+- `AZURE_OPENAI_DEPLOYMENT_NAME`: Your deployment name (not model name)
+- `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
+
+**Getting Started with Azure OpenAI:**
+1. Create an Azure OpenAI resource in [Azure Portal](https://portal.azure.com)
+2. Deploy an embedding model (e.g., text-embedding-3-small)
+3. Copy your endpoint URL and API key from Azure Portal
+4. Use the deployment name you created (not the model name)
+
+</details>
+
+<details>
+<summary><strong>3. VoyageAI Configuration</strong></summary>
 
 VoyageAI offers specialized code embeddings optimized for programming languages.
 
@@ -92,7 +121,7 @@ See `getSupportedModels` in [`voyageai-embedding.ts`](https://github.com/zillizt
 </details>
 
 <details>
-<summary><strong>3. Gemini Configuration</strong></summary>
+<summary><strong>4. Gemini Configuration</strong></summary>
 
 Google's Gemini provides competitive embeddings with good multilingual support.
 
@@ -120,7 +149,7 @@ See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztec
 </details>
 
 <details>
-<summary><strong>4. Ollama Configuration (Local/Self-hosted)</strong></summary>
+<summary><strong>5. Ollama Configuration (Local/Self-hosted)</strong></summary>
 
 Ollama allows you to run embeddings locally without sending data to external services.
 
@@ -291,6 +320,25 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
       "env": {
         "EMBEDDING_PROVIDER": "OpenAI",
         "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**Azure OpenAI Configuration:**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "AzureOpenAI",
+        "AZURE_OPENAI_API_KEY": "your-azure-api-key",
+        "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com",
+        "AZURE_OPENAI_DEPLOYMENT_NAME": "text-embedding-3-small-deployment",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }

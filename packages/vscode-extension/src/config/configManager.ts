@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, GeminiEmbedding, GeminiEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
+import { OpenAIEmbedding, OpenAIEmbeddingConfig, AzureOpenAIEmbedding, AzureOpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, GeminiEmbedding, GeminiEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
 
 // Simplified Milvus configuration interface for frontend
 export interface MilvusWebConfig {
@@ -10,6 +10,9 @@ export interface MilvusWebConfig {
 export type EmbeddingProviderConfig = {
     provider: 'OpenAI';
     config: OpenAIEmbeddingConfig;
+} | {
+    provider: 'AzureOpenAI';
+    config: AzureOpenAIEmbeddingConfig;
 } | {
     provider: 'VoyageAI';
     config: VoyageAIEmbeddingConfig;
@@ -59,6 +62,22 @@ const EMBEDDING_PROVIDERS = {
         ] as FieldDefinition[],
         defaultConfig: {
             model: 'text-embedding-3-small'
+        }
+    },
+    'AzureOpenAI': {
+        name: 'Azure OpenAI',
+        class: AzureOpenAIEmbedding,
+        requiredFields: [
+            { name: 'deploymentName', type: 'string', description: 'Azure deployment name', inputType: 'text', required: true },
+            { name: 'azureEndpoint', type: 'string', description: 'Azure OpenAI endpoint URL', inputType: 'url', required: true, placeholder: 'https://your-resource.openai.azure.com' },
+            { name: 'apiKey', type: 'string', description: 'Azure OpenAI API key', inputType: 'password', required: true }
+        ] as FieldDefinition[],
+        optionalFields: [
+            { name: 'apiVersion', type: 'string', description: 'API version', inputType: 'text', placeholder: '2024-02-01' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            deploymentName: 'text-embedding-3-small-deployment',
+            apiVersion: '2024-02-01'
         }
     },
     'VoyageAI': {

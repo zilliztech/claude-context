@@ -20,10 +20,14 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ### Embedding Provider
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
+| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `AzureOpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
 | `EMBEDDING_MODEL` | Embedding model name (works for all providers) | Provider-specific default |
 | `OPENAI_API_KEY` | OpenAI API key | Required for OpenAI |
 | `OPENAI_BASE_URL` | OpenAI API base URL (optional, for custom endpoints) | `https://api.openai.com/v1` |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI API key | Required for Azure OpenAI |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL | Required for Azure OpenAI |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | Azure deployment name | Required for Azure OpenAI |
+| `AZURE_OPENAI_API_VERSION` | Azure API version | `2024-02-01` |
 | `VOYAGEAI_API_KEY` | VoyageAI API key | Required for VoyageAI |
 | `GEMINI_API_KEY` | Gemini API key | Required for Gemini |
 | `GEMINI_BASE_URL` | Gemini API base URL (optional, for custom endpoints) | `https://generativelanguage.googleapis.com/v1beta` |
@@ -33,6 +37,8 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 > **Supported Model Names:**
 > 
 > - OpenAI Models: See `getSupportedModels` in [`openai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/openai-embedding.ts) for the full list of supported models.
+>
+> - Azure OpenAI: Uses deployment names instead of model names. Supports the same models as OpenAI (text-embedding-3-small, text-embedding-3-large, text-embedding-ada-002).
 > 
 > - VoyageAI Models: See `getSupportedModels` in [`voyageai-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/voyageai-embedding.ts) for the full list of supported models.
 > 
@@ -67,12 +73,26 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ## 🚀 Quick Setup
 
 ### 1. Create Global Config
+
+**Option A: OpenAI**
 ```bash
 mkdir -p ~/.context
 cat > ~/.context/.env << 'EOF'
 EMBEDDING_PROVIDER=OpenAI
 OPENAI_API_KEY=sk-your-openai-api-key
 EMBEDDING_MODEL=text-embedding-3-small
+MILVUS_TOKEN=your-zilliz-cloud-api-key
+EOF
+```
+
+**Option B: Azure OpenAI**
+```bash
+mkdir -p ~/.context
+cat > ~/.context/.env << 'EOF'
+EMBEDDING_PROVIDER=AzureOpenAI
+AZURE_OPENAI_API_KEY=your-azure-api-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_DEPLOYMENT_NAME=text-embedding-3-small-deployment
 MILVUS_TOKEN=your-zilliz-cloud-api-key
 EOF
 ```

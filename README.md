@@ -42,12 +42,23 @@ Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configurati
 </details>
 
 <details>
-<summary>Get OpenAI API Key for embedding model</summary>
+<summary>Get an API Key for embedding model</summary>
 
-You need an OpenAI API key for the embedding model. You can get one by signing up at [OpenAI](https://platform.openai.com/api-keys).  
+You need an API key for the embedding model. Claude Context supports multiple providers:
 
-Your API key will look like this: it always starts with `sk-`.  
-Copy your key and use it in the configuration examples below as `your-openai-api-key`.
+**Option 1: OpenAI**
+- Sign up at [OpenAI](https://platform.openai.com/api-keys)
+- Your API key will start with `sk-`
+- Use as `your-openai-api-key` in configuration
+
+**Option 2: Azure OpenAI**
+- Use your Azure OpenAI resource endpoint and API key
+- Requires deployment name instead of model name
+- See [Azure OpenAI Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
+
+**Option 3: Other Providers**
+- VoyageAI, Gemini, or Ollama (local)
+- See [Provider Configuration Guide](packages/mcp/README.md#embedding-provider-configuration) for details
 
 </details>
 
@@ -542,8 +553,7 @@ Claude Context is a monorepo containing three main packages:
 - **`@zilliz/claude-context-mcp`**: Model Context Protocol server for AI agent integration
 
 ### Supported Technologies
-
-- **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
+- **Embedding Providers**: [OpenAI](https://openai.com), [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-services/openai-service), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.ai), [Gemini](https://gemini.google.com)
 - **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
 - **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
