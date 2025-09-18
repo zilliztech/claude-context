@@ -403,16 +403,105 @@ export class SnapshotManager {
      * Get codebase status
      */
     public getCodebaseStatus(codebasePath: string): 'indexed' | 'indexing' | 'indexfailed' | 'not_found' {
-        const info = this.codebaseInfoMap.get(codebasePath);
-        if (!info) return 'not_found';
-        return info.status;
+        // Read from JSON file to ensure consistency and persistence
+        try {
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                return 'not_found';
+            }
+
+            const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
+            const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
+
+            if (this.isV2Format(snapshot)) {
+                const info = snapshot.codebases[codebasePath];
+                if (!info) return 'not_found';
+                return info.status;
+            } else {
+                // V1 format compatibility
+                const indexedCodebases = snapshot.indexedCodebases || [];
+                if (indexedCodebases.includes(codebasePath)) {
+                    return 'indexed';
+                }
+
+                // Check indexing codebases (handle both array and object formats)
+                let indexingCodebases: string[] = [];
+                if (Array.isArray(snapshot.indexingCodebases)) {
+                    indexingCodebases = snapshot.indexingCodebases;
+                } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                    indexingCodebases = Object.keys(snapshot.indexingCodebases);
+                }
+
+                if (indexingCodebases.includes(codebasePath)) {
+                    return 'indexing';
+                }
+
+                return 'not_found';
+            }
+        } catch (error) {
+            console.warn(`[SNAPSHOT-DEBUG] Error reading codebase status from file for ${codebasePath}:`, error);
+            // Fallback to memory if file reading fails
+            const info = this.codebaseInfoMap.get(codebasePath);
+            if (!info) return 'not_found';
+            return info.status;
+        }
     }
 
     /**
      * Get complete codebase information
      */
     public getCodebaseInfo(codebasePath: string): CodebaseInfo | undefined {
-        return this.codebaseInfoMap.get(codebasePath);
+        // Read from JSON file to ensure consistency and persistence
+        try {
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                return undefined;
+            }
+
+            const snapshotData = fs.readFileSync(this.snapshotFilePath, 'utf8');
+            const snapshot: CodebaseSnapshot = JSON.parse(snapshotData);
+
+            if (this.isV2Format(snapshot)) {
+                return snapshot.codebases[codebasePath];
+            } else {
+                // V1 format compatibility - construct info from available data
+                const indexedCodebases = snapshot.indexedCodebases || [];
+                if (indexedCodebases.includes(codebasePath)) {
+                    const info: CodebaseInfoIndexed = {
+                        status: 'indexed',
+                        indexedFiles: 0, // Unknown in v1 format
+                        totalChunks: 0,  // Unknown in v1 format
+                        indexStatus: 'completed',
+                        lastUpdated: new Date().toISOString()
+                    };
+                    return info;
+                }
+
+                // Check indexing codebases
+                let indexingCodebases: string[] = [];
+                let progress = 0;
+
+                if (Array.isArray(snapshot.indexingCodebases)) {
+                    indexingCodebases = snapshot.indexingCodebases;
+                } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                    indexingCodebases = Object.keys(snapshot.indexingCodebases);
+                    progress = snapshot.indexingCodebases[codebasePath] || 0;
+                }
+
+                if (indexingCodebases.includes(codebasePath)) {
+                    const info: CodebaseInfoIndexing = {
+                        status: 'indexing',
+                        indexingPercentage: progress,
+                        lastUpdated: new Date().toISOString()
+                    };
+                    return info;
+                }
+
+                return undefined;
+            }
+        } catch (error) {
+            console.warn(`[SNAPSHOT-DEBUG] Error reading codebase info from file for ${codebasePath}:`, error);
+            // Fallback to memory if file reading fails
+            return this.codebaseInfoMap.get(codebasePath);
+        }
     }
 
     /**
