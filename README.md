@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/zilliztech-claude-context-badge.png)](https://mseep.ai/app/zilliztech-claude-context)
+
 ![](assets/claude-context.png)
 
 ### Your entire codebase as Claude's context
