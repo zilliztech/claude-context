@@ -58,8 +58,8 @@ __pycache__/
 *.log
 !evaluation/case_study/**/*.log
 
-.claude/*
-CLAUDE.md
+# .claude/* - Removed to commit Claude Code configuration
+# CLAUDE.md
 
 .cursor/*
 

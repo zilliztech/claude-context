@@ -1,0 +1,37 @@
+{
+  "name": "Claude Context",
+  "description": "MCP plugin for semantic code search in Claude Code and other AI coding agents",
+  "version": "1.0.0",
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "MILVUS_TOKEN": "${MILVUS_TOKEN}"
+      }
+    }
+  },
+  "automation": {
+    "preCommit": ".claude/hooks/pre-commit.sh",
+    "postBuild": ".claude/hooks/post-build.sh",
+    "preRelease": ".claude/hooks/pre-release.sh"
+  },
+  "commands": {
+    "build": ".claude/commands/build.md",
+    "test": ".claude/commands/test.md",
+    "lint": ".claude/commands/lint.md",
+    "dev": ".claude/commands/dev.md",
+    "clean": ".claude/commands/clean.md",
+    "benchmark": ".claude/commands/benchmark.md",
+    "typecheck": ".claude/commands/typecheck.md",
+    "ci": ".claude/commands/ci.md",
+    "setup": ".claude/commands/setup.md",
+    "release": ".claude/commands/release.md"
+  },
+  "prompts": {
+    "feature": ".claude/prompts/feature.md",
+    "bugfix": ".claude/prompts/bugfix.md",
+    "refactor": ".claude/prompts/refactor.md"
+  }
+}
