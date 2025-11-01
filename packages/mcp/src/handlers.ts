@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { isCurrentProcessLeader, acquireLock } from './lock';
 import { Context, COLLECTION_LIMIT_MESSAGE } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
@@ -29,6 +30,11 @@ export class ToolHandlers {
      * - If local snapshot is missing directories (exist in cloud), ignore them
      */
     private async syncIndexedCodebasesFromCloud(): Promise<void> {
+        if (!isCurrentProcessLeader()) {
+            console.log('[SYNC-CLOUD] This process is a follower. Skipping cloud sync.');
+            return;
+        }
+
         try {
             console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
 
@@ -142,6 +148,16 @@ export class ToolHandlers {
     }
 
     public async handleIndexCodebase(args: any) {
+        if (!isCurrentProcessLeader()) {
+            return {
+                content: [{
+                    type: "text",
+                    text: "Another process is already indexing. This process is a follower and cannot index."
+                }],
+                isError: true
+            };
+        }
+
         const { path: codebasePath, force, splitter, customExtensions, ignorePatterns } = args;
         const forceReindex = force || false;
         const splitterType = splitter || 'ast'; // Default to AST
@@ -569,6 +585,16 @@ export class ToolHandlers {
     }
 
     public async handleClearIndex(args: any) {
+        if (!isCurrentProcessLeader()) {
+            return {
+                content: [{
+                    type: "text",
+                    text: "Another process is already indexing. This process is a follower and cannot index."
+                }],
+                isError: true
+            };
+        }
+
         const { path: codebasePath } = args;
 
         if (this.snapshotManager.getIndexedCodebases().length === 0 && this.snapshotManager.getIndexingCodebases().length === 0) {
