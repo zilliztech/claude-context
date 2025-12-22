@@ -124,8 +124,20 @@ export class ToolHandlers {
                 }
             }
 
-            // Note: We don't add cloud codebases that are missing locally (as per user requirement)
-            console.log(`[SYNC-CLOUD] ℹ️  Skipping addition of cloud codebases not present locally (per sync policy)`);
+            // Add cloud codebases that are missing locally - this fixes the issue where
+            // after MCP server restart, the local snapshot is empty but data exists in Milvus
+            for (const cloudCodebase of cloudCodebases) {
+                if (!localCodebases.has(cloudCodebase)) {
+                    // Add to snapshot - data exists in cloud
+                    this.snapshotManager.setCodebaseIndexed(cloudCodebase, {
+                        indexedFiles: 0,  // Stats unknown from cloud query
+                        totalChunks: 0,   // Will show in status as 0 until re-indexed
+                        status: 'completed'
+                    });
+                    hasChanges = true;
+                    console.log(`[SYNC-CLOUD] ➕ Added cloud codebase to local snapshot: ${cloudCodebase}`);
+                }
+            }
 
             if (hasChanges) {
                 this.snapshotManager.saveCodebaseSnapshot();
