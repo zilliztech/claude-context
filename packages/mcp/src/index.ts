@@ -23,6 +23,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Context } from "@zilliz/claude-context-core";
 import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
+import { MilvusRestfulVectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
@@ -30,6 +31,7 @@ import { createEmbeddingInstance, logEmbeddingProviderInfo } from "./embedding.j
 import { SnapshotManager } from "./snapshot.js";
 import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
+import { acquireLeaderLock } from "./lock.js";
 
 class ContextMcpServer {
     private server: Server;
@@ -60,7 +62,11 @@ class ContextMcpServer {
         logEmbeddingProviderInfo(config, embedding);
 
         // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
+        // const vectorDatabase = new MilvusVectorDatabase({
+        //     address: config.milvusAddress,
+        //     ...(config.milvusToken && { token: config.milvusToken })
+        // });
+        const vectorDatabase = new MilvusRestfulVectorDatabase({
             address: config.milvusAddress,
             ...(config.milvusToken && { token: config.milvusToken })
         });
@@ -77,9 +83,13 @@ class ContextMcpServer {
         this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager);
 
         // Load existing codebase snapshot on startup
-        this.snapshotManager.loadCodebaseSnapshot();
+        // this.snapshotManager.loadCodebaseSnapshot();
 
         this.setupTools();
+    }
+
+    async init() {
+        await this.snapshotManager.loadCodebaseSnapshot();
     }
 
     private setupTools() {
@@ -246,6 +256,8 @@ This tool is versatile and can be used before completing various tasks to retrie
     }
 
     async start() {
+
+        await this.init();
         console.log('[SYNC-DEBUG] MCP server start() method called');
         console.log('Starting Context MCP server...');
 
@@ -259,6 +271,11 @@ This tool is versatile and can be used before completing various tasks to retrie
         // Start background sync after server is connected
         console.log('[SYNC-DEBUG] Initializing background sync...');
         this.syncManager.startBackgroundSync();
+
+        // Try to acquire leader lock (non-blocking, will be leader or follower)
+        console.log('[LEADER] Attempting to acquire leader lock...');
+        await acquireLeaderLock();
+
         console.log('[SYNC-DEBUG] MCP server initialization complete');
     }
 }

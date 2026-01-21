@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import { Context, FileSynchronizer } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
+import { isCurrentProcessLeader } from "./lock.js";
 
 export class SyncManager {
     private context: Context;
@@ -13,6 +14,12 @@ export class SyncManager {
     }
 
     public async handleSyncIndex(): Promise<void> {
+        // Leader check - followers should not sync
+        if (!isCurrentProcessLeader()) {
+            console.log('[SYNC-DEBUG] Follower mode: Skipping background sync (read-only)');
+            return;
+        }
+
         const syncStartTime = Date.now();
         console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
 
