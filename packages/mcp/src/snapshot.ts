@@ -1,8 +1,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { CodebaseSnapshot } from "./config.js";
+import { CodebaseSnapshot, CodebaseSnapshotV2 } from "./config.js";
 import { withFileLock } from './lock.js';
+
+function isV2(snapshot: CodebaseSnapshot): snapshot is CodebaseSnapshotV2 {
+    return (snapshot as CodebaseSnapshotV2).formatVersion === 'v2';
+}
 
 export class SnapshotManager {
     private snapshotFilePath: string;
@@ -78,26 +82,43 @@ export class SnapshotManager {
 
                 // Validate indexed codebases
                 const validCodebases: string[] = [];
-                for (const codebasePath of snapshot.indexedCodebases) {
-                    if (fs.existsSync(codebasePath)) {
-                        validCodebases.push(codebasePath);
-                        console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
-                    } else {
-                        console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
-                    }
-                }
-
-                // Handle indexing codebases
                 let indexingCodebasesList: string[] = [];
                 let indexingProgress: Record<string, number> = {};
 
-                if (Array.isArray(snapshot.indexingCodebases)) {
-                    indexingCodebasesList = snapshot.indexingCodebases;
-                    console.log(`[SNAPSHOT-DEBUG] Found legacy indexingCodebases array format with ${indexingCodebasesList.length} entries`);
-                } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
-                    indexingProgress = snapshot.indexingCodebases;
-                    indexingCodebasesList = Object.keys(indexingProgress);
-                    console.log(`[SNAPSHOT-DEBUG] Found new indexingCodebases object format with ${indexingCodebasesList.length} entries`);
+                if (isV2(snapshot)) {
+                    // Handle V2
+                    for (const [path, info] of Object.entries(snapshot.codebases)) {
+                        if (info.status === 'indexed') {
+                            if (fs.existsSync(path)) {
+                                validCodebases.push(path);
+                                console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${path}`);
+                            } else {
+                                console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${path}`);
+                            }
+                        } else if (info.status === 'indexing') {
+                            indexingCodebasesList.push(path);
+                            indexingProgress[path] = info.indexingPercentage;
+                        }
+                    }
+                } else {
+                    // Handle V1
+                    for (const codebasePath of snapshot.indexedCodebases) {
+                        if (fs.existsSync(codebasePath)) {
+                            validCodebases.push(codebasePath);
+                            console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
+                        } else {
+                            console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
+                        }
+                    }
+
+                    if (Array.isArray(snapshot.indexingCodebases)) {
+                        indexingCodebasesList = snapshot.indexingCodebases;
+                        console.log(`[SNAPSHOT-DEBUG] Found legacy indexingCodebases array format with ${indexingCodebasesList.length} entries`);
+                    } else if (snapshot.indexingCodebases && typeof snapshot.indexingCodebases === 'object') {
+                        indexingProgress = snapshot.indexingCodebases;
+                        indexingCodebasesList = Object.keys(indexingProgress);
+                        console.log(`[SNAPSHOT-DEBUG] Found new indexingCodebases object format with ${indexingCodebasesList.length} entries`);
+                    }
                 }
 
                 // Restore valid indexing codebases with their progress
@@ -157,15 +178,26 @@ export class SnapshotManager {
                 const mergedIndexing = new Map<string, number>(this.indexingCodebases);
 
                 if (existingSnapshot) {
-                    // Add indexed codebases from file
-                    existingSnapshot.indexedCodebases.forEach(path => mergedIndexed.add(path));
-
-                    // Merge indexing codebases (keep higher progress)
-                    if (typeof existingSnapshot.indexingCodebases === 'object' && !Array.isArray(existingSnapshot.indexingCodebases)) {
-                        Object.entries(existingSnapshot.indexingCodebases).forEach(([path, progress]) => {
-                            const currentProgress = mergedIndexing.get(path) ?? 0;
-                            mergedIndexing.set(path, Math.max(currentProgress, progress));
+                    if (isV2(existingSnapshot)) {
+                        Object.entries(existingSnapshot.codebases).forEach(([path, info]) => {
+                            if (info.status === 'indexed') {
+                                mergedIndexed.add(path);
+                            } else if (info.status === 'indexing') {
+                                const currentProgress = mergedIndexing.get(path) ?? 0;
+                                mergedIndexing.set(path, Math.max(currentProgress, info.indexingPercentage));
+                            }
                         });
+                    } else {
+                        // Add indexed codebases from file
+                        existingSnapshot.indexedCodebases.forEach(path => mergedIndexed.add(path));
+
+                        // Merge indexing codebases (keep higher progress)
+                        if (typeof existingSnapshot.indexingCodebases === 'object' && !Array.isArray(existingSnapshot.indexingCodebases)) {
+                            Object.entries(existingSnapshot.indexingCodebases).forEach(([path, progress]) => {
+                                const currentProgress = mergedIndexing.get(path) ?? 0;
+                                mergedIndexing.set(path, Math.max(currentProgress, progress));
+                            });
+                        }
                     }
                 }
 
@@ -212,22 +244,36 @@ export class SnapshotManager {
 
                 // Update indexed codebases (merge with existing)
                 const updatedIndexed = new Set(this.indexedCodebases);
-                snapshot.indexedCodebases.forEach(path => {
-                    if (fs.existsSync(path)) {
-                        updatedIndexed.add(path);
-                    }
-                });
-                this.indexedCodebases = Array.from(updatedIndexed);
 
-                // Update indexing codebases (merge progress, keep higher values)
-                if (typeof snapshot.indexingCodebases === 'object' && !Array.isArray(snapshot.indexingCodebases)) {
-                    Object.entries(snapshot.indexingCodebases).forEach(([path, progress]) => {
-                        if (fs.existsSync(path)) {
+                if (isV2(snapshot)) {
+                    Object.entries(snapshot.codebases).forEach(([path, info]) => {
+                        if (info.status === 'indexed' && fs.existsSync(path)) {
+                            updatedIndexed.add(path);
+                        }
+                        if (info.status === 'indexing' && fs.existsSync(path)) {
                             const currentProgress = this.indexingCodebases.get(path) ?? 0;
-                            this.indexingCodebases.set(path, Math.max(currentProgress, progress));
+                            this.indexingCodebases.set(path, Math.max(currentProgress, info.indexingPercentage));
                         }
                     });
+                } else {
+                    snapshot.indexedCodebases.forEach(path => {
+                        if (fs.existsSync(path)) {
+                            updatedIndexed.add(path);
+                        }
+                    });
+
+                    // Update indexing codebases (merge progress, keep higher values)
+                    if (typeof snapshot.indexingCodebases === 'object' && !Array.isArray(snapshot.indexingCodebases)) {
+                        Object.entries(snapshot.indexingCodebases).forEach(([path, progress]) => {
+                            if (fs.existsSync(path)) {
+                                const currentProgress = this.indexingCodebases.get(path) ?? 0;
+                                this.indexingCodebases.set(path, Math.max(currentProgress, progress));
+                            }
+                        });
+                    }
                 }
+
+                this.indexedCodebases = Array.from(updatedIndexed);
 
                 console.log('[SNAPSHOT-DEBUG] Refreshed from file. Indexed:', this.indexedCodebases.length, 'Indexing:', this.indexingCodebases.size);
             });
