@@ -10,6 +10,7 @@ export class FileSynchronizer {
     private rootDir: string;
     private snapshotPath: string;
     private ignorePatterns: string[];
+    private regexCache = new Map<string, RegExp>();
 
     constructor(rootDir: string, ignorePatterns: string[] = []) {
         this.rootDir = rootDir;
@@ -183,12 +184,15 @@ export class FileSynchronizer {
     private simpleGlobMatch(text: string, pattern: string): boolean {
         if (!text || !pattern) return false;
 
-        // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-            .replace(/\*/g, '.*'); // Convert * to .*
-
-        const regex = new RegExp(`^${regexPattern}$`);
+        // Use cached regex if available, otherwise compile and cache
+        let regex = this.regexCache.get(pattern);
+        if (!regex) {
+            const regexPattern = pattern
+                .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
+                .replace(/\*/g, '.*'); // Convert * to .*
+            regex = new RegExp(`^${regexPattern}$`);
+            this.regexCache.set(pattern, regex);
+        }
         return regex.test(text);
     }
 

@@ -103,6 +103,7 @@ export class Context {
     private supportedExtensions: string[];
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
+    private regexCache = new Map<string, RegExp>();
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -1100,12 +1101,15 @@ export class Context {
      * @returns True if pattern matches
      */
     private simpleGlobMatch(text: string, pattern: string): boolean {
-        // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-            .replace(/\*/g, '.*'); // Convert * to .*
-
-        const regex = new RegExp(`^${regexPattern}$`);
+        // Use cached regex if available, otherwise compile and cache
+        let regex = this.regexCache.get(pattern);
+        if (!regex) {
+            const regexPattern = pattern
+                .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
+                .replace(/\*/g, '.*'); // Convert * to .*
+            regex = new RegExp(`^${regexPattern}$`);
+            this.regexCache.set(pattern, regex);
+        }
         return regex.test(text);
     }
 
