@@ -1,4 +1,4 @@
-import * as path from "path";
+import { normalizeCodebasePath } from "@zilliz/claude-context-core";
 
 /**
  * Truncate content to specified length
@@ -11,17 +11,11 @@ export function truncateContent(content: string, maxLength: number): string {
 }
 
 /**
- * Ensure path is absolute. If relative path is provided, resolve it properly.
+ * Ensure path is absolute and normalized for consistent cross-client usage.
+ * Handles MSYS/Git Bash paths, forward slashes, mixed separators on Windows.
  */
 export function ensureAbsolutePath(inputPath: string): string {
-    // If already absolute, return as is
-    if (path.isAbsolute(inputPath)) {
-        return inputPath;
-    }
-
-    // For relative paths, resolve to absolute path
-    const resolved = path.resolve(inputPath);
-    return resolved;
+    return normalizeCodebasePath(inputPath);
 }
 
 export function trackCodebasePath(codebasePath: string): void {

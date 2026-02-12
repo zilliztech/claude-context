@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { MerkleDAG } from './merkle';
 import * as os from 'os';
+import { canonicalCodebasePath } from '../utils/path';
 
 export class FileSynchronizer {
     private fileHashes: Map<string, string>;
@@ -22,9 +23,8 @@ export class FileSynchronizer {
     private getSnapshotPath(codebasePath: string): string {
         const homeDir = os.homedir();
         const merkleDir = path.join(homeDir, '.context', 'merkle');
-
-        const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+        const canonicalPath = canonicalCodebasePath(codebasePath);
+        const hash = crypto.createHash('md5').update(canonicalPath).digest('hex');
 
         return path.join(merkleDir, `${hash}.json`);
     }
@@ -329,8 +329,8 @@ export class FileSynchronizer {
     static async deleteSnapshot(codebasePath: string): Promise<void> {
         const homeDir = os.homedir();
         const merkleDir = path.join(homeDir, '.context', 'merkle');
-        const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+        const canonicalPath = canonicalCodebasePath(codebasePath);
+        const hash = crypto.createHash('md5').update(canonicalPath).digest('hex');
         const snapshotPath = path.join(merkleDir, `${hash}.json`);
 
         try {
