@@ -17,10 +17,12 @@ console.warn = (...args: any[]) => {
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
+import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { Context } from "@zilliz/claude-context-core";
 import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
 
@@ -32,25 +34,14 @@ import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
 
 class ContextMcpServer {
-    private server: Server;
+    private config: ContextMcpConfig;
     private context: Context;
     private snapshotManager: SnapshotManager;
     private syncManager: SyncManager;
     private toolHandlers: ToolHandlers;
 
     constructor(config: ContextMcpConfig) {
-        // Initialize MCP server
-        this.server = new Server(
-            {
-                name: config.name,
-                version: config.version
-            },
-            {
-                capabilities: {
-                    tools: {}
-                }
-            }
-        );
+        this.config = config;
 
         // Initialize embedding provider
         console.log(`[EMBEDDING] Initializing embedding provider: ${config.embeddingProvider}`);
@@ -78,11 +69,30 @@ class ContextMcpServer {
 
         // Load existing codebase snapshot on startup
         this.snapshotManager.loadCodebaseSnapshot();
-
-        this.setupTools();
     }
 
-    private setupTools() {
+    /**
+     * Creates a new Server instance with tool handlers registered.
+     * Each SSE client needs its own Server instance because Protocol.connect()
+     * only supports one transport at a time.
+     */
+    private createServer(): Server {
+        const server = new Server(
+            {
+                name: this.config.name,
+                version: this.config.version
+            },
+            {
+                capabilities: {
+                    tools: {}
+                }
+            }
+        );
+        this.setupTools(server);
+        return server;
+    }
+
+    private setupTools(server: Server) {
         const index_description = `
 Index a codebase directory to enable semantic search using a configurable code splitter.
 
@@ -117,7 +127,7 @@ This tool is versatile and can be used before completing various tasks to retrie
 `;
 
         // Define available tools
-        this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+        server.setRequestHandler(ListToolsRequestSchema, async () => {
             return {
                 tools: [
                     {
@@ -226,7 +236,7 @@ This tool is versatile and can be used before completing various tasks to retrie
         });
 
         // Handle tool execution
-        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
             const { name, arguments: args } = request.params;
 
             switch (name) {
@@ -247,14 +257,56 @@ This tool is versatile and can be used before completing various tasks to retrie
 
     async start() {
         console.log('[SYNC-DEBUG] MCP server start() method called');
-        console.log('Starting Context MCP server...');
+        console.log(`Starting Context MCP server (transport: ${this.config.transport})...`);
 
-        const transport = new StdioServerTransport();
-        console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
+        if (this.config.transport === 'sse') {
+            const sessions = new Map<string, SSEServerTransport>();
 
-        await this.server.connect(transport);
-        console.log("MCP server started and listening on stdio.");
-        console.log('[SYNC-DEBUG] Server connection established successfully');
+            const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+                const url = new URL(req.url || '', `http://localhost:${this.config.port}`);
+
+                if (req.method === 'GET' && url.pathname === '/sse') {
+                    console.log(`[SSE] New client connection`);
+                    const transport = new SSEServerTransport('/message', res);
+                    sessions.set(transport.sessionId, transport);
+
+                    // Each SSE client gets its own Server instance because
+                    // Protocol.connect() only supports one transport at a time
+                    const server = this.createServer();
+
+                    transport.onclose = () => {
+                        console.log(`[SSE] Client disconnected (session: ${transport.sessionId})`);
+                        sessions.delete(transport.sessionId);
+                    };
+
+                    // connect() internally calls transport.start()
+                    await server.connect(transport);
+                    console.log(`[SSE] Client connected (session: ${transport.sessionId}, active: ${sessions.size})`);
+                } else if (req.method === 'POST' && url.pathname === '/message') {
+                    const sessionId = url.searchParams.get('sessionId');
+                    const transport = sessionId ? sessions.get(sessionId) : undefined;
+                    if (transport) {
+                        await transport.handlePostMessage(req, res);
+                    } else {
+                        res.writeHead(404, { 'Content-Type': 'text/plain' });
+                        res.end('Session not found');
+                    }
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'text/plain' });
+                    res.end('Not found');
+                }
+            });
+
+            httpServer.listen(this.config.port, () => {
+                console.log(`MCP SSE server listening on http://localhost:${this.config.port}/sse`);
+            });
+        } else {
+            // Default: stdio transport (existing behavior, unchanged)
+            const server = this.createServer();
+            const transport = new StdioServerTransport();
+            await server.connect(transport);
+            console.log("MCP server started and listening on stdio.");
+        }
 
         // Start background sync after server is connected
         console.log('[SYNC-DEBUG] Initializing background sync...');
