@@ -83,7 +83,7 @@ export class ToolHandlers {
 
                         if (metadataStr) {
                             try {
-                                const metadata = JSON.parse(metadataStr);
+                                const metadata = typeof metadataStr === 'string' ? JSON.parse(metadataStr) : metadataStr;
                                 const codebasePath = metadata.codebasePath;
 
                                 if (codebasePath && typeof codebasePath === 'string') {
