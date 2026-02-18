@@ -47,5 +47,22 @@
         "url": "https://github.com/zilliztech/claude-context.git"
     },
     "license": "MIT",
-    "author": "Cheney Zhang <277584121@qq.com>"
+    "author": "Cheney Zhang <277584121@qq.com>",
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "esbuild",
+            "tree-sitter",
+            "tree-sitter-c-sharp",
+            "tree-sitter-cli",
+            "tree-sitter-cpp",
+            "tree-sitter-go",
+            "tree-sitter-java",
+            "tree-sitter-javascript",
+            "tree-sitter-python",
+            "tree-sitter-rust",
+            "tree-sitter-scala",
+            "tree-sitter-typescript",
+            "unrs-resolver"
+        ]
+    }
 }
