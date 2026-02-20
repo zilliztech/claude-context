@@ -19,14 +19,12 @@ export class ToolHandlers {
     }
 
     /**
-     * Sync indexed codebases from Zilliz Cloud collections
-     * This method fetches all collections from the vector database,
-     * gets the first document from each collection to extract codebasePath from metadata,
-     * and updates the snapshot with discovered codebases.
-     * 
-     * Logic: Compare mcp-codebase-snapshot.json with zilliz cloud collections
-     * - If local snapshot has extra directories (not in cloud), remove them
-     * - If local snapshot is missing directories (exist in cloud), ignore them
+     * Best-effort cloud sync for diagnostics.
+     *
+     * IMPORTANT SAFETY RULE:
+     * Never remove local snapshot entries based only on cloud list/query results.
+     * Different CLI sessions may run with different credentials/clusters, and
+     * transient cloud visibility issues can cause false negatives.
      */
     private async syncIndexedCodebasesFromCloud(): Promise<void> {
         try {
@@ -41,18 +39,7 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 📋 Found ${collections.length} collections in Zilliz Cloud`);
 
             if (collections.length === 0) {
-                console.log(`[SYNC-CLOUD] ✅ No collections found in cloud`);
-                // If no collections in cloud, remove all local codebases
-                const localCodebases = this.snapshotManager.getIndexedCodebases();
-                if (localCodebases.length > 0) {
-                    console.log(`[SYNC-CLOUD] 🧹 Removing ${localCodebases.length} local codebases as cloud has no collections`);
-                    for (const codebasePath of localCodebases) {
-                        this.snapshotManager.removeIndexedCodebase(codebasePath);
-                        console.log(`[SYNC-CLOUD] ➖ Removed local codebase: ${codebasePath}`);
-                    }
-                    this.snapshotManager.saveCodebaseSnapshot();
-                    console.log(`[SYNC-CLOUD] 💾 Updated snapshot to match empty cloud state`);
-                }
+                console.warn(`[SYNC-CLOUD] ⚠️  Cloud returned zero collections. Skipping local snapshot cleanup to avoid false negatives.`);
                 return;
             }
 
@@ -110,30 +97,19 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 📊 Found ${cloudCodebases.size} valid codebases in cloud`);
 
             // Get current local codebases
-            const localCodebases = new Set(this.snapshotManager.getIndexedCodebases());
-            console.log(`[SYNC-CLOUD] 📊 Found ${localCodebases.size} local codebases in snapshot`);
+            const localCodebases = this.snapshotManager.getIndexedCodebases();
+            console.log(`[SYNC-CLOUD] 📊 Found ${localCodebases.length} local codebases in snapshot`);
 
-            let hasChanges = false;
-
-            // Remove local codebases that don't exist in cloud
-            for (const localCodebase of localCodebases) {
-                if (!cloudCodebases.has(localCodebase)) {
-                    this.snapshotManager.removeIndexedCodebase(localCodebase);
-                    hasChanges = true;
-                    console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
-                }
+            const missingInCloud = localCodebases.filter((localCodebase) => !cloudCodebases.has(localCodebase));
+            if (missingInCloud.length > 0) {
+                console.warn(
+                    `[SYNC-CLOUD] ⚠️  ${missingInCloud.length} local codebase(s) were not found in cloud metadata. ` +
+                    `Keeping local snapshot unchanged for safety.`
+                );
             }
 
-            // Note: We don't add cloud codebases that are missing locally (as per user requirement)
-            console.log(`[SYNC-CLOUD] ℹ️  Skipping addition of cloud codebases not present locally (per sync policy)`);
-
-            if (hasChanges) {
-                this.snapshotManager.saveCodebaseSnapshot();
-                console.log(`[SYNC-CLOUD] 💾 Updated snapshot to match cloud state`);
-            } else {
-                console.log(`[SYNC-CLOUD] ✅ Local snapshot already matches cloud state`);
-            }
-
+            // Note: intentionally no snapshot mutation here.
+            console.log(`[SYNC-CLOUD] ℹ️  Cloud sync is non-destructive; local snapshot was not modified.`);
             console.log(`[SYNC-CLOUD] ✅ Cloud sync completed successfully`);
         } catch (error: any) {
             console.error(`[SYNC-CLOUD] ❌ Error syncing codebases from cloud:`, error.message || error);
@@ -199,13 +175,29 @@ export class ToolHandlers {
                 };
             }
 
-            //Check if the snapshot and cloud index are in sync
-            if (this.snapshotManager.getIndexedCodebases().includes(absolutePath) !== await this.context.hasIndex(absolutePath)) {
+            const snapshotHasIndex = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
+            const cloudHasIndex = await this.context.hasIndex(absolutePath);
+
+            // Reconcile local snapshot with cloud truth for this specific codebase
+            if (snapshotHasIndex !== cloudHasIndex) {
                 console.warn(`[INDEX-VALIDATION] ❌ Snapshot and cloud index mismatch: ${absolutePath}`);
+                if (cloudHasIndex && !snapshotHasIndex) {
+                    this.snapshotManager.setCodebaseIndexed(absolutePath, {
+                        indexedFiles: 0,
+                        totalChunks: 0,
+                        status: 'completed'
+                    });
+                    await this.snapshotManager.saveCodebaseSnapshot('index-reconcile-cloud-present');
+                    console.log(`[INDEX-VALIDATION] 🛠️  Recovered missing snapshot entry from cloud index: ${absolutePath}`);
+                } else if (!cloudHasIndex && snapshotHasIndex) {
+                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                    await this.snapshotManager.saveCodebaseSnapshot('index-reconcile-cloud-missing');
+                    console.log(`[INDEX-VALIDATION] 🧹 Removed stale snapshot entry without cloud index: ${absolutePath}`);
+                }
             }
 
-            // Check if already indexed (unless force is true)
-            if (!forceReindex && this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
+            // Check if already indexed in cloud (unless force is true)
+            if (!forceReindex && cloudHasIndex) {
                 return {
                     content: [{
                         type: "text",
@@ -219,9 +211,9 @@ export class ToolHandlers {
             if (forceReindex) {
                 if (this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
                     console.log(`[FORCE-REINDEX] 🔄 Removing '${absolutePath}' from indexed list for re-indexing`);
-                    this.snapshotManager.removeIndexedCodebase(absolutePath);
+                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
                 }
-                if (await this.context.hasIndex(absolutePath)) {
+                if (cloudHasIndex) {
                     console.log(`[FORCE-REINDEX] 🔄 Clearing index for '${absolutePath}'`);
                     await this.context.clearIndex(absolutePath);
                 }
@@ -279,7 +271,7 @@ export class ToolHandlers {
 
             // Set to indexing status and save snapshot immediately
             this.snapshotManager.setCodebaseIndexing(absolutePath, 0);
-            this.snapshotManager.saveCodebaseSnapshot();
+            await this.snapshotManager.saveCodebaseSnapshot('index-started');
 
             // Track the codebase path for syncing
             trackCodebasePath(absolutePath);
@@ -323,7 +315,7 @@ export class ToolHandlers {
 
     private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string) {
         const absolutePath = codebasePath;
-        let lastSaveTime = 0; // Track last save timestamp
+        let lastPersistedProgress = -1;
 
         try {
             console.log(`[BACKGROUND-INDEX] Starting background indexing for: ${absolutePath}`);
@@ -369,12 +361,16 @@ export class ToolHandlers {
                 // Update progress in snapshot manager using new method
                 this.snapshotManager.setCodebaseIndexing(absolutePath, progress.percentage);
 
-                // Save snapshot periodically (every 2 seconds to avoid too frequent saves)
-                const currentTime = Date.now();
-                if (currentTime - lastSaveTime >= 2000) { // 2 seconds = 2000ms
-                    this.snapshotManager.saveCodebaseSnapshot();
-                    lastSaveTime = currentTime;
-                    console.log(`[BACKGROUND-INDEX] 💾 Saved progress snapshot at ${progress.percentage.toFixed(1)}%`);
+                // Coalesce disk writes: persist only meaningful progress jumps.
+                const shouldPersistProgress =
+                    lastPersistedProgress < 0 ||
+                    progress.percentage >= 100 ||
+                    Math.abs(progress.percentage - lastPersistedProgress) >= 2;
+
+                if (shouldPersistProgress) {
+                    this.snapshotManager.scheduleSaveCodebaseSnapshot('index-progress');
+                    lastPersistedProgress = progress.percentage;
+                    console.log(`[BACKGROUND-INDEX] 💾 Scheduled progress snapshot at ${progress.percentage.toFixed(1)}%`);
                 }
 
                 console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
@@ -386,7 +382,7 @@ export class ToolHandlers {
             this.indexingStats = { indexedFiles: stats.indexedFiles, totalChunks: stats.totalChunks };
 
             // Save snapshot after updating codebase lists
-            this.snapshotManager.saveCodebaseSnapshot();
+            await this.snapshotManager.saveCodebaseSnapshot('index-completed');
 
             let message = `Background indexing completed for '${absolutePath}' using ${splitterType.toUpperCase()} splitter.\nIndexed ${stats.indexedFiles} files, ${stats.totalChunks} chunks.`;
             if (stats.status === 'limit_reached') {
@@ -404,7 +400,7 @@ export class ToolHandlers {
             // Set codebase to failed status with error information
             const errorMessage = error.message || String(error);
             this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress);
-            this.snapshotManager.saveCodebaseSnapshot();
+            await this.snapshotManager.saveCodebaseSnapshot('index-failed');
 
             // Log error but don't crash MCP service - indexing errors are handled gracefully
             console.error(`[BACKGROUND-INDEX] Indexing failed for ${absolutePath}: ${errorMessage}`);
@@ -447,11 +443,23 @@ export class ToolHandlers {
 
             trackCodebasePath(absolutePath);
 
-            // Check if this codebase is indexed or being indexed
-            const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
+            // Check status with cloud as source of truth and snapshot as progress source
+            const isIndexedInSnapshot = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
             const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
+            const hasCloudIndex = await this.context.hasIndex(absolutePath);
 
-            if (!isIndexed && !isIndexing) {
+            // Self-heal snapshot if index exists in cloud but local snapshot is missing
+            if (hasCloudIndex && !isIndexedInSnapshot && !isIndexing) {
+                this.snapshotManager.setCodebaseIndexed(absolutePath, {
+                    indexedFiles: 0,
+                    totalChunks: 0,
+                    status: 'completed'
+                });
+                await this.snapshotManager.saveCodebaseSnapshot('search-reconcile-cloud-present');
+                console.log(`[SEARCH] 🛠️ Restored missing snapshot entry from cloud index for: ${absolutePath}`);
+            }
+
+            if (!hasCloudIndex && !isIndexing) {
                 return {
                     content: [{
                         type: "text",
@@ -469,7 +477,7 @@ export class ToolHandlers {
 
             console.log(`[SEARCH] Searching in codebase: ${absolutePath}`);
             console.log(`[SEARCH] Query: "${query}"`);
-            console.log(`[SEARCH] Indexing status: ${isIndexing ? 'In Progress' : 'Completed'}`);
+            console.log(`[SEARCH] Indexing status: ${isIndexing ? 'In Progress' : (hasCloudIndex ? 'Completed' : 'No collection yet')}`);
 
             // Log embedding provider information before search
             const embeddingProvider = this.context.getEmbedding();
@@ -571,15 +579,6 @@ export class ToolHandlers {
     public async handleClearIndex(args: any) {
         const { path: codebasePath } = args;
 
-        if (this.snapshotManager.getIndexedCodebases().length === 0 && this.snapshotManager.getIndexingCodebases().length === 0) {
-            return {
-                content: [{
-                    type: "text",
-                    text: "No codebases are currently indexed or being indexed."
-                }]
-            };
-        }
-
         try {
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = ensureAbsolutePath(codebasePath);
@@ -610,8 +609,9 @@ export class ToolHandlers {
             // Check if this codebase is indexed or being indexed
             const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
             const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
+            const hasCloudIndex = await this.context.hasIndex(absolutePath);
 
-            if (!isIndexed && !isIndexing) {
+            if (!isIndexed && !isIndexing && !hasCloudIndex) {
                 return {
                     content: [{
                         type: "text",
@@ -623,19 +623,23 @@ export class ToolHandlers {
 
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
 
-            try {
-                await this.context.clearIndex(absolutePath);
-                console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
-            } catch (error: any) {
-                const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;
-                console.error(`[CLEAR] ${errorMsg}`);
-                return {
-                    content: [{
-                        type: "text",
-                        text: errorMsg
-                    }],
-                    isError: true
-                };
+            if (hasCloudIndex) {
+                try {
+                    await this.context.clearIndex(absolutePath);
+                    console.log(`[CLEAR] Successfully cleared index for: ${absolutePath}`);
+                } catch (error: any) {
+                    const errorMsg = `Failed to clear ${absolutePath}: ${error.message}`;
+                    console.error(`[CLEAR] ${errorMsg}`);
+                    return {
+                        content: [{
+                            type: "text",
+                            text: errorMsg
+                        }],
+                        isError: true
+                    };
+                }
+            } else {
+                console.log(`[CLEAR] ℹ️ No cloud collection found for ${absolutePath}, cleaning snapshot only`);
             }
 
             // Completely remove the cleared codebase from snapshot
@@ -645,7 +649,7 @@ export class ToolHandlers {
             this.indexingStats = null;
 
             // Save snapshot after clearing index
-            this.snapshotManager.saveCodebaseSnapshot();
+            await this.snapshotManager.saveCodebaseSnapshot('clear-index');
 
             let resultText = `Successfully cleared codebase '${absolutePath}'`;
 
@@ -718,9 +722,34 @@ export class ToolHandlers {
                 };
             }
 
-            // Check indexing status using new status system
-            const status = this.snapshotManager.getCodebaseStatus(absolutePath);
-            const info = this.snapshotManager.getCodebaseInfo(absolutePath);
+            // Check indexing status using snapshot plus cloud truth
+            let status = this.snapshotManager.getCodebaseStatus(absolutePath);
+            let info = this.snapshotManager.getCodebaseInfo(absolutePath);
+            let recoveredFromCloud = false;
+            const hasCloudIndex = await this.context.hasIndex(absolutePath);
+
+            // Self-heal snapshot if cloud has index but local status is missing
+            if (status === 'not_found' && hasCloudIndex) {
+                this.snapshotManager.setCodebaseIndexed(absolutePath, {
+                    indexedFiles: 0,
+                    totalChunks: 0,
+                    status: 'completed'
+                });
+                await this.snapshotManager.saveCodebaseSnapshot('status-reconcile-cloud-present');
+                status = 'indexed';
+                info = this.snapshotManager.getCodebaseInfo(absolutePath);
+                recoveredFromCloud = true;
+                console.log(`[STATUS] 🛠️ Restored missing snapshot entry from cloud index for: ${absolutePath}`);
+            }
+
+            // Cleanup stale snapshot entries if cloud index no longer exists
+            if (status === 'indexed' && !hasCloudIndex) {
+                this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                await this.snapshotManager.saveCodebaseSnapshot('status-reconcile-cloud-missing');
+                status = 'not_found';
+                info = undefined;
+                console.log(`[STATUS] 🧹 Removed stale indexed snapshot entry without cloud index for: ${absolutePath}`);
+            }
 
             let statusMessage = '';
 
@@ -734,6 +763,9 @@ export class ToolHandlers {
                         statusMessage += `\n🕐 Last updated: ${new Date(indexedInfo.lastUpdated).toLocaleString()}`;
                     } else {
                         statusMessage = `✅ Codebase '${absolutePath}' is fully indexed and ready for search.`;
+                    }
+                    if (recoveredFromCloud) {
+                        statusMessage += `\nℹ️ Index was detected directly in vector database and local snapshot state was restored.`;
                     }
                     break;
 
