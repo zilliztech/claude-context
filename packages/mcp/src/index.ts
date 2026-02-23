@@ -18,11 +18,14 @@ console.warn = (...args: any[]) => {
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
     ListToolsRequestSchema,
-    CallToolRequestSchema
+    CallToolRequestSchema,
+    isInitializeRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import { Context } from "@zilliz/claude-context-core";
 import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
 
@@ -32,6 +35,22 @@ import { createEmbeddingInstance, logEmbeddingProviderInfo } from "./embedding.j
 import { SnapshotManager } from "./snapshot.js";
 import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
+
+/** Read and JSON-parse the request body from an IncomingMessage. */
+function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => {
+            try {
+                resolve(JSON.parse(Buffer.concat(chunks).toString()));
+            } catch (e) {
+                reject(e);
+            }
+        });
+        req.on('error', reject);
+    });
+}
 
 class ContextMcpServer {
     private config: ContextMcpConfig;
@@ -73,8 +92,8 @@ class ContextMcpServer {
 
     /**
      * Creates a new Server instance with tool handlers registered.
-     * Each SSE client needs its own Server instance because Protocol.connect()
-     * only supports one transport at a time.
+     * Each client session (SSE or Streamable HTTP) needs its own Server
+     * instance because Protocol.connect() only supports one transport at a time.
      */
     private createServer(): Server {
         const server = new Server(
@@ -260,45 +279,164 @@ This tool is versatile and can be used before completing various tasks to retrie
         console.log(`Starting Context MCP server (transport: ${this.config.transport})...`);
 
         if (this.config.transport === 'sse') {
-            const sessions = new Map<string, SSEServerTransport>();
+            type TransportEntry = SSEServerTransport | StreamableHTTPServerTransport;
+            const sessions = new Map<string, TransportEntry>();
+            const sseResponses = new Map<string, ServerResponse>(); // raw res refs for heartbeat
 
             const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
                 const url = new URL(req.url || '', `http://localhost:${this.config.port}`);
+                const pathname = url.pathname;
 
-                if (req.method === 'GET' && url.pathname === '/sse') {
-                    console.log(`[SSE] New client connection`);
-                    const transport = new SSEServerTransport('/message', res);
-                    sessions.set(transport.sessionId, transport);
+                try {
+                    // ── Streamable HTTP (protocol 2025-03-26) ─────────────
+                    if (pathname === '/mcp') {
+                        if (req.method === 'POST') {
+                            let body: Record<string, unknown>;
+                            try {
+                                body = await readBody(req);
+                            } catch {
+                                res.writeHead(400, { 'Content-Type': 'text/plain' });
+                                res.end('Invalid JSON');
+                                return;
+                            }
 
-                    // Each SSE client gets its own Server instance because
-                    // Protocol.connect() only supports one transport at a time
-                    const server = this.createServer();
+                            const sessionId = req.headers['mcp-session-id'] as string | undefined;
+                            let transport = sessionId ? sessions.get(sessionId) : undefined;
 
-                    transport.onclose = () => {
-                        console.log(`[SSE] Client disconnected (session: ${transport.sessionId})`);
-                        sessions.delete(transport.sessionId);
-                    };
+                            if (transport && !(transport instanceof StreamableHTTPServerTransport)) {
+                                res.writeHead(400, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    error: { code: -32000, message: 'Session uses a different transport protocol' },
+                                    id: null,
+                                }));
+                                return;
+                            }
 
-                    // connect() internally calls transport.start()
-                    await server.connect(transport);
-                    console.log(`[SSE] Client connected (session: ${transport.sessionId}, active: ${sessions.size})`);
-                } else if (req.method === 'POST' && url.pathname === '/message') {
-                    const sessionId = url.searchParams.get('sessionId');
-                    const transport = sessionId ? sessions.get(sessionId) : undefined;
-                    if (transport) {
-                        await transport.handlePostMessage(req, res);
-                    } else {
-                        res.writeHead(404, { 'Content-Type': 'text/plain' });
-                        res.end('Session not found');
+                            if (!transport && isInitializeRequest(body)) {
+                                const newTransport = new StreamableHTTPServerTransport({
+                                    sessionIdGenerator: () => randomUUID(),
+                                    onsessioninitialized: (sid: string) => {
+                                        console.log(`[HTTP] Streamable HTTP session initialized: ${sid}`);
+                                        sessions.set(sid, newTransport);
+                                    },
+                                });
+                                newTransport.onclose = () => {
+                                    const sid = newTransport.sessionId;
+                                    if (sid) {
+                                        console.log(`[HTTP] Streamable HTTP session closed: ${sid}`);
+                                        sessions.delete(sid);
+                                    }
+                                };
+                                const server = this.createServer();
+                                await server.connect(newTransport);
+                                transport = newTransport;
+                            }
+
+                            if (transport instanceof StreamableHTTPServerTransport) {
+                                await transport.handleRequest(req, res, body);
+                            } else {
+                                res.writeHead(400, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    error: { code: -32000, message: 'Bad Request: No valid session' },
+                                    id: null,
+                                }));
+                            }
+                        } else if (req.method === 'GET' || req.method === 'DELETE') {
+                            const sessionId = req.headers['mcp-session-id'] as string | undefined;
+                            const transport = sessionId ? sessions.get(sessionId) : undefined;
+                            if (transport instanceof StreamableHTTPServerTransport) {
+                                await transport.handleRequest(req, res);
+                            } else {
+                                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                                res.end('Session not found');
+                            }
+                        } else {
+                            res.writeHead(405, { 'Content-Type': 'text/plain' });
+                            res.end('Method not allowed');
+                        }
                     }
-                } else {
-                    res.writeHead(404, { 'Content-Type': 'text/plain' });
-                    res.end('Not found');
+
+                    // ── Legacy SSE (deprecated protocol 2024-11-05) ───────
+                    else if (req.method === 'GET' && pathname === '/sse') {
+                        console.log(`[SSE] New client connection`);
+                        const transport = new SSEServerTransport('/message', res);
+                        sessions.set(transport.sessionId, transport);
+                        sseResponses.set(transport.sessionId, res);
+
+                        const server = this.createServer();
+
+                        transport.onclose = () => {
+                            console.log(`[SSE] Client disconnected (session: ${transport.sessionId})`);
+                            sessions.delete(transport.sessionId);
+                            sseResponses.delete(transport.sessionId);
+                        };
+
+                        // Redundant close handler on raw response for extra safety
+                        res.on('close', () => {
+                            sessions.delete(transport.sessionId);
+                            sseResponses.delete(transport.sessionId);
+                        });
+
+                        await server.connect(transport);
+                        console.log(`[SSE] Client connected (session: ${transport.sessionId}, active: ${sessions.size})`);
+                    }
+
+                    else if (req.method === 'POST' && pathname === '/message') {
+                        const sessionId = url.searchParams.get('sessionId');
+                        const transport = sessionId ? sessions.get(sessionId) : undefined;
+                        if (transport instanceof SSEServerTransport) {
+                            await transport.handlePostMessage(req, res);
+                        } else {
+                            res.writeHead(404, { 'Content-Type': 'text/plain' });
+                            res.end('Session not found');
+                        }
+                    }
+
+                    // ── Catch-all ─────────────────────────────────────────
+                    else {
+                        res.writeHead(404, { 'Content-Type': 'text/plain' });
+                        res.end('Not found');
+                    }
+                } catch (error) {
+                    console.error('[HTTP] Error handling request:', error);
+                    if (!res.headersSent) {
+                        res.writeHead(500, { 'Content-Type': 'text/plain' });
+                        res.end('Internal server error');
+                    }
                 }
             });
 
+            // ── Heartbeat: detect zombie SSE sessions ─────────────────
+            const HEARTBEAT_INTERVAL = 30_000;
+            setInterval(() => {
+                for (const [sessionId, sseRes] of sseResponses) {
+                    if (sseRes.writableEnded || sseRes.destroyed) {
+                        console.log(`[SSE] Stale response detected, removing session: ${sessionId}`);
+                        sessions.delete(sessionId);
+                        sseResponses.delete(sessionId);
+                        continue;
+                    }
+                    try {
+                        sseRes.write(':ping\n\n');
+                    } catch {
+                        console.log(`[SSE] Heartbeat failed, removing zombie session: ${sessionId}`);
+                        sessions.delete(sessionId);
+                        sseResponses.delete(sessionId);
+                    }
+                }
+                if (sessions.size > 0) {
+                    const sseCount = [...sessions.values()].filter(t => t instanceof SSEServerTransport).length;
+                    const httpCount = [...sessions.values()].filter(t => t instanceof StreamableHTTPServerTransport).length;
+                    console.log(`[SESSIONS] Active: ${sessions.size} (SSE: ${sseCount}, HTTP: ${httpCount})`);
+                }
+            }, HEARTBEAT_INTERVAL);
+
             httpServer.listen(this.config.port, () => {
-                console.log(`MCP SSE server listening on http://localhost:${this.config.port}/sse`);
+                console.log(`MCP server listening on http://localhost:${this.config.port}`);
+                console.log(`  Streamable HTTP: POST|GET|DELETE /mcp`);
+                console.log(`  Legacy SSE:      GET /sse + POST /message`);
             });
         } else {
             // Default: stdio transport (existing behavior, unchanged)
