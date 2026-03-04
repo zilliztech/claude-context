@@ -556,22 +556,27 @@ export class SnapshotManager {
                 continue;
             }
 
-            // Store the complete info for this codebase
-            validCodebaseInfoMap.set(codebasePath, info);
-
             if (info.status === 'indexed') {
+                // Store the complete info for indexed codebases
+                validCodebaseInfoMap.set(codebasePath, info);
                 validIndexedCodebases.push(codebasePath);
                 if ('indexedFiles' in info) {
                     validFileCount.set(codebasePath, info.indexedFiles);
                 }
                 console.log(`[SNAPSHOT-DEBUG] Validated indexed codebase: ${codebasePath} (${info.indexedFiles || 'unknown'} files, ${info.totalChunks || 'unknown'} chunks)`);
             } else if (info.status === 'indexing') {
-                if ('indexingPercentage' in info) {
-                    validIndexingCodebases.set(codebasePath, info.indexingPercentage);
-                }
                 console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath} (${info.indexingPercentage || 0}%). Treating as not indexed.`);
-                // Don't add to indexed - treat interrupted indexing as not indexed
+                // Interrupted indexing should not block future indexing attempts.
+                // Convert it into a failed status to preserve diagnostics while avoiding stale "indexing" locks.
+                const interruptedInfo: CodebaseInfoIndexFailed = {
+                    status: 'indexfailed',
+                    errorMessage: 'Indexing was interrupted (likely due to MCP restart). Please run index_codebase again.',
+                    lastAttemptedPercentage: info.indexingPercentage,
+                    lastUpdated: new Date().toISOString()
+                };
+                validCodebaseInfoMap.set(codebasePath, interruptedInfo);
             } else if (info.status === 'indexfailed') {
+                validCodebaseInfoMap.set(codebasePath, info);
                 console.warn(`[SNAPSHOT-DEBUG] Found failed indexing codebase: ${codebasePath}. Error: ${info.errorMessage}`);
                 // Failed indexing codebases are not added to indexed or indexing lists
                 // But we keep the info for potential retry
@@ -580,7 +585,7 @@ export class SnapshotManager {
 
         // Restore state
         this.indexedCodebases = validIndexedCodebases;
-        this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
+        this.indexingCodebases = validIndexingCodebases;
         this.codebaseFileCount = validFileCount;
         this.codebaseInfoMap = validCodebaseInfoMap;
     }

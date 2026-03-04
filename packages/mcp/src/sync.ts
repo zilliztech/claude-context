@@ -70,6 +70,17 @@ export class SyncManager {
                     totalStats.modified += stats.modified;
 
                     if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
+                        // Refresh snapshot metadata so get_indexing_status shows recent incremental reindex time.
+                        const currentInfo = this.snapshotManager.getCodebaseInfo(codebasePath);
+                        if (currentInfo && currentInfo.status === 'indexed') {
+                            this.snapshotManager.setCodebaseIndexed(codebasePath, {
+                                indexedFiles: currentInfo.indexedFiles,
+                                totalChunks: currentInfo.totalChunks,
+                                status: currentInfo.indexStatus
+                            });
+                            await this.snapshotManager.saveCodebaseSnapshot('sync-incremental-updated');
+                        }
+
                         console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
                     } else {
                         console.log(`[SYNC] No changes detected for '${codebasePath}' (${codebaseElapsed}ms)`);

@@ -164,8 +164,10 @@ export class ToolHandlers {
                 };
             }
 
-            // Check if already indexing
-            if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
+            // Check if this process is already indexing the codebase.
+            // We intentionally rely on in-memory status here so stale on-disk "indexing"
+            // entries from previous MCP sessions don't block force reindex.
+            if (this.snapshotManager.getCodebaseStatus(absolutePath) === 'indexing') {
                 return {
                     content: [{
                         type: "text",
