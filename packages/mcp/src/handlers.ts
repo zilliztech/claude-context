@@ -41,18 +41,7 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 📋 Found ${collections.length} collections in Zilliz Cloud`);
 
             if (collections.length === 0) {
-                console.log(`[SYNC-CLOUD] ✅ No collections found in cloud`);
-                // If no collections in cloud, remove all local codebases
-                const localCodebases = this.snapshotManager.getIndexedCodebases();
-                if (localCodebases.length > 0) {
-                    console.log(`[SYNC-CLOUD] 🧹 Removing ${localCodebases.length} local codebases as cloud has no collections`);
-                    for (const codebasePath of localCodebases) {
-                        this.snapshotManager.removeIndexedCodebase(codebasePath);
-                        console.log(`[SYNC-CLOUD] ➖ Removed local codebase: ${codebasePath}`);
-                    }
-                    this.snapshotManager.saveCodebaseSnapshot();
-                    console.log(`[SYNC-CLOUD] 💾 Updated snapshot to match empty cloud state`);
-                }
+                console.log(`[SYNC-CLOUD] ✅ No collections found in Milvus, preserving local snapshot`);
                 return;
             }
 
@@ -124,8 +113,21 @@ export class ToolHandlers {
                 }
             }
 
-            // Note: We don't add cloud codebases that are missing locally (as per user requirement)
-            console.log(`[SYNC-CLOUD] ℹ️  Skipping addition of cloud codebases not present locally (per sync policy)`);
+            // Restore codebases found in Milvus that are missing from the local snapshot.
+            // Only restore if the path exists locally — this ensures safety for both
+            // local Milvus (paths are always local) and Zilliz Cloud (paths from other
+            // machines are ignored since they don't exist on this filesystem).
+            for (const cloudCodebase of cloudCodebases) {
+                if (!localCodebases.has(cloudCodebase) && fs.existsSync(cloudCodebase)) {
+                    this.snapshotManager.setCodebaseIndexed(cloudCodebase, {
+                        indexedFiles: 0,
+                        totalChunks: 0,
+                        status: 'completed'
+                    });
+                    hasChanges = true;
+                    console.log(`[SYNC-CLOUD] ➕ Restored codebase from Milvus to local snapshot: ${cloudCodebase}`);
+                }
+            }
 
             if (hasChanges) {
                 this.snapshotManager.saveCodebaseSnapshot();
