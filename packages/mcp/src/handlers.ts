@@ -46,6 +46,7 @@ export class ToolHandlers {
             }
 
             const cloudCodebases = new Set<string>();
+            let hasUnresolvableCollections = false;
 
             // Check each collection for codebase path
             for (const collectionName of collections) {
@@ -80,18 +81,23 @@ export class ToolHandlers {
                                     cloudCodebases.add(codebasePath);
                                 } else {
                                     console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
+                                    hasUnresolvableCollections = true;
                                 }
                             } catch (parseError) {
                                 console.warn(`[SYNC-CLOUD] ⚠️  Failed to parse metadata JSON for collection ${collectionName}:`, parseError);
+                                hasUnresolvableCollections = true;
                             }
                         } else {
                             console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
+                            hasUnresolvableCollections = true;
                         }
                     } else {
-                        console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
+                        console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} returned empty query results, skipping removal of local codebases`);
+                        hasUnresolvableCollections = true;
                     }
                 } catch (collectionError: any) {
                     console.warn(`[SYNC-CLOUD] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
+                    hasUnresolvableCollections = true;
                     // Continue with next collection
                 }
             }
@@ -104,13 +110,19 @@ export class ToolHandlers {
 
             let hasChanges = false;
 
-            // Remove local codebases that don't exist in cloud
-            for (const localCodebase of localCodebases) {
-                if (!cloudCodebases.has(localCodebase)) {
-                    this.snapshotManager.removeIndexedCodebase(localCodebase);
-                    hasChanges = true;
-                    console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
+            // Remove local codebases that don't exist in cloud.
+            // Only do this when we could resolve all collections — if any query failed
+            // or returned empty, we can't be sure the codebase doesn't exist in Milvus.
+            if (!hasUnresolvableCollections) {
+                for (const localCodebase of localCodebases) {
+                    if (!cloudCodebases.has(localCodebase)) {
+                        this.snapshotManager.removeIndexedCodebase(localCodebase);
+                        hasChanges = true;
+                        console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
+                    }
                 }
+            } else {
+                console.log(`[SYNC-CLOUD] ⚠️  Skipping removal of local codebases — some collections could not be resolved`);
             }
 
             // Restore codebases found in Milvus that are missing from the local snapshot.
