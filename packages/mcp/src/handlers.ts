@@ -528,6 +528,18 @@ export class ToolHandlers {
             console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
 
             if (searchResults.length === 0) {
+                // Check if collection was lost (indexed locally but missing in Milvus)
+                if (isIndexed && !isIndexing) {
+                    const collectionName = this.context.getCollectionName(absolutePath);
+                    const hasCollection = await this.context.getVectorDatabase().hasCollection(collectionName);
+                    if (!hasCollection) {
+                        return {
+                            content: [{ type: "text", text: `Error: Index data for '${absolutePath}' has been lost (collection not found in Milvus). Please re-index using index_codebase with force=true.` }],
+                            isError: true
+                        };
+                    }
+                }
+
                 let noResultsMessage = `No results found for query: "${query}" in codebase '${absolutePath}'`;
                 if (isIndexing) {
                     noResultsMessage += `\n\nNote: This codebase is still being indexed. Try searching again after indexing completes, or the query may not match any indexed content.`;
