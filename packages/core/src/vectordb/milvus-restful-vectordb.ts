@@ -191,11 +191,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
             // Build collection schema based on the original milvus-vectordb.ts implementation
-            // Note: REST API doesn't support description parameter in collection creation
-            // Unlike gRPC version, the description parameter is ignored in REST API
-            const collectionSchema = {
+            const collectionSchema: any = {
                 collectionName,
                 dbName: restfulConfig.database,
+                description: description || `Claude Context collection: ${collectionName}`,
                 schema: {
                     enableDynamicField: false,
                     fields: [
@@ -492,14 +491,22 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
-            const queryRequest = {
+            const queryRequest: Record<string, any> = {
                 collectionName,
                 dbName: restfulConfig.database,
-                filter,
                 outputFields,
-                limit: limit || 16384, // Use provided limit or default
                 offset: 0
             };
+            // Only include filter if it's a non-empty, non-whitespace string
+            if (filter && filter.trim() !== '') {
+                queryRequest.filter = filter;
+            }
+            // Add limit if provided, or default when no filter is specified
+            if (limit !== undefined) {
+                queryRequest.limit = limit;
+            } else if (!filter || filter.trim() === '') {
+                queryRequest.limit = 16384;
+            }
 
             const response = await this.makeRequest('/entities/query', 'POST', queryRequest);
 
@@ -519,9 +526,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
 
-            const collectionSchema = {
+            const collectionSchema: any = {
                 collectionName,
                 dbName: restfulConfig.database,
+                description: description || `Hybrid code context collection: ${collectionName}`,
                 schema: {
                     enableDynamicField: false,
                     functions: [
@@ -783,6 +791,23 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         } catch (error) {
             console.error(`[MilvusRestfulDB] ❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
+            throw error;
+        }
+    }
+
+    async getCollectionDescription(collectionName: string): Promise<string> {
+        await this.ensureInitialized();
+
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+            const response = await this.makeRequest('/collections/describe', 'POST', {
+                collectionName,
+                dbName: restfulConfig.database
+            });
+
+            return response.data?.description || '';
+        } catch (error) {
+            console.error(`[MilvusRestfulDB] ❌ Failed to get description for collection '${collectionName}':`, error);
             throw error;
         }
     }

@@ -21,9 +21,10 @@ export class ToolHandlers {
     /**
      * Sync indexed codebases from Zilliz Cloud collections
      * This method fetches all collections from the vector database,
-     * gets the first document from each collection to extract codebasePath from metadata,
+     * extracts codebasePath from collection description (preferred) or falls back
+     * to querying document metadata for old collections,
      * and updates the snapshot with discovered codebases.
-     * 
+     *
      * Logic: Compare mcp-codebase-snapshot.json with zilliz cloud collections
      * - If local snapshot has extra directories (not in cloud), remove them
      * - If local snapshot is missing directories (exist in cloud), ignore them
@@ -41,22 +42,13 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] 📋 Found ${collections.length} collections in Zilliz Cloud`);
 
             if (collections.length === 0) {
-                console.log(`[SYNC-CLOUD] ✅ No collections found in cloud`);
-                // If no collections in cloud, remove all local codebases
-                const localCodebases = this.snapshotManager.getIndexedCodebases();
-                if (localCodebases.length > 0) {
-                    console.log(`[SYNC-CLOUD] 🧹 Removing ${localCodebases.length} local codebases as cloud has no collections`);
-                    for (const codebasePath of localCodebases) {
-                        this.snapshotManager.removeIndexedCodebase(codebasePath);
-                        console.log(`[SYNC-CLOUD] ➖ Removed local codebase: ${codebasePath}`);
-                    }
-                    this.snapshotManager.saveCodebaseSnapshot();
-                    console.log(`[SYNC-CLOUD] 💾 Updated snapshot to match empty cloud state`);
-                }
+                console.log(`[SYNC-CLOUD] ✅ No collections found in cloud. Skipping deletion of local codebases to avoid data loss from transient errors.`);
                 return;
             }
 
             const cloudCodebases = new Set<string>();
+            let codeCollectionsChecked = 0;
+            let successfulExtractions = 0;
 
             // Check each collection for codebase path
             for (const collectionName of collections) {
@@ -67,39 +59,61 @@ export class ToolHandlers {
                         continue;
                     }
 
+                    codeCollectionsChecked++;
                     console.log(`[SYNC-CLOUD] 🔍 Checking collection: ${collectionName}`);
 
-                    // Query the first document to get metadata
-                    const results = await vectorDb.query(
-                        collectionName,
-                        '', // Empty filter to get all results
-                        ['metadata'], // Only fetch metadata field
-                        1 // Only need one result to extract codebasePath
-                    );
-
-                    if (results && results.length > 0) {
-                        const firstResult = results[0];
-                        const metadataStr = firstResult.metadata;
-
-                        if (metadataStr) {
-                            try {
-                                const metadata = JSON.parse(metadataStr);
-                                const codebasePath = metadata.codebasePath;
-
-                                if (codebasePath && typeof codebasePath === 'string') {
-                                    console.log(`[SYNC-CLOUD] 📍 Found codebase path: ${codebasePath} in collection: ${collectionName}`);
-                                    cloudCodebases.add(codebasePath);
-                                } else {
-                                    console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
-                                }
-                            } catch (parseError) {
-                                console.warn(`[SYNC-CLOUD] ⚠️  Failed to parse metadata JSON for collection ${collectionName}:`, parseError);
+                    // Try to extract codebasePath from collection description first (new format)
+                    let extracted = false;
+                    try {
+                        const description = await vectorDb.getCollectionDescription(collectionName);
+                        if (description && description.startsWith('codebasePath:')) {
+                            const codebasePath = description.substring('codebasePath:'.length);
+                            if (codebasePath.length > 0) {
+                                console.log(`[SYNC-CLOUD] 📍 Found codebase path from description: ${codebasePath} in collection: ${collectionName}`);
+                                cloudCodebases.add(codebasePath);
+                                successfulExtractions++;
+                                extracted = true;
                             }
-                        } else {
-                            console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
                         }
-                    } else {
-                        console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
+                    } catch (descError: any) {
+                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to get description for collection ${collectionName}:`, descError.message || descError);
+                    }
+
+                    // Fallback: query document metadata for old collections without new description format
+                    if (!extracted) {
+                        console.log(`[SYNC-CLOUD] 🔄 Falling back to query-based extraction for collection: ${collectionName}`);
+                        try {
+                            const results = await vectorDb.query(
+                                collectionName,
+                                '', // Empty filter to get all results
+                                ['metadata'], // Only fetch metadata field
+                                1 // Only need one result to extract codebasePath
+                            );
+
+                            if (results && results.length > 0) {
+                                const firstResult = results[0];
+                                const metadataStr = firstResult.metadata;
+
+                                if (metadataStr) {
+                                    const metadata = JSON.parse(metadataStr);
+                                    const codebasePath = metadata.codebasePath;
+
+                                    if (codebasePath && typeof codebasePath === 'string') {
+                                        console.log(`[SYNC-CLOUD] 📍 Found codebase path from query: ${codebasePath} in collection: ${collectionName}`);
+                                        cloudCodebases.add(codebasePath);
+                                        successfulExtractions++;
+                                    } else {
+                                        console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
+                                    }
+                                } else {
+                                    console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
+                                }
+                            } else {
+                                console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
+                            }
+                        } catch (queryError: any) {
+                            console.warn(`[SYNC-CLOUD] ⚠️  Fallback query failed for collection ${collectionName}:`, queryError.message || queryError);
+                        }
                     }
                 } catch (collectionError: any) {
                     console.warn(`[SYNC-CLOUD] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
@@ -107,7 +121,15 @@ export class ToolHandlers {
                 }
             }
 
-            console.log(`[SYNC-CLOUD] 📊 Found ${cloudCodebases.size} valid codebases in cloud`);
+            console.log(`[SYNC-CLOUD] 📊 Found ${cloudCodebases.size} valid codebases in cloud (checked ${codeCollectionsChecked} code collections, ${successfulExtractions} successfully extracted)`);
+
+            // Safety guard: if we checked code collections but none returned results,
+            // treat this as an extraction failure rather than "cloud is empty".
+            // This prevents deleting all local codebases due to transient errors.
+            if (codeCollectionsChecked > 0 && successfulExtractions === 0) {
+                console.warn(`[SYNC-CLOUD] ⚠️  All ${codeCollectionsChecked} code collection extractions failed. Skipping sync to avoid accidental deletion of local codebases.`);
+                return;
+            }
 
             // Get current local codebases
             const localCodebases = new Set(this.snapshotManager.getIndexedCodebases());
