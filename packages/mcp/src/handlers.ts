@@ -212,13 +212,19 @@ export class ToolHandlers {
 
             // Check if already indexing
             if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: `Codebase '${absolutePath}' is already being indexed in the background. Please wait for completion.`
-                    }],
-                    isError: true
-                };
+                if (forceReindex) {
+                    console.log(`[FORCE-REINDEX] Clearing stale indexing state for '${absolutePath}'`);
+                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                    this.snapshotManager.saveCodebaseSnapshot();
+                } else {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Codebase '${absolutePath}' is already being indexed in the background. Please wait for completion.`
+                        }],
+                        isError: true
+                    };
+                }
             }
 
             //Check if the snapshot and cloud index are in sync
@@ -239,10 +245,8 @@ export class ToolHandlers {
 
             // If force reindex and codebase is already indexed, remove it
             if (forceReindex) {
-                if (this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
-                    console.log(`[FORCE-REINDEX] 🔄 Removing '${absolutePath}' from indexed list for re-indexing`);
-                    this.snapshotManager.removeIndexedCodebase(absolutePath);
-                }
+                this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                this.snapshotManager.saveCodebaseSnapshot();
                 if (await this.context.hasIndex(absolutePath)) {
                     console.log(`[FORCE-REINDEX] 🔄 Clearing index for '${absolutePath}'`);
                     await this.context.clearIndex(absolutePath);
