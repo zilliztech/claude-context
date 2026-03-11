@@ -115,11 +115,14 @@ export class SnapshotManager {
                 }
                 console.log(`[SNAPSHOT-DEBUG] Validated indexed codebase: ${codebasePath} (${info.indexedFiles || 'unknown'} files, ${info.totalChunks || 'unknown'} chunks)`);
             } else if (info.status === 'indexing') {
-                if ('indexingPercentage' in info) {
-                    validIndexingCodebases.set(codebasePath, info.indexingPercentage);
-                }
-                console.warn(`[SNAPSHOT-DEBUG] Found interrupted indexing codebase: ${codebasePath} (${info.indexingPercentage || 0}%). Treating as not indexed.`);
-                // Don't add to indexed - treat interrupted indexing as not indexed
+                console.warn(`[SNAPSHOT] Found interrupted indexing for '${codebasePath}', resetting to failed`);
+                const failedInfo: CodebaseInfoIndexFailed = {
+                    status: 'indexfailed',
+                    errorMessage: 'Indexing was interrupted (MCP server restarted)',
+                    lastAttemptedPercentage: info.indexingPercentage,
+                    lastUpdated: new Date().toISOString()
+                };
+                validCodebaseInfoMap.set(codebasePath, failedInfo);
             } else if (info.status === 'indexfailed') {
                 console.warn(`[SNAPSHOT-DEBUG] Found failed indexing codebase: ${codebasePath}. Error: ${info.errorMessage}`);
                 // Failed indexing codebases are not added to indexed or indexing lists
