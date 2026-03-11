@@ -648,9 +648,9 @@ export class Context {
         const dirName = path.basename(codebasePath);
 
         if (isHybrid === true) {
-            await this.vectorDatabase.createHybridCollection(collectionName, dimension, `Hybrid Index for ${dirName}`);
+            await this.vectorDatabase.createHybridCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
         } else {
-            await this.vectorDatabase.createCollection(collectionName, dimension, `Index for ${dirName}`);
+            await this.vectorDatabase.createCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
         }
 
         console.log(`[Context] ✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
