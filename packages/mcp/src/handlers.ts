@@ -85,7 +85,7 @@ export class ToolHandlers {
                         try {
                             const results = await vectorDb.query(
                                 collectionName,
-                                '', // Empty filter to get all results
+                                undefined as any, // Don't pass empty filter
                                 ['metadata'], // Only fetch metadata field
                                 1 // Only need one result to extract codebasePath
                             );
@@ -140,14 +140,24 @@ export class ToolHandlers {
             // Remove local codebases that don't exist in cloud
             for (const localCodebase of localCodebases) {
                 if (!cloudCodebases.has(localCodebase)) {
-                    this.snapshotManager.removeIndexedCodebase(localCodebase);
+                    this.snapshotManager.removeCodebaseCompletely(localCodebase);
                     hasChanges = true;
                     console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
                 }
             }
 
-            // Note: We don't add cloud codebases that are missing locally (as per user requirement)
-            console.log(`[SYNC-CLOUD] ℹ️  Skipping addition of cloud codebases not present locally (per sync policy)`);
+            // Add cloud codebases that are missing from local snapshot (recovery)
+            for (const cloudCodebase of cloudCodebases) {
+                if (!localCodebases.has(cloudCodebase)) {
+                    this.snapshotManager.setCodebaseIndexed(cloudCodebase, {
+                        indexedFiles: 0,
+                        totalChunks: 0,
+                        status: 'completed' as const
+                    });
+                    hasChanges = true;
+                    console.log(`[SYNC-CLOUD] ➕ Recovered codebase from cloud: ${cloudCodebase}`);
+                }
+            }
 
             if (hasChanges) {
                 this.snapshotManager.saveCodebaseSnapshot();
@@ -228,8 +238,18 @@ export class ToolHandlers {
             }
 
             //Check if the snapshot and cloud index are in sync
-            if (this.snapshotManager.getIndexedCodebases().includes(absolutePath) !== await this.context.hasIndex(absolutePath)) {
-                console.warn(`[INDEX-VALIDATION] ❌ Snapshot and cloud index mismatch: ${absolutePath}`);
+            const snapshotHasIndex = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
+            const vectorDbHasIndex = await this.context.hasIndex(absolutePath);
+            if (snapshotHasIndex !== vectorDbHasIndex) {
+                if (vectorDbHasIndex && !snapshotHasIndex) {
+                    console.warn(`[INDEX-VALIDATION] Recovering missing snapshot for '${absolutePath}'`);
+                    this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' as const });
+                    this.snapshotManager.saveCodebaseSnapshot();
+                } else if (!vectorDbHasIndex && snapshotHasIndex) {
+                    console.warn(`[INDEX-VALIDATION] Clearing stale snapshot for '${absolutePath}'`);
+                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                    this.snapshotManager.saveCodebaseSnapshot();
+                }
             }
 
             // Check if already indexed (unless force is true)
@@ -478,13 +498,22 @@ export class ToolHandlers {
             const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
 
             if (!isIndexed && !isIndexing) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first using the index_codebase tool.`
-                    }],
-                    isError: true
-                };
+                // Fallback: check VectorDB directly in case snapshot is out of sync
+                const hasVectorIndex = await this.context.hasIndex(absolutePath);
+                if (hasVectorIndex) {
+                    console.warn(`[SEARCH] Snapshot missing but VectorDB has index for '${absolutePath}', recovering snapshot`);
+                    this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' as const });
+                    this.snapshotManager.saveCodebaseSnapshot();
+                    // Continue with search (don't return error)
+                } else {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first using the index_codebase tool.`
+                        }],
+                        isError: true
+                    };
+                }
             }
 
             // Show indexing status if codebase is being indexed
