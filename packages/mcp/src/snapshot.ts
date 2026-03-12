@@ -17,6 +17,7 @@ export class SnapshotManager {
     private indexingCodebases: Map<string, number> = new Map(); // Map of codebase path to progress percentage
     private codebaseFileCount: Map<string, number> = new Map(); // Map of codebase path to indexed file count
     private codebaseInfoMap: Map<string, CodebaseInfo> = new Map(); // Map of codebase path to complete info
+    private recentlyRemoved: Set<string> = new Set(); // Tracks codebases removed since last save
 
     constructor() {
         // Initialize snapshot file path
@@ -437,6 +438,9 @@ export class SnapshotManager {
         this.codebaseFileCount.delete(codebasePath);
         this.codebaseInfoMap.delete(codebasePath);
 
+        // Track removal so mergeExternalEntry won't re-add it from disk
+        this.recentlyRemoved.add(codebasePath);
+
         console.log(`[SNAPSHOT-DEBUG] Completely removed codebase from snapshot: ${codebasePath}`);
     }
 
@@ -500,6 +504,7 @@ export class SnapshotManager {
 
     private mergeExternalEntry(codebasePath: string, info: CodebaseInfo): void {
         if (this.codebaseInfoMap.has(codebasePath)) return; // we already know about it
+        if (this.recentlyRemoved.has(codebasePath)) return; // explicitly removed, don't re-add from disk
         this.codebaseInfoMap.set(codebasePath, info);
         if (info.status === 'indexed') {
             if (!this.indexedCodebases.includes(codebasePath)) {
@@ -562,6 +567,9 @@ export class SnapshotManager {
             };
 
             fs.writeFileSync(this.snapshotFilePath, JSON.stringify(snapshot, null, 2));
+
+            // Clear recently removed set after successful save
+            this.recentlyRemoved.clear();
 
             const indexedCount = this.indexedCodebases.length;
             const indexingCount = this.indexingCodebases.size;
