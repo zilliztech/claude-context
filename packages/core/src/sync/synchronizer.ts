@@ -4,8 +4,14 @@ import * as crypto from 'crypto';
 import { MerkleDAG } from './merkle';
 import * as os from 'os';
 
+interface FileStat {
+    mtimeMs: number;
+    size: number;
+}
+
 export class FileSynchronizer {
     private fileHashes: Map<string, string>;
+    private fileStats: Map<string, FileStat>;
     private merkleDAG: MerkleDAG;
     private rootDir: string;
     private snapshotPath: string;
@@ -15,6 +21,7 @@ export class FileSynchronizer {
         this.rootDir = rootDir;
         this.snapshotPath = this.getSnapshotPath(rootDir);
         this.fileHashes = new Map();
+        this.fileStats = new Map();
         this.merkleDAG = new MerkleDAG();
         this.ignorePatterns = ignorePatterns;
     }
@@ -30,36 +37,51 @@ export class FileSynchronizer {
     }
 
     private async hashFile(filePath: string): Promise<string> {
-        // Double-check that this is actually a file, not a directory
-        const stat = await fs.stat(filePath);
-        if (stat.isDirectory()) {
-            throw new Error(`Attempted to hash a directory: ${filePath}`);
-        }
         const content = await fs.readFile(filePath, 'utf-8');
         return crypto.createHash('sha256').update(content).digest('hex');
     }
 
-    private async generateFileHashes(dir: string): Promise<Map<string, string>> {
-        const fileHashes = new Map<string, string>();
+    /**
+     * Walk directory tree, stat each file, and hash only files whose
+     * mtime or size changed compared to previous snapshot.
+     * Returns both hashes and stats for the new state.
+     */
+    private async generateFileStates(
+        dir: string,
+        oldHashes: Map<string, string>,
+        oldStats: Map<string, FileStat>
+    ): Promise<{ hashes: Map<string, string>; stats: Map<string, FileStat> }> {
+        const hashes = new Map<string, string>();
+        const stats = new Map<string, FileStat>();
 
+        await this.walkDirectory(dir, hashes, stats, oldHashes, oldStats);
+
+        return { hashes, stats };
+    }
+
+    private async walkDirectory(
+        dir: string,
+        hashes: Map<string, string>,
+        stats: Map<string, FileStat>,
+        oldHashes: Map<string, string>,
+        oldStats: Map<string, FileStat>
+    ): Promise<void> {
         let entries;
         try {
             entries = await fs.readdir(dir, { withFileTypes: true });
         } catch (error: any) {
             console.warn(`[Synchronizer] Cannot read directory ${dir}: ${error.message}`);
-            return fileHashes;
+            return;
         }
 
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
             const relativePath = path.relative(this.rootDir, fullPath);
 
-            // Check if this path should be ignored BEFORE any file system operations
             if (this.shouldIgnore(relativePath, entry.isDirectory())) {
-                continue; // Skip completely - no access at all
+                continue;
             }
 
-            // Double-check with fs.stat to be absolutely sure about file type
             let stat;
             try {
                 stat = await fs.stat(fullPath);
@@ -69,30 +91,43 @@ export class FileSynchronizer {
             }
 
             if (stat.isDirectory()) {
-                // Verify it's really a directory and not ignored
                 if (!this.shouldIgnore(relativePath, true)) {
-                    const subHashes = await this.generateFileHashes(fullPath);
-                    const entries = Array.from(subHashes.entries());
-                    for (let i = 0; i < entries.length; i++) {
-                        const [p, h] = entries[i];
-                        fileHashes.set(p, h);
-                    }
+                    await this.walkDirectory(fullPath, hashes, stats, oldHashes, oldStats);
                 }
             } else if (stat.isFile()) {
-                // Verify it's really a file and not ignored
                 if (!this.shouldIgnore(relativePath, false)) {
-                    try {
-                        const hash = await this.hashFile(fullPath);
-                        fileHashes.set(relativePath, hash);
-                    } catch (error: any) {
-                        console.warn(`[Synchronizer] Cannot hash file ${fullPath}: ${error.message}`);
-                        continue;
+                    const currentStat: FileStat = { mtimeMs: stat.mtimeMs, size: stat.size };
+                    const oldStat = oldStats.get(relativePath);
+                    const oldHash = oldHashes.get(relativePath);
+
+                    // Reuse cached hash if mtime and size are unchanged
+                    if (oldHash && oldStat &&
+                        oldStat.mtimeMs === currentStat.mtimeMs &&
+                        oldStat.size === currentStat.size) {
+                        hashes.set(relativePath, oldHash);
+                    } else {
+                        try {
+                            const hash = await this.hashFile(fullPath);
+                            hashes.set(relativePath, hash);
+                        } catch (error: any) {
+                            console.warn(`[Synchronizer] Cannot hash file ${fullPath}: ${error.message}`);
+                            continue;
+                        }
                     }
+                    stats.set(relativePath, currentStat);
                 }
             }
-            // Skip other types (symlinks, etc.)
         }
-        return fileHashes;
+    }
+
+    /**
+     * Legacy method kept for initial full scan (no previous stats available).
+     */
+    private async generateFileHashes(dir: string): Promise<Map<string, string>> {
+        const { hashes } = await this.generateFileStates(
+            dir, new Map(), new Map()
+        );
+        return hashes;
     }
 
     private shouldIgnore(relativePath: string, isDirectory: boolean = false): boolean {
@@ -224,7 +259,9 @@ export class FileSynchronizer {
     public async checkForChanges(): Promise<{ added: string[], removed: string[], modified: string[] }> {
         console.log('[Synchronizer] Checking for file changes...');
 
-        const newFileHashes = await this.generateFileHashes(this.rootDir);
+        const { hashes: newFileHashes, stats: newFileStats } = await this.generateFileStates(
+            this.rootDir, this.fileHashes, this.fileStats
+        );
         const newMerkleDAG = this.buildMerkleDAG(newFileHashes);
 
         // Compare the DAGs
@@ -236,12 +273,16 @@ export class FileSynchronizer {
             const fileChanges = this.compareStates(this.fileHashes, newFileHashes);
 
             this.fileHashes = newFileHashes;
+            this.fileStats = newFileStats;
             this.merkleDAG = newMerkleDAG;
             await this.saveSnapshot();
 
             console.log(`[Synchronizer] Found changes: ${fileChanges.added.length} added, ${fileChanges.removed.length} removed, ${fileChanges.modified.length} modified.`);
             return fileChanges;
         }
+
+        // Update stats even when no hash changes (mtime could drift without content change)
+        this.fileStats = newFileStats;
 
         console.log('[Synchronizer] No changes detected based on Merkle DAG comparison.');
         return { added: [], removed: [], modified: [] };
@@ -281,15 +322,22 @@ export class FileSynchronizer {
         const merkleDir = path.dirname(this.snapshotPath);
         await fs.mkdir(merkleDir, { recursive: true });
 
-        // Convert Map to array without using iterator
+        // Convert Maps to arrays without using iterator
         const fileHashesArray: [string, string][] = [];
         const keys = Array.from(this.fileHashes.keys());
         keys.forEach(key => {
             fileHashesArray.push([key, this.fileHashes.get(key)!]);
         });
 
+        const fileStatsArray: [string, FileStat][] = [];
+        const statKeys = Array.from(this.fileStats.keys());
+        statKeys.forEach(key => {
+            fileStatsArray.push([key, this.fileStats.get(key)!]);
+        });
+
         const data = JSON.stringify({
             fileHashes: fileHashesArray,
+            fileStats: fileStatsArray,
             merkleDAG: this.merkleDAG.serialize()
         });
         await fs.writeFile(this.snapshotPath, data, 'utf-8');
@@ -307,10 +355,18 @@ export class FileSynchronizer {
                 this.fileHashes.set(key, value);
             }
 
+            // Load file stats (backward compat: old snapshots won't have this)
+            this.fileStats = new Map();
+            if (obj.fileStats) {
+                for (const [key, value] of obj.fileStats) {
+                    this.fileStats.set(key, value);
+                }
+            }
+
             if (obj.merkleDAG) {
                 this.merkleDAG = MerkleDAG.deserialize(obj.merkleDAG);
             }
-            console.log(`Loaded snapshot from ${this.snapshotPath}`);
+            console.log(`Loaded snapshot from ${this.snapshotPath} (${this.fileHashes.size} files, stats: ${this.fileStats.size > 0 ? 'yes' : 'legacy'})`);
         } catch (error: any) {
             if (error.code === 'ENOENT') {
                 console.log(`Snapshot file not found at ${this.snapshotPath}. Generating new one.`);
