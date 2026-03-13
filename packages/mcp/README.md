@@ -354,6 +354,26 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
 }
 ```
 
+**OAPI Forwarding Configuration (OpenAI-compatible API → Ollama):**
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "OpenAI",
+        "OPENAI_API_KEY": "ollama-key",
+        "OPENAI_BASE_URL": "http://localhost:8080/v1",
+        "EMBEDDING_MODEL": "nomic-embed-text",
+        "OPENAI_CUSTOM_BASE_USING_OLLAMA_MODEL": "true",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
 </details>
 
 <details>
