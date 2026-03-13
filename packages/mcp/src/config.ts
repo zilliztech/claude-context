@@ -4,11 +4,16 @@ export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
-    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
+    embeddingProvider: 'OpenAI' | 'AzureOpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
     embeddingModel: string;
     // Provider-specific API keys
     openaiApiKey?: string;
     openaiBaseUrl?: string;
+    // Azure OpenAI configuration
+    azureOpenaiApiKey?: string;
+    azureOpenaiEndpoint?: string;
+    azureOpenaiApiVersion?: string;
+    azureOpenaiDeploymentName?: string;
     voyageaiApiKey?: string;
     geminiApiKey?: string;
     geminiBaseUrl?: string;
@@ -72,6 +77,8 @@ export function getDefaultModelForProvider(provider: string): string {
     switch (provider) {
         case 'OpenAI':
             return 'text-embedding-3-small';
+        case 'AzureOpenAI':
+            return 'text-embedding-3-small-deployment'; // Default deployment name
         case 'VoyageAI':
             return 'voyage-code-3';
         case 'Gemini':
@@ -91,6 +98,11 @@ export function getEmbeddingModelForProvider(provider: string): string {
             const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
             console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`);
             return ollamaModel;
+        case 'AzureOpenAI':
+            // For Azure OpenAI, use AZURE_OPENAI_DEPLOYMENT_NAME or EMBEDDING_MODEL
+            const azureDeployment = envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
+            console.log(`[DEBUG] 🎯 Azure OpenAI deployment selection: AZURE_OPENAI_DEPLOYMENT_NAME=${envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${azureDeployment}`);
+            return azureDeployment;
         case 'OpenAI':
         case 'VoyageAI':
         case 'Gemini':
@@ -110,6 +122,8 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   AZURE_OPENAI_API_KEY: ${envManager.get('AZURE_OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('AZURE_OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   AZURE_OPENAI_ENDPOINT: ${envManager.get('AZURE_OPENAI_ENDPOINT') || 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
@@ -117,11 +131,16 @@ export function createMcpConfig(): ContextMcpConfig {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'AzureOpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
         openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
+        // Azure OpenAI configuration
+        azureOpenaiApiKey: envManager.get('AZURE_OPENAI_API_KEY'),
+        azureOpenaiEndpoint: envManager.get('AZURE_OPENAI_ENDPOINT'),
+        azureOpenaiApiVersion: envManager.get('AZURE_OPENAI_API_VERSION'),
+        azureOpenaiDeploymentName: envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME'),
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
         geminiBaseUrl: envManager.get('GEMINI_BASE_URL'),
@@ -151,6 +170,14 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             console.log(`[MCP]   OpenAI API Key: ${config.openaiApiKey ? '✅ Configured' : '❌ Missing'}`);
             if (config.openaiBaseUrl) {
                 console.log(`[MCP]   OpenAI Base URL: ${config.openaiBaseUrl}`);
+            }
+            break;
+        case 'AzureOpenAI':
+            console.log(`[MCP]   Azure OpenAI API Key: ${config.azureOpenaiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            console.log(`[MCP]   Azure OpenAI Endpoint: ${config.azureOpenaiEndpoint || '❌ Missing'}`);
+            console.log(`[MCP]   Azure OpenAI Deployment: ${config.azureOpenaiDeploymentName || config.embeddingModel}`);
+            if (config.azureOpenaiApiVersion) {
+                console.log(`[MCP]   Azure OpenAI API Version: ${config.azureOpenaiApiVersion}`);
             }
             break;
         case 'VoyageAI':
@@ -185,12 +212,19 @@ Environment Variables:
   MCP_SERVER_VERSION      Server version
   
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, AzureOpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
   
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
+  
+  Azure OpenAI Configuration:
+  AZURE_OPENAI_API_KEY    Azure OpenAI API key (required for AzureOpenAI provider)
+  AZURE_OPENAI_ENDPOINT   Azure OpenAI endpoint URL (required for AzureOpenAI provider)
+  AZURE_OPENAI_API_VERSION Azure OpenAI API version (optional, default: 2024-02-01)
+  AZURE_OPENAI_DEPLOYMENT_NAME Azure deployment name (required, alternative to EMBEDDING_MODEL)
+  
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
@@ -212,6 +246,9 @@ Examples:
   
   # Start MCP server with VoyageAI and specific model
   EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with Azure OpenAI
+  EMBEDDING_PROVIDER=AzureOpenAI AZURE_OPENAI_API_KEY=xxx AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com AZURE_OPENAI_DEPLOYMENT_NAME=text-embedding-3-small-deployment npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with Gemini and specific model
   EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
