@@ -12,6 +12,7 @@
         "dev:core": "pnpm --filter @zilliz/claude-context-core dev",
         "dev:vscode": "pnpm --filter semanticcodesearch watch",
         "dev:mcp": "pnpm --filter @zilliz/claude-context-mcp dev",
+        "start:mcp": "pnpm --filter @zilliz/claude-context-mcp start",
         "clean": "pnpm -r clean",
         "lint": "pnpm -r lint",
         "lint:fix": "pnpm -r run lint:fix",

@@ -94,6 +94,9 @@ export interface ContextConfig {
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
+    chunkSize?: number;
+    chunkOverlap?: number;
+    vectorDbType?: 'postgres' | 'milvus' | 'azureaisearch';
 }
 
 export class Context {
@@ -103,12 +106,13 @@ export class Context {
     private supportedExtensions: string[];
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
+    private vectorDbType: 'postgres' | 'milvus' | 'azureaisearch';
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
-            model: 'text-embedding-3-small',
+            model: envManager.get('EMBEDDING_MODEL') || 'text-embedding-3-small',
             ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
         });
 
@@ -116,8 +120,14 @@ export class Context {
             throw new Error('VectorDatabase is required. Please provide a vectorDatabase instance in the config.');
         }
         this.vectorDatabase = config.vectorDatabase;
+        this.vectorDbType = config.vectorDbType || 'azureaisearch';
 
-        this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
+        console.log(`[Context] 🗄️  Using vector database type: ${this.vectorDbType}`);
+
+        config.chunkSize = Number(envManager.get('INDEXING_CHUNK_SIZE') ?? 2500);
+        config.chunkOverlap = Number(envManager.get('INDEXING_CHUNK_OVERLAP') ?? 300);
+
+        this.codeSplitter = new AstCodeSplitter(config.chunkSize, config.chunkOverlap);
 
         // Load custom extensions from environment variables
         const envCustomExtensions = this.getCustomExtensionsFromEnv();
@@ -967,6 +977,8 @@ export class Context {
             } else {
                 console.log('📄 No ignore files found, keeping existing patterns');
             }
+
+            console.log(`[Context] 🔍 Ignore patterns: ${this.ignorePatterns.join(', ')}`);
         } catch (error) {
             console.warn(`[Context] ⚠️ Failed to load ignore patterns: ${error}`);
             // Continue with existing patterns on error - don't reset them
