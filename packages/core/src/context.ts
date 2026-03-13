@@ -94,6 +94,8 @@ export interface ContextConfig {
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
+    chunkSize?: number;
+    chunkOverlap?: number;
 }
 
 export class Context {
@@ -117,7 +119,10 @@ export class Context {
         }
         this.vectorDatabase = config.vectorDatabase;
 
-        this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
+        config.chunkSize = Number(envManager.get('INDEXING_CHUNK_SIZE') ?? 2500);
+        config.chunkOverlap = Number(envManager.get('INDEXING_CHUNK_OVERLAP') ?? 300);
+
+        this.codeSplitter = new AstCodeSplitter(config.chunkSize, config.chunkOverlap);
 
         // Load custom extensions from environment variables
         const envCustomExtensions = this.getCustomExtensionsFromEnv();
