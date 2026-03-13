@@ -5,6 +5,7 @@ import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbe
 export interface MilvusWebConfig {
     address: string;
     token?: string;
+    database?: string;
 }
 
 export type EmbeddingProviderConfig = {
@@ -297,12 +298,14 @@ export class ConfigManager {
         const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_KEY);
         const address = config.get<string>('milvus.address');
         const token = config.get<string>('milvus.token');
+        const database = config.get<string>('milvus.database');
 
         if (!address) return undefined;
 
         return {
             address,
-            token
+            token,
+            database
         };
     }
 
@@ -322,6 +325,7 @@ export class ConfigManager {
 
         await workspaceConfig.update('milvus.address', milvusConfig.address, vscode.ConfigurationTarget.Global);
         await workspaceConfig.update('milvus.token', milvusConfig.token ?? undefined, vscode.ConfigurationTarget.Global);
+        await workspaceConfig.update('milvus.database', milvusConfig.database ?? undefined, vscode.ConfigurationTarget.Global);
     }
 
     /**
@@ -335,6 +339,7 @@ export class ConfigManager {
         return {
             address: webConfig.address,
             token: webConfig.token,
+            database: webConfig.database,
             // Set default values
             ssl: webConfig.address.startsWith('https://'), // Enable SSL if https address
             // username and password are usually handled via token, so not set
