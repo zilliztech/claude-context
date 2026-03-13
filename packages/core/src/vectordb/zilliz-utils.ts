@@ -273,38 +273,42 @@ export class ClusterManager {
      * Static utility method to get address from token using Zilliz Cloud API
      * This method will find or create a cluster and return its connect address
      * @param token Zilliz Cloud API token
+     * @param projectName Optional project name (defaults to 'Default Project')
      * @returns Connect address for the cluster
      */
-    static async getAddressFromToken(token?: string): Promise<string> {
+    static async getAddressFromToken(token?: string, projectName?: string): Promise<string> {
         if (!token) {
             throw new Error('Token is required when address is not provided');
         }
 
+        // Use environment variable or default to 'Default Project' for backward compatibility
+        const targetProjectName = projectName || envManager.get('ZILLIZ_PROJECT_NAME') || 'Default Project';
+
         try {
             const clusterManager = new ClusterManager({ token });
 
-            // Get Default Project ID
+            // Get project by name
             const projects = await clusterManager.listProjects();
-            const defaultProject = projects.find(p => p.projectName === 'Default Project');
+            const targetProject = projects.find(p => p.projectName === targetProjectName);
 
-            if (!defaultProject) {
-                throw new Error('Default Project not found');
+            if (!targetProject) {
+                throw new Error(`Project '${targetProjectName}' not found. Available projects: ${projects.map(p => p.projectName).join(', ')}`);
             }
 
-            // List clusters in the default project
-            const clustersResponse = await clusterManager.listClusters(defaultProject.projectId);
+            // List clusters in the target project
+            const clustersResponse = await clusterManager.listClusters(targetProject.projectId);
 
             if (clustersResponse.clusters.length > 0) {
                 // Use the first available cluster
                 const cluster = clustersResponse.clusters[0];
-                console.log(`🎯 Using existing cluster: ${cluster.clusterName} (${cluster.clusterId})`);
+                console.log(`🎯 Using existing cluster: ${cluster.clusterName} (${cluster.clusterId}) in project '${targetProjectName}'`);
                 return cluster.connectAddress;
             } else {
                 // No clusters found, create a free cluster
-                console.log('📝 No clusters found, creating a new free cluster...');
+                console.log(`📝 No clusters found in project '${targetProjectName}', creating a new free cluster...`);
                 const createResponse = await clusterManager.createFreeCluster({
                     clusterName: `auto-cluster-${Date.now()}`,
-                    projectId: defaultProject.projectId,
+                    projectId: targetProject.projectId,
                     regionId: 'gcp-us-west1' // Default region
                 });
 

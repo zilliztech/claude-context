@@ -47,6 +47,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 |----------|-------------|---------|
 | `MILVUS_TOKEN` | Milvus authentication token. Get [Zilliz Personal API Key](https://github.com/zilliztech/claude-context/blob/master/assets/signup_and_get_apikey.png) | Recommended |
 | `MILVUS_ADDRESS` | Milvus server address. Optional when using Zilliz Personal API Key | Auto-resolved from token |
+| `ZILLIZ_PROJECT_NAME` | Zilliz Cloud project name to use when auto-resolving address from token | `Default Project` |
 
 ### Ollama (Optional)
 | Variable | Description | Default |
