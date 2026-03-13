@@ -32,8 +32,8 @@ export class AstCodeSplitter implements Splitter {
     private langchainFallback: any; // LangChainCodeSplitter for fallback
 
     constructor(chunkSize?: number, chunkOverlap?: number) {
-        if (chunkSize) this.chunkSize = chunkSize;
-        if (chunkOverlap) this.chunkOverlap = chunkOverlap;
+        if (typeof chunkSize === 'number') this.chunkSize = chunkSize;
+        if (typeof chunkOverlap === 'number') this.chunkOverlap = chunkOverlap;
         this.parser = new Parser();
 
         // Initialize fallback splitter

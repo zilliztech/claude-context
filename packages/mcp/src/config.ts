@@ -4,11 +4,16 @@ export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
-    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
+    embeddingProvider: 'OpenAI' | 'AzureOpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
     embeddingModel: string;
     // Provider-specific API keys
     openaiApiKey?: string;
     openaiBaseUrl?: string;
+    // Azure OpenAI configuration
+    azureOpenaiApiKey?: string;
+    azureOpenaiEndpoint?: string;
+    azureOpenaiApiVersion?: string;
+    azureOpenaiDeploymentName?: string;
     voyageaiApiKey?: string;
     geminiApiKey?: string;
     geminiBaseUrl?: string;
@@ -16,8 +21,25 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     // Vector database configuration
+    vectorDatabaseProvider: 'milvus' | 'postgres' | 'azureaisearch';
+
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    // PostgreSQL configuration
+    postgresConnectionString?: string;
+    postgresHost?: string;
+    postgresPort?: number;
+    postgresDatabase?: string;
+    postgresUsername?: string;
+    postgresPassword?: string;
+    postgresSSL?: boolean;
+    // Azure AI Search Vector Database configuration
+    azureAISearchEndpoint?: string;
+    azureAISearchApiKey?: string;
+    azureAISearchBatchSize?: number;
+    azureAISearchMaxRetries?: number;
+    azureAISearchRetryDelayMs?: number;
+
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -72,6 +94,8 @@ export function getDefaultModelForProvider(provider: string): string {
     switch (provider) {
         case 'OpenAI':
             return 'text-embedding-3-small';
+        case 'AzureOpenAI':
+            return 'text-embedding-3-small'; // Default deployment name
         case 'VoyageAI':
             return 'voyage-code-3';
         case 'Gemini':
@@ -91,6 +115,11 @@ export function getEmbeddingModelForProvider(provider: string): string {
             const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
             console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`);
             return ollamaModel;
+        case 'AzureOpenAI':
+            // For Azure OpenAI, use AZURE_OPENAI_DEPLOYMENT_NAME or EMBEDDING_MODEL
+            const azureDeployment = envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
+            console.log(`[DEBUG] 🎯 Azure OpenAI deployment selection: AZURE_OPENAI_DEPLOYMENT_NAME=${envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${azureDeployment}`);
+            return azureDeployment;
         case 'OpenAI':
         case 'VoyageAI':
         case 'Gemini':
@@ -110,27 +139,55 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   AZURE_OPENAI_API_KEY: ${envManager.get('AZURE_OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('AZURE_OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   AZURE_OPENAI_ENDPOINT: ${envManager.get('AZURE_OPENAI_ENDPOINT') || 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
+    console.log(`[DEBUG]   POSTGRES_CONNECTION_STRING: ${envManager.get('POSTGRES_CONNECTION_STRING') ? 'SET' : 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: ContextMcpConfig = {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'AzureOpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
         openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
+        // Azure OpenAI configuration
+        azureOpenaiApiKey: envManager.get('AZURE_OPENAI_API_KEY'),
+        azureOpenaiEndpoint: envManager.get('AZURE_OPENAI_ENDPOINT'),
+        azureOpenaiApiVersion: envManager.get('AZURE_OPENAI_API_VERSION'),
+        azureOpenaiDeploymentName: envManager.get('AZURE_OPENAI_DEPLOYMENT_NAME'),
+
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
         geminiBaseUrl: envManager.get('GEMINI_BASE_URL'),
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
-        // Vector database configuration - address can be auto-resolved from token
+        // Vector database configuration
+        vectorDatabaseProvider: (envManager.get('VECTOR_DATABASE_PROVIDER') as 'milvus' | 'postgres' | 'azureaisearch') || 'milvus',
+
+        // Milvus Configuration
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        // PostgreSQL configuration
+        postgresConnectionString: envManager.get('POSTGRES_CONNECTION_STRING'),
+        postgresHost: envManager.get('POSTGRES_HOST'),
+        postgresPort: envManager.get('POSTGRES_PORT') ? parseInt(envManager.get('POSTGRES_PORT')!) : undefined,
+        postgresDatabase: envManager.get('POSTGRES_DATABASE'),
+        postgresUsername: envManager.get('POSTGRES_USERNAME'),
+        postgresPassword: envManager.get('POSTGRES_PASSWORD'),
+        postgresSSL: envManager.get('POSTGRES_SSL') === 'true',
+
+        // Azure AI Search configuration 
+        azureAISearchEndpoint: envManager.get('AZURE_AI_SEARCH_ENDPOINT'),
+        azureAISearchApiKey: envManager.get('AZURE_AI_SEARCH_API_KEY'),
+        azureAISearchBatchSize: envManager.get('AZURE_AI_SEARCH_BATCH_SIZE') ? parseInt(envManager.get('AZURE_AI_SEARCH_BATCH_SIZE')!) : 100,
+        azureAISearchMaxRetries: envManager.get('AZURE_AI_SEARCH_MAX_RETRIES') ? parseInt(envManager.get('AZURE_AI_SEARCH_MAX_RETRIES')!) : 3,
+        azureAISearchRetryDelayMs: envManager.get('AZURE_AI_SEARCH_RETRY_DELAY_MS') ? parseInt(envManager.get('AZURE_AI_SEARCH_RETRY_DELAY_MS')!) : 1000,
+
     };
 
     return config;
@@ -143,7 +200,23 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
-    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Vector Database Provider: ${config.vectorDatabaseProvider}`);
+
+    // Log vector database configuration
+    switch (config.vectorDatabaseProvider) {
+        case 'postgres':
+            console.log(`[MCP]   PostgreSQL Connection: ${config.postgresConnectionString ? '✅ Connection string configured' :
+                (config.postgresHost ? `${config.postgresHost}:${config.postgresPort || 5432}/${config.postgresDatabase || 'postgres'}` : '❌ Not configured')}`);
+            break;
+        case 'milvus':
+            console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+            break;
+        case 'azureaisearch':
+            console.log(`[MCP]   Azure AI Search Endpoint: ${config.azureAISearchEndpoint ? '✅ Connection string configured' : '❌ Not configured'}`);
+            console.log(`[MCP]   Azure AI Search API Key: ${config.azureAISearchApiKey ? '✅ Api Key string configured' : '❌ Not configured'}`);
+            break;
+    }
+
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -151,6 +224,14 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             console.log(`[MCP]   OpenAI API Key: ${config.openaiApiKey ? '✅ Configured' : '❌ Missing'}`);
             if (config.openaiBaseUrl) {
                 console.log(`[MCP]   OpenAI Base URL: ${config.openaiBaseUrl}`);
+            }
+            break;
+        case 'AzureOpenAI':
+            console.log(`[MCP]   Azure OpenAI API Key: ${config.azureOpenaiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            console.log(`[MCP]   Azure OpenAI Endpoint: ${config.azureOpenaiEndpoint || '❌ Missing'}`);
+            console.log(`[MCP]   Azure OpenAI Deployment: ${config.azureOpenaiDeploymentName || config.embeddingModel}`);
+            if (config.azureOpenaiApiVersion) {
+                console.log(`[MCP]   Azure OpenAI API Version: ${config.azureOpenaiApiVersion}`);
             }
             break;
         case 'VoyageAI':
@@ -185,12 +266,19 @@ Environment Variables:
   MCP_SERVER_VERSION      Server version
   
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, AzureOpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
   
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
+  
+  Azure OpenAI Configuration:
+  AZURE_OPENAI_API_KEY    Azure OpenAI API key (required for AzureOpenAI provider)
+  AZURE_OPENAI_ENDPOINT   Azure OpenAI endpoint URL (required for AzureOpenAI provider)
+  AZURE_OPENAI_API_VERSION Azure OpenAI API version (optional, default: 2024-02-01)
+  AZURE_OPENAI_DEPLOYMENT_NAME Azure deployment name (required, alternative to EMBEDDING_MODEL)
+  
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
@@ -200,18 +288,36 @@ Environment Variables:
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
   
   Vector Database Configuration:
+  VECTOR_DATABASE_PROVIDER Vector database provider: milvus, postgres (default: milvus)
+  
+  Milvus Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  
+  PostgreSQL Configuration:
+  POSTGRES_CONNECTION_STRING PostgreSQL connection string (e.g., postgresql://user:pass@localhost:5432/db)
+  POSTGRES_HOST           PostgreSQL host (default: localhost)
+  POSTGRES_PORT           PostgreSQL port (default: 5432)
+  POSTGRES_DATABASE       PostgreSQL database name (default: postgres)
+  POSTGRES_USERNAME       PostgreSQL username (default: postgres)
+  POSTGRES_PASSWORD       PostgreSQL password
+  POSTGRES_SSL            Enable SSL connection (true/false, default: false)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with OpenAI and PostgreSQL
+  OPENAI_API_KEY=sk-xxx VECTOR_DATABASE_PROVIDER=postgres POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost:5432/db npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with OpenAI and specific model
   OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with VoyageAI and specific model
   EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with Azure OpenAI
+  EMBEDDING_PROVIDER=AzureOpenAI AZURE_OPENAI_API_KEY=xxx AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com AZURE_OPENAI_DEPLOYMENT_NAME=text-embedding-3-small-deployment npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with Gemini and specific model
   EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest

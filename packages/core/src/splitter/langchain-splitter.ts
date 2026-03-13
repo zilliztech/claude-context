@@ -9,8 +9,8 @@ export class LangChainCodeSplitter implements Splitter {
     private chunkOverlap: number = 200;
 
     constructor(chunkSize?: number, chunkOverlap?: number) {
-        if (chunkSize) this.chunkSize = chunkSize;
-        if (chunkOverlap) this.chunkOverlap = chunkOverlap;
+        if (typeof chunkSize === 'number') this.chunkSize = chunkSize;
+        if (typeof chunkOverlap === 'number') this.chunkOverlap = chunkOverlap;
     }
 
     async split(code: string, language: string, filePath?: string): Promise<CodeChunk[]> {
