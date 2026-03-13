@@ -718,6 +718,305 @@ Check the `/examples` directory for complete usage examples:
 
 ---
 
+## 🐳 Self-Hosted with Docker Compose
+
+Run everything locally — no cloud accounts needed. This sets up Milvus (vector database) and the claude-context MCP server on your machine with a single command.
+
+### What you get
+
+- A **private, local** Milvus instance for vector storage (no Zilliz Cloud account required)
+- The claude-context MCP server running as a persistent SSE service
+- Semantic code search available to **any** MCP client (Claude Code, Copilot, Cursor, etc.)
+
+### Step 1: Prerequisites
+
+You need:
+
+- **Docker Engine 24+** with **Compose v2.23+** ([install guide](https://docs.docker.com/engine/install/))
+- An **embedding API key** (e.g., [OpenAI](https://platform.openai.com/api-keys) — starts with `sk-`)
+- **~10 GB free disk space** for Milvus data
+
+Verify Docker is ready:
+
+```bash
+docker compose version   # Should show v2.23.0 or higher
+```
+
+### Step 2: Clone the repository
+
+```bash
+git clone https://github.com/zilliztech/claude-context.git
+cd claude-context
+```
+
+### Step 3: Create your configuration
+
+Copy the example `.env` and edit it with your API key:
+
+```bash
+mkdir -p ~/.context
+cp .env.example ~/.context/.env
+```
+
+Open `~/.context/.env` in your editor and set **at minimum** these two values:
+
+```ini
+# ~/.context/.env
+
+OPENAI_API_KEY=sk-your-actual-openai-key-here
+MILVUS_ADDRESS=localhost:19530
+```
+
+> **Using Ollama instead of OpenAI?** Set `EMBEDDING_PROVIDER=Ollama`, `OLLAMA_HOST=http://host.docker.internal:11434`, and comment out `OPENAI_API_KEY`. See [.env.example](.env.example) for all providers.
+
+### Step 4: Tell Docker where your code lives
+
+The MCP server needs read access to your codebases. Create a `docker-compose.override.yml` from the template:
+
+```bash
+cp docker-compose.override.example.yml docker-compose.override.yml
+```
+
+Edit `docker-compose.override.yml` with your actual project paths. **Important**: source and destination must be the same path (the indexer stores absolute paths):
+
+```yaml
+# docker-compose.override.yml
+services:
+  claude-context:
+    volumes:
+      - /home/youruser/projects/myapp:/home/youruser/projects/myapp:ro
+      - /home/youruser/projects/backend:/home/youruser/projects/backend:ro
+```
+
+> On **macOS**, paths look like `/Users/youruser/projects/myapp`.
+
+### Step 5: Start the services
+
+```bash
+docker compose up -d
+```
+
+The first run will:
+1. Build the claude-context image (~2 min)
+2. Pull the Milvus image (~1 GB download)
+3. Start both services
+
+Wait for Milvus to become healthy (~30–90 seconds):
+
+```bash
+docker compose ps
+```
+
+You should see:
+
+```
+NAME                 STATUS
+milvus-standalone    Up (healthy)
+claude-context-mcp   Up
+```
+
+### Step 6: Verify the MCP server is reachable
+
+```bash
+curl -s http://localhost:8001/sse
+```
+
+If it hangs waiting for events — that's correct! The SSE endpoint is streaming. Press `Ctrl+C` to stop.
+
+### Step 7: Connect your AI coding tool
+
+The self-hosted server uses **SSE transport** on `http://localhost:8001/sse`. Configure your tool:
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+```bash
+claude mcp add --transport sse claude-context http://localhost:8001/sse
+```
+
+Verify it was added:
+
+```bash
+claude mcp list
+```
+
+</details>
+
+<details>
+<summary><strong>VS Code (Copilot Chat / GitHub Copilot)</strong></summary>
+
+Add to your VS Code settings (`.vscode/mcp.json` in your project, or user settings):
+
+```json
+{
+  "servers": {
+    "claude-context": {
+      "type": "sse",
+      "url": "http://localhost:8001/sse"
+    }
+  }
+}
+```
+
+Restart VS Code. You should see claude-context tools available in Copilot Chat (agent mode).
+
+</details>
+
+<details>
+<summary><strong>Cursor</strong></summary>
+
+Add to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "type": "sse",
+      "url": "http://localhost:8001/sse"
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Claude Desktop</strong></summary>
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "type": "sse",
+      "url": "http://localhost:8001/sse"
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Any other MCP client</strong></summary>
+
+Use SSE transport pointed at:
+
+```
+http://localhost:8001/sse
+```
+
+No API keys or environment variables needed on the client side — all configuration lives in `~/.context/.env`.
+
+</details>
+
+### Step 8: Index your codebase
+
+Open your AI tool and ask it to index your project:
+
+```
+Index the codebase at /home/youruser/projects/myapp
+```
+
+> **Note**: Use the **absolute path** that matches the volume mount from Step 4.
+
+The indexer will parse your code into an AST, generate embeddings, and store them in Milvus. Progress is reported in real time. A typical 100K-line codebase takes 2–5 minutes.
+
+### Step 9: Test it
+
+Once indexing completes, try a semantic search:
+
+```
+Search for functions that handle authentication in /home/youruser/projects/myapp
+```
+
+You should get back relevant code snippets with file paths, line numbers, and similarity scores.
+
+Check the indexing status at any time with:
+
+```
+Check the indexing status
+```
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `docker compose ps` shows Milvus unhealthy | Wait 90 seconds for startup. Check `docker compose logs milvus` |
+| `curl localhost:8001/sse` connection refused | Check `docker compose logs claude-context` — likely a missing `.env` |
+| Indexing fails with "connection refused" | Verify `MILVUS_ADDRESS=localhost:19530` in `~/.context/.env` |
+| "No such file or directory" during index | The path must match a volume mount in `docker-compose.override.yml` |
+| Permission denied errors | Set `UID` and `GID` in a `.env` file next to `docker-compose.yml`: `UID=1000` and `GID=1000` (use `id -u` and `id -g` to find yours) |
+
+### Configuration reference
+
+All variables have sensible defaults. Override in a `.env` file next to `docker-compose.yml`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_PORT` | `8001` | SSE server port |
+| `MCP_TRANSPORT` | `sse` | Transport protocol |
+| `CONTEXT_DIR` | `$HOME/.context` | Path to .context directory |
+| `UID` / `GID` | `1000` | Container user/group IDs |
+| `MILVUS_PORT` | `19530` | Milvus gRPC port |
+| `MILVUS_HEALTH_PORT` | `9091` | Milvus health check port |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│              Docker Compose                  │
+│                                              │
+│  ┌──────────┐     bridge      ┌───────────┐ │
+│  │  Milvus  │◄───network────►│  claude-   │ │
+│  │  (vector │  milvus:19530   │  context   │ │
+│  │   db)    │                 │  (MCP)     │ │
+│  └────┬─────┘                 └─────┬─────┘ │
+│       │                             │        │
+│  :19530 :9091                  :8001         │
+└───────┼─────────────────────────┼────────────┘
+        │                         │
+   host ports                host port ◄── Claude Code
+   (optional)               (SSE)      ◄── Copilot
+                                        ◄── Cursor
+```
+
+- **Bridge network**: Services communicate internally via DNS. No `network_mode: host` needed.
+- **Milvus configs**: Defined inline in `docker-compose.yml` via `configs:`. No external config files.
+- **Data**: Named volume `milvus_data` (Docker-managed, persists across restarts).
+- **Runtime state**: `~/.context/` bind-mounted into claude-context.
+
+### Daily usage
+
+```bash
+docker compose up -d                        # Start all services
+docker compose down                         # Stop all (data preserved in volume)
+docker compose restart claude-context       # Restart MCP only
+docker compose build claude-context         # Rebuild image (after git pull)
+docker compose up -d --build claude-context # Rebuild + restart
+docker compose logs -f                      # Follow all logs
+```
+
+### Migrating from standalone containers
+
+If you previously ran Milvus via `standalone_embed.sh`:
+
+```bash
+# 1. Stop old containers
+docker stop claude-context-mcp milvus-standalone
+docker rm claude-context-mcp milvus-standalone
+
+# 2. Migrate data to named volume (idempotent — skips if volume already has data)
+MILVUS_LEGACY_DATA=/path/to/old/volumes/milvus \
+  docker compose --profile migrate run --rm milvus-migrate
+
+# 3. Start
+docker compose up -d
+```
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to get started.

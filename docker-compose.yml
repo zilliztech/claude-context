@@ -1,0 +1,89 @@
+configs:
+  embed_etcd:
+    content: |
+      listen-client-urls: http://0.0.0.0:2379
+      advertise-client-urls: http://0.0.0.0:2379
+      quota-backend-bytes: 4294967296
+      auto-compaction-mode: revision
+      auto-compaction-retention: '1000'
+  milvus_user:
+    content: |
+      # Extra config to override default milvus.yaml
+
+services:
+  milvus:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.6.0
+    command: milvus run standalone
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      ETCD_CONFIG_PATH: /milvus/configs/embedEtcd.yaml
+      COMMON_STORAGETYPE: local
+      DEPLOY_MODE: STANDALONE
+    configs:
+      - source: embed_etcd
+        target: /milvus/configs/embedEtcd.yaml
+      - source: milvus_user
+        target: /milvus/configs/user.yaml
+    volumes:
+      - milvus_data:/var/lib/milvus
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "${MILVUS_HEALTH_PORT:-9091}:9091"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  claude-context:
+    container_name: claude-context-mcp
+    image: claude-context-mcp
+    build: .
+    user: "${UID:-1000}:${GID:-1000}"
+    env_file:
+      - ${CONTEXT_DIR:-${HOME}/.context}/.env
+    environment:
+      HOME: /home/node
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-sse}
+      MCP_PORT: "${MCP_PORT:-8001}"
+      MILVUS_ADDRESS: milvus:19530
+    volumes:
+      - ${CONTEXT_DIR:-${HOME}/.context}:/home/node/.context
+    ports:
+      - "${MCP_PORT:-8001}:${MCP_PORT:-8001}"
+    depends_on:
+      milvus:
+        condition: service_healthy
+    restart: unless-stopped
+
+  milvus-migrate:
+    image: alpine
+    volumes:
+      - ${MILVUS_LEGACY_DATA:-/tmp}:/src:ro
+      - milvus_data:/dest
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -n "$$(ls -A /dest 2>/dev/null)" ]; then
+          echo "Volume already has data, skipping."
+          exit 0
+        fi
+        if [ ! -d /src/etcd ]; then
+          echo "ERROR: No Milvus data found in /src."
+          echo "Usage: MILVUS_LEGACY_DATA=/path/to/old/milvus docker compose --profile migrate run --rm milvus-migrate"
+          exit 1
+        fi
+        echo "Migrating Milvus data from /src..."
+        cp -a /src/. /dest/
+        echo "Migration complete."
+    profiles:
+      - migrate
+
+volumes:
+  milvus_data:

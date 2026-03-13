@@ -14,6 +14,9 @@ build/
 .env.development.local
 .env.production.local
 
+# Docker Compose local overrides
+docker-compose.override.yml
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

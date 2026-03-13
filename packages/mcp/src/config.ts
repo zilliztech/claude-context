@@ -3,6 +3,9 @@ import { envManager } from "@zilliz/claude-context-core";
 export interface ContextMcpConfig {
     name: string;
     version: string;
+    // Transport configuration
+    transport: 'stdio' | 'sse';
+    port: number;
     // Embedding provider configuration
     embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
     embeddingModel: string;
@@ -102,6 +105,16 @@ export function getEmbeddingModelForProvider(provider: string): string {
     }
 }
 
+// Helper to parse CLI arguments (--key value pairs)
+function getCliArg(name: string): string | undefined {
+    const args = process.argv.slice(2);
+    const idx = args.indexOf(`--${name}`);
+    if (idx !== -1 && idx + 1 < args.length) {
+        return args[idx + 1];
+    }
+    return undefined;
+}
+
 export function createMcpConfig(): ContextMcpConfig {
     // Debug: Print all environment variables related to Context
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
@@ -113,9 +126,16 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
+    // Transport config: CLI args take priority over env vars
+    const transportArg = getCliArg('transport') || envManager.get('MCP_TRANSPORT') || 'stdio';
+    const portArg = getCliArg('port') || envManager.get('MCP_PORT') || '8000';
+
     const config: ContextMcpConfig = {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
+        // Transport configuration
+        transport: transportArg === 'sse' ? 'sse' : 'stdio',
+        port: parseInt(portArg, 10) || 8000,
         // Embedding provider configuration
         embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
@@ -141,6 +161,7 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP] 🚀 Starting Context MCP Server`);
     console.log(`[MCP] Configuration Summary:`);
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
+    console.log(`[MCP]   Transport: ${config.transport}${config.transport === 'sse' ? ` (port ${config.port})` : ''}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
     console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
@@ -179,8 +200,13 @@ Usage: npx @zilliz/claude-context-mcp@latest [options]
 
 Options:
   --help, -h                          Show this help message
+  --transport <stdio|sse>             Transport mode (default: stdio)
+  --port <number>                     Port for SSE transport (default: 8000)
 
 Environment Variables:
+  MCP_TRANSPORT           Transport mode: stdio or sse (default: stdio)
+  MCP_PORT                Port for SSE transport (default: 8000)
+
   MCP_SERVER_NAME         Server name
   MCP_SERVER_VERSION      Server version
   
@@ -221,5 +247,11 @@ Examples:
   
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with SSE transport (shared server for multiple clients)
+  npx @zilliz/claude-context-mcp@latest --transport sse --port 8000
+
+  # SSE transport via environment variables
+  MCP_TRANSPORT=sse MCP_PORT=8000 npx @zilliz/claude-context-mcp@latest
         `);
 } 
