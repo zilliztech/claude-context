@@ -20,7 +20,7 @@ Model Context Protocol (MCP) allows you to integrate Claude Context with your fa
 
 Before using the MCP server, make sure you have:
 
-- API key for your chosen embedding provider (OpenAI, VoyageAI, Gemini, or Ollama setup)
+- API key for your chosen embedding provider (OpenAI, VoyageAI, Gemini, Ollama, or LlamaCpp setup)
 - Milvus vector database (local or cloud)
 
 > 💡 **Setup Help:** See the [main project setup guide](../../README.md#-quick-start) for detailed installation instructions.
@@ -34,7 +34,7 @@ Claude Context MCP supports multiple embedding providers. Choose the one that be
 > 📋 **Quick Reference**: For a complete list of environment variables and their descriptions, see the [Environment Variables Guide](../../docs/getting-started/environment-variables.md).
 
 ```bash
-# Supported providers: OpenAI, VoyageAI, Gemini, Ollama
+# Supported providers: OpenAI, VoyageAI, Gemini, Ollama, LlamaCpp
 EMBEDDING_PROVIDER=OpenAI
 ```
 
@@ -149,6 +149,51 @@ OLLAMA_HOST=http://127.0.0.1:11434
 
 </details>
 
+<details>
+<summary><strong>5. LlamaCpp Configuration (Local/Self-hosted)</strong></summary>
+
+LlamaCpp enables running large language models locally on consumer hardware including Apple Silicon, desktop GPUs, and CPU-only systems with state-of-the-art performance. It allows you to run embeddings locally with GGUF models without sending data to external services.
+
+```bash
+# Required: Specify which LlamaCpp model to use
+EMBEDDING_MODEL=nomic-embed-code
+
+# Optional: Specify LlamaCpp host (default: http://localhost:8080)
+LLAMACPP_HOST=http://localhost:8080
+
+# Optional: Request timeout in milliseconds (default: 30000)
+LLAMACPP_TIMEOUT=30000
+
+# Optional: Enable code prefix for better code search (default: true)
+LLAMACPP_CODE_PREFIX=true
+```
+
+**Setup Instructions:**
+
+1. Install llama.cpp from [GitHub](https://github.com/ggerganov/llama.cpp)
+2. Download the GGUF embedding model (e.g., nomic-embed-code):
+
+   ```bash
+   # Example: Download nomic-embed-code model
+   curl -L "https://huggingface.co/nomic-ai/nomic-embed-code-GGUF/resolve/main/nomic-embed-code.Q4_1.gguf" -o nomic-embed-code.Q4_1.gguf
+   ```
+
+3. Start the llama.cpp server with embeddings:
+
+   ```bash
+   llama-server -m nomic-embed-code.Q4_1.gguf --embeddings --pooling last
+   ```
+
+4. Verify the server is running:
+
+   ```bash
+   curl http://localhost:8080/v1/embeddings \
+     -H "Content-Type: application/json" \
+     -d '{"model": "nomic-embed-code", "input": "test"}'
+   ```
+
+</details>
+
 #### Get a free vector database on Zilliz Cloud
 
 Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
@@ -182,6 +227,30 @@ CUSTOM_IGNORE_PATTERNS=temp/**,*.backup,private/**,uploads/**
 ```
 
 These settings work in combination with tool parameters - patterns from both sources will be merged together.
+
+#### Collection Naming Configuration (Optional)
+
+You can configure how collection names are generated to prevent conflicts when using multiple embedding providers:
+
+```bash
+# Use strict collection naming that includes provider and model info
+# This prevents data conflicts when switching between providers
+EMBEDDING_STRICT_COLLECTION_NAMES=true
+
+# Or set a custom collection name manually (overrides all automatic naming)
+MILVUS_COLLECTION_NAME=my_custom_collection
+```
+
+**Collection Naming Modes:**
+- **Legacy mode** (default, `EMBEDDING_STRICT_COLLECTION_NAMES=false`):
+  - Format: `hybrid_code_chunks_<hash>`
+  - Same collection name for all providers (may cause conflicts)
+
+- **Strict mode** (`EMBEDDING_STRICT_COLLECTION_NAMES=true`):
+  - Format: `hybrid_<provider>_<model>_<hash>_<unique>`
+  - Example: `hybrid_ollama_nomic_embed_text_abc12345_def67890`
+  - Prevents conflicts when switching between Ollama, LlamaCpp, OpenAI, etc.
+  - **Recommended** when experimenting with multiple embedding providers
 
 ## Usage with MCP Clients
 
@@ -347,6 +416,25 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
         "EMBEDDING_PROVIDER": "Ollama",
         "EMBEDDING_MODEL": "nomic-embed-text",
         "OLLAMA_HOST": "http://127.0.0.1:11434",
+        "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
+      }
+    }
+  }
+}
+```
+
+**LlamaCpp Configuration:**
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "EMBEDDING_PROVIDER": "LlamaCpp",
+        "EMBEDDING_MODEL": "nomic-embed-code",
+        "LLAMACPP_HOST": "http://localhost:8080",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }

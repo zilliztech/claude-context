@@ -94,6 +94,7 @@ export interface ContextConfig {
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
+    customCollectionName?: string; // New: custom collection name from MCP config
 }
 
 export class Context {
@@ -103,6 +104,7 @@ export class Context {
     private supportedExtensions: string[];
     private ignorePatterns: string[];
     private synchronizers = new Map<string, FileSynchronizer>();
+    private customCollectionName?: string;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -144,6 +146,9 @@ export class Context {
         ];
         // Remove duplicates
         this.ignorePatterns = [...new Set(allIgnorePatterns)];
+
+        // Store custom collection name if provided
+        this.customCollectionName = config.customCollectionName;
 
         console.log(`[Context] 🔧 Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
         if (envCustomExtensions.length > 0) {
@@ -229,14 +234,37 @@ export class Context {
     }
 
     /**
-     * Generate collection name based on codebase path and hybrid mode
+     * Generate collection name based on codebase path, provider, model and hybrid mode
      */
     public getCollectionName(codebasePath: string): string {
+        // If custom collection name is provided, use it directly
+        if (this.customCollectionName) {
+            return this.customCollectionName;
+        }
+
         const isHybrid = this.getIsHybrid();
         const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
-        const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
-        return `${prefix}_${hash.substring(0, 8)}`;
+        const pathHash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+
+        // Check if strict collection naming is enabled
+        const strictNaming = envManager.get('EMBEDDING_STRICT_COLLECTION_NAMES')?.toLowerCase() === 'true';
+
+        if (strictNaming) {
+            // Generate collection name including provider and model to prevent conflicts
+            const provider = this.embedding.getProvider().toLowerCase();
+            const model = this.embedding.getModel().replace(/[^a-zA-Z0-9]/g, '_'); // Sanitize model name
+
+            // Create a comprehensive hash including provider and model to ensure uniqueness
+            const uniqueString = `${provider}_${model}_${normalizedPath}`;
+            const fullHash = crypto.createHash('md5').update(uniqueString).digest('hex');
+
+            const prefix = isHybrid === true ? 'hybrid' : 'code';
+            return `${prefix}_${provider}_${model}_${pathHash.substring(0, 8)}_${fullHash.substring(0, 8)}`;
+        } else {
+            // Legacy collection naming (default behavior)
+            const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
+            return `${prefix}_${pathHash.substring(0, 8)}`;
+        }
     }
 
     /**

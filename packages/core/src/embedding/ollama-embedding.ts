@@ -132,6 +132,10 @@ export class OllamaEmbedding extends Embedding {
         return 'Ollama';
     }
 
+    getModel(): string {
+        return this.config.model;
+    }
+
     /**
      * Set model type and detect its dimension
      * @param model Model name

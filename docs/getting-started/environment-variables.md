@@ -20,7 +20,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ### Embedding Provider
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
+| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama`, `LlamaCpp` | `OpenAI` |
 | `EMBEDDING_MODEL` | Embedding model name (works for all providers) | Provider-specific default |
 | `OPENAI_API_KEY` | OpenAI API key | Required for OpenAI |
 | `OPENAI_BASE_URL` | OpenAI API base URL (optional, for custom endpoints) | `https://api.openai.com/v1` |
@@ -47,12 +47,28 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 |----------|-------------|---------|
 | `MILVUS_TOKEN` | Milvus authentication token. Get [Zilliz Personal API Key](https://github.com/zilliztech/claude-context/blob/master/assets/signup_and_get_apikey.png) | Recommended |
 | `MILVUS_ADDRESS` | Milvus server address. Optional when using Zilliz Personal API Key | Auto-resolved from token |
+| `MILVUS_COLLECTION_NAME` | Custom collection name (optional, overrides automatic naming) | Auto-generated |
+| `EMBEDDING_STRICT_COLLECTION_NAMES` | Use strict collection naming with provider+model info to prevent conflicts | `false` |
+
+> **💡 Collection Naming:**
+> - **Legacy mode** (default): Collections named `hybrid_code_chunks_<hash>` - same name for all providers
+> - **Strict mode** (`EMBEDDING_STRICT_COLLECTION_NAMES=true`): Collections include provider and model, e.g. `hybrid_ollama_nomic_embed_text_<hash>_<unique>`
+> - **Benefits of strict mode**: Prevents data conflicts when switching between different embedding providers or models
+> - **Use case**: Enable strict mode when experimenting with multiple providers (Ollama, LlamaCpp, etc.) on the same codebase
 
 ### Ollama (Optional)
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OLLAMA_HOST` | Ollama server URL | `http://127.0.0.1:11434` |
 | `OLLAMA_MODEL`(alternative to `EMBEDDING_MODEL`) | Model name |  |
+
+### LlamaCpp (Optional)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LLAMACPP_HOST` | LlamaCpp server URL | `http://localhost:8080` |
+| `LLAMACPP_MODEL` (alternative to `EMBEDDING_MODEL`) | Model name |  |
+| `LLAMACPP_TIMEOUT` | Request timeout in milliseconds | `30000` |
+| `LLAMACPP_CODE_PREFIX` | Enable automatic code prefix for embeddings | `true` |
 
 
 ### Advanced Configuration

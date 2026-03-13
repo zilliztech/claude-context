@@ -134,6 +134,10 @@ export class OpenAIEmbedding extends Embedding {
         return 'OpenAI';
     }
 
+    getModel(): string {
+        return this.config.model;
+    }
+
     /**
      * Set model type
      * @param model Model name

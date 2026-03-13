@@ -65,10 +65,16 @@ class ContextMcpServer {
             ...(config.milvusToken && { token: config.milvusToken })
         });
 
+        // Set collection naming strategy from config
+        if (config.embeddingStrictCollectionNames !== undefined) {
+            process.env.EMBEDDING_STRICT_COLLECTION_NAMES = config.embeddingStrictCollectionNames.toString();
+        }
+
         // Initialize Claude Context
         this.context = new Context({
             embedding,
-            vectorDatabase
+            vectorDatabase,
+            customCollectionName: config.milvusCollectionName
         });
 
         // Initialize managers

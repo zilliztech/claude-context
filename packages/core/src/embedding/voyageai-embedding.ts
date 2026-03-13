@@ -119,6 +119,10 @@ export class VoyageAIEmbedding extends Embedding {
         return 'VoyageAI';
     }
 
+    getModel(): string {
+        return this.config.model;
+    }
+
     /**
      * Set model type
      * @param model Model name

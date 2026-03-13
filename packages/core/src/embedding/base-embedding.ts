@@ -73,4 +73,10 @@ export abstract class Embedding {
      * @returns Provider name
      */
     abstract getProvider(): string;
+
+    /**
+     * Get model name/identifier
+     * @returns Model name
+     */
+    abstract getModel(): string;
 } 
