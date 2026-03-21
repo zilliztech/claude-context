@@ -1,8 +1,8 @@
-import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@zilliz/claude-context-core";
+import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding, MiniMaxEmbedding } from "@zilliz/claude-context-core";
 import { ContextMcpConfig } from "./config.js";
 
 // Helper function to create embedding instance based on provider
-export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding {
+export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding | MiniMaxEmbedding {
     console.log(`[EMBEDDING] Creating ${config.embeddingProvider} embedding instance...`);
 
     switch (config.embeddingProvider) {
@@ -47,6 +47,20 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
             console.log(`[EMBEDDING] ✅ Gemini embedding instance created successfully`);
             return geminiEmbedding;
 
+        case 'MiniMax':
+            if (!config.minimaxApiKey) {
+                console.error(`[EMBEDDING] ❌ MiniMax API key is required but not provided`);
+                throw new Error('MINIMAX_API_KEY is required for MiniMax embedding provider');
+            }
+            console.log(`[EMBEDDING] 🔧 Configuring MiniMax with model: ${config.embeddingModel}`);
+            const minimaxEmbedding = new MiniMaxEmbedding({
+                apiKey: config.minimaxApiKey,
+                model: config.embeddingModel,
+                ...(config.minimaxBaseUrl && { baseURL: config.minimaxBaseUrl })
+            });
+            console.log(`[EMBEDDING] ✅ MiniMax embedding instance created successfully`);
+            return minimaxEmbedding;
+
         case 'Ollama':
             const ollamaHost = config.ollamaHost || 'http://127.0.0.1:11434';
             console.log(`[EMBEDDING] 🔧 Configuring Ollama with model: ${config.embeddingModel}, host: ${ollamaHost}`);
@@ -63,7 +77,7 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
     }
 }
 
-export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding): void {
+export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding | MiniMaxEmbedding): void {
     console.log(`[EMBEDDING] ✅ Successfully initialized ${config.embeddingProvider} embedding provider`);
     console.log(`[EMBEDDING] Provider details - Model: ${config.embeddingModel}, Dimension: ${embedding.getDimension()}`);
 
@@ -77,6 +91,9 @@ export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: Op
             break;
         case 'Gemini':
             console.log(`[EMBEDDING] Gemini configuration - API Key: ${config.geminiApiKey ? '✅ Provided' : '❌ Missing'}, Base URL: ${config.geminiBaseUrl || 'Default'}`);
+            break;
+        case 'MiniMax':
+            console.log(`[EMBEDDING] MiniMax configuration - API Key: ${config.minimaxApiKey ? '✅ Provided' : '❌ Missing'}, Base URL: ${config.minimaxBaseUrl || 'https://api.minimax.io/v1'}`);
             break;
         case 'Ollama':
             console.log(`[EMBEDDING] Ollama configuration - Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}, Model: ${config.embeddingModel}`);
