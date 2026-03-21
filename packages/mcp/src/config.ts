@@ -4,7 +4,7 @@ export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
-    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
+    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'MiniMax';
     embeddingModel: string;
     // Provider-specific API keys
     openaiApiKey?: string;
@@ -12,6 +12,8 @@ export interface ContextMcpConfig {
     voyageaiApiKey?: string;
     geminiApiKey?: string;
     geminiBaseUrl?: string;
+    minimaxApiKey?: string;
+    minimaxBaseUrl?: string;
     // Ollama configuration
     ollamaModel?: string;
     ollamaHost?: string;
@@ -78,6 +80,8 @@ export function getDefaultModelForProvider(provider: string): string {
             return 'gemini-embedding-001';
         case 'Ollama':
             return 'nomic-embed-text';
+        case 'MiniMax':
+            return 'embo-01';
         default:
             return 'text-embedding-3-small';
     }
@@ -94,6 +98,7 @@ export function getEmbeddingModelForProvider(provider: string): string {
         case 'OpenAI':
         case 'VoyageAI':
         case 'Gemini':
+        case 'MiniMax':
         default:
             // For all other providers, use EMBEDDING_MODEL or default
             const selectedModel = envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
@@ -110,6 +115,7 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   MINIMAX_API_KEY: ${envManager.get('MINIMAX_API_KEY') ? 'SET (length: ' + envManager.get('MINIMAX_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
@@ -117,7 +123,7 @@ export function createMcpConfig(): ContextMcpConfig {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'MiniMax') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
@@ -125,6 +131,9 @@ export function createMcpConfig(): ContextMcpConfig {
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
         geminiBaseUrl: envManager.get('GEMINI_BASE_URL'),
+        // MiniMax configuration
+        minimaxApiKey: envManager.get('MINIMAX_API_KEY'),
+        minimaxBaseUrl: envManager.get('MINIMAX_BASE_URL'),
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
@@ -162,6 +171,12 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
                 console.log(`[MCP]   Gemini Base URL: ${config.geminiBaseUrl}`);
             }
             break;
+        case 'MiniMax':
+            console.log(`[MCP]   MiniMax API Key: ${config.minimaxApiKey ? '✅ Configured' : '❌ Missing'}`);
+            if (config.minimaxBaseUrl) {
+                console.log(`[MCP]   MiniMax Base URL: ${config.minimaxBaseUrl}`);
+            }
+            break;
         case 'Ollama':
             console.log(`[MCP]   Ollama Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}`);
             console.log(`[MCP]   Ollama Model: ${config.embeddingModel}`);
@@ -185,7 +200,7 @@ Environment Variables:
   MCP_SERVER_VERSION      Server version
   
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama, MiniMax (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
   
   Provider-specific API Keys:
@@ -194,7 +209,9 @@ Environment Variables:
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
-  
+  MINIMAX_API_KEY         MiniMax API key (required for MiniMax provider)
+  MINIMAX_BASE_URL        MiniMax API base URL (optional, default: https://api.minimax.io/v1)
+
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
@@ -216,6 +233,9 @@ Examples:
   # Start MCP server with Gemini and specific model
   EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
+  # Start MCP server with MiniMax
+  EMBEDDING_PROVIDER=MiniMax MINIMAX_API_KEY=xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
   # Start MCP server with Ollama and specific model (using OLLAMA_MODEL)
   EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   

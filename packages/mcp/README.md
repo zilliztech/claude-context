@@ -20,7 +20,7 @@ Model Context Protocol (MCP) allows you to integrate Claude Context with your fa
 
 Before using the MCP server, make sure you have:
 
-- API key for your chosen embedding provider (OpenAI, VoyageAI, Gemini, or Ollama setup)
+- API key for your chosen embedding provider (OpenAI, VoyageAI, Gemini, MiniMax, or Ollama setup)
 - Milvus vector database (local or cloud)
 
 > 💡 **Setup Help:** See the [main project setup guide](../../README.md#-quick-start) for detailed installation instructions.
@@ -34,7 +34,7 @@ Claude Context MCP supports multiple embedding providers. Choose the one that be
 > 📋 **Quick Reference**: For a complete list of environment variables and their descriptions, see the [Environment Variables Guide](../../docs/getting-started/environment-variables.md).
 
 ```bash
-# Supported providers: OpenAI, VoyageAI, Gemini, Ollama
+# Supported providers: OpenAI, VoyageAI, Gemini, Ollama, MiniMax
 EMBEDDING_PROVIDER=OpenAI
 ```
 
@@ -120,7 +120,35 @@ See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztec
 </details>
 
 <details>
-<summary><strong>4. Ollama Configuration (Local/Self-hosted)</strong></summary>
+<summary><strong>4. MiniMax Configuration</strong></summary>
+
+MiniMax provides the embo-01 embedding model with 1536 dimensions, suitable for general-purpose text and code embedding.
+
+```bash
+# Required: Your MiniMax API key
+MINIMAX_API_KEY=your-minimax-api-key
+
+# Optional: Specify embedding model (default: embo-01)
+EMBEDDING_MODEL=embo-01
+
+# Optional: Custom API base URL (default: https://api.minimax.io/v1)
+MINIMAX_BASE_URL=https://api.minimax.io/v1
+```
+
+**Available Models:**
+See `getSupportedModels` in [`minimax-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/minimax-embedding.ts) for the full list of supported models.
+
+**Getting API Key:**
+
+1. Visit [MiniMax Platform](https://platform.minimaxi.com/)
+2. Sign up for an account
+3. Navigate to API Keys section
+4. Create a new API key
+
+</details>
+
+<details>
+<summary><strong>5. Ollama Configuration (Local/Self-hosted)</strong></summary>
 
 Ollama allows you to run embeddings locally without sending data to external services.
 

@@ -20,13 +20,15 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ### Embedding Provider
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
+| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama`, `MiniMax` | `OpenAI` |
 | `EMBEDDING_MODEL` | Embedding model name (works for all providers) | Provider-specific default |
 | `OPENAI_API_KEY` | OpenAI API key | Required for OpenAI |
 | `OPENAI_BASE_URL` | OpenAI API base URL (optional, for custom endpoints) | `https://api.openai.com/v1` |
 | `VOYAGEAI_API_KEY` | VoyageAI API key | Required for VoyageAI |
 | `GEMINI_API_KEY` | Gemini API key | Required for Gemini |
 | `GEMINI_BASE_URL` | Gemini API base URL (optional, for custom endpoints) | `https://generativelanguage.googleapis.com/v1beta` |
+| `MINIMAX_API_KEY` | MiniMax API key | Required for MiniMax |
+| `MINIMAX_BASE_URL` | MiniMax API base URL (optional, for custom endpoints) | `https://api.minimax.io/v1` |
 
 > **💡 Note:** `EMBEDDING_MODEL` is a universal environment variable that works with all embedding providers. Simply set it to the model name you want to use (e.g., `text-embedding-3-large` for OpenAI, `voyage-code-3` for VoyageAI, etc.).
 
@@ -38,6 +40,8 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 > 
 > - Gemini Models: See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/gemini-embedding.ts) for the full list of supported models.
 > 
+> - MiniMax Models: See `getSupportedModels` in [`minimax-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/minimax-embedding.ts) for the full list of supported models.
+>
 > - Ollama Models: Depends on the model you install locally.
 
 > **📖 For detailed provider-specific configuration examples and setup instructions, see the [MCP Configuration Guide](../../packages/mcp/README.md#embedding-provider-configuration).**
