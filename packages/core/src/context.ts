@@ -29,8 +29,11 @@ const DEFAULT_SUPPORTED_EXTENSIONS = [
     '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
     // Text and markup files
     '.md', '.markdown', '.ipynb',
-    // '.txt',  '.json', '.yaml', '.yml', '.xml', '.html', '.htm',
-    // '.css', '.scss', '.less', '.sql', '.sh', '.bash', '.env'
+    // Config, infrastructure, and supporting files
+    '.json', '.yaml', '.yml', '.xml', '.html', '.htm', '.toml',
+    '.css', '.scss', '.less', '.sql', '.sh', '.bash',
+    '.prisma', '.graphql', '.gql', '.proto',
+    '.dockerfile', '.tf', '.hcl',
 ];
 
 const DEFAULT_IGNORE_PATTERNS = [
