@@ -29,9 +29,29 @@ const DEFAULT_SUPPORTED_EXTENSIONS = [
     '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
     // Text and markup files
     '.md', '.markdown', '.ipynb',
-    // '.txt',  '.json', '.yaml', '.yml', '.xml', '.html', '.htm',
-    // '.css', '.scss', '.less', '.sql', '.sh', '.bash', '.env'
+    // Config, infrastructure, and supporting files
+    '.json', '.yaml', '.yml', '.xml', '.html', '.htm', '.toml',
+    '.css', '.scss', '.less', '.sql', '.sh', '.bash',
+    '.prisma', '.graphql', '.gql', '.proto',
+    '.dockerfile', '.tf', '.hcl',
 ];
+
+/**
+ * Well-known extension-less filenames that should be indexed.
+ * Users can extend this via CUSTOM_EXTENSIONLESS_FILENAMES env var (comma-separated).
+ */
+const DEFAULT_EXTENSIONLESS_FILENAMES = new Set([
+    'Dockerfile', 'dockerfile',
+    'Makefile', 'makefile', 'GNUmakefile',
+    'Jenkinsfile',
+    'Vagrantfile',
+    'Gemfile', 'Rakefile', 'Guardfile',
+    'Procfile',
+    'Brewfile',
+    'Caddyfile',
+    'Fastfile',
+    'Appfile',
+]);
 
 const DEFAULT_IGNORE_PATTERNS = [
     // Common build output and dependency directories
@@ -102,6 +122,7 @@ export class Context {
     private codeSplitter: Splitter;
     private supportedExtensions: string[];
     private ignorePatterns: string[];
+    private extensionlessFilenames: Set<string>;
     private synchronizers = new Map<string, FileSynchronizer>();
 
     constructor(config: ContextConfig = {}) {
@@ -145,7 +166,14 @@ export class Context {
         // Remove duplicates
         this.ignorePatterns = [...new Set(allIgnorePatterns)];
 
-        console.log(`[Context] 🔧 Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
+        // Build extensionless filename set from defaults + env
+        const envExtensionlessFilenames = this.getCustomExtensionlessFilenamesFromEnv();
+        this.extensionlessFilenames = new Set([
+            ...DEFAULT_EXTENSIONLESS_FILENAMES,
+            ...envExtensionlessFilenames,
+        ]);
+
+        console.log(`[Context] 🔧 Initialized with ${this.supportedExtensions.length} supported extensions, ${this.extensionlessFilenames.size} extensionless filenames, and ${this.ignorePatterns.length} ignore patterns`);
         if (envCustomExtensions.length > 0) {
             console.log(`[Context] 📎 Loaded ${envCustomExtensions.length} custom extensions from environment: ${envCustomExtensions.join(', ')}`);
         }
@@ -677,7 +705,11 @@ export class Context {
                     await traverseDirectory(fullPath);
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
-                    if (this.supportedExtensions.includes(ext)) {
+                    if (ext === '') {
+                        if (this.extensionlessFilenames.has(entry.name)) {
+                            files.push(fullPath);
+                        }
+                    } else if (this.supportedExtensions.includes(ext)) {
                         files.push(fullPath);
                     }
                 }
@@ -1154,6 +1186,21 @@ export class Context {
             return patterns;
         } catch (error) {
             console.warn(`[Context] ⚠️  Failed to parse CUSTOM_IGNORE_PATTERNS: ${error}`);
+            return [];
+        }
+    }
+
+    /**
+     * Get custom extensionless filenames from environment variables.
+     * Supports CUSTOM_EXTENSIONLESS_FILENAMES as comma-separated list (e.g. "Dockerfile,Makefile").
+     */
+    private getCustomExtensionlessFilenamesFromEnv(): string[] {
+        const envValue = envManager.get('CUSTOM_EXTENSIONLESS_FILENAMES');
+        if (!envValue) return [];
+        try {
+            return envValue.split(',').map(f => f.trim()).filter(f => f.length > 0);
+        } catch (error) {
+            console.warn(`[Context] ⚠️  Failed to parse CUSTOM_EXTENSIONLESS_FILENAMES: ${error}`);
             return [];
         }
     }
