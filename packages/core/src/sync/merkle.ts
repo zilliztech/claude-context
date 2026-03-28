@@ -78,22 +78,13 @@ export class MerkleDAG {
         return dag;
     }
 
-    public static compare(dag1: MerkleDAG, dag2: MerkleDAG): { added: string[], removed: string[], modified: string[] } {
-        const nodes1 = new Map(Array.from(dag1.getAllNodes()).map(n => [n.id, n]));
-        const nodes2 = new Map(Array.from(dag2.getAllNodes()).map(n => [n.id, n]));
+    public static compare(dag1: MerkleDAG, dag2: MerkleDAG): { added: string[], removed: string[] } {
+        const nodes1 = new Set(Array.from(dag1.getAllNodes()).map(n => n.id));
+        const nodes2 = new Set(Array.from(dag2.getAllNodes()).map(n => n.id));
 
-        const added = Array.from(nodes2.keys()).filter(k => !nodes1.has(k));
-        const removed = Array.from(nodes1.keys()).filter(k => !nodes2.has(k));
-        
-        // For modified, we'll check if the data has changed for nodes that exist in both
-        const modified: string[] = [];
-        for (const [id, node1] of Array.from(nodes1.entries())) {
-            const node2 = nodes2.get(id);
-            if (node2 && node1.data !== node2.data) {
-                modified.push(id);
-            }
-        }
+        const added = Array.from(nodes2).filter(k => !nodes1.has(k));
+        const removed = Array.from(nodes1).filter(k => !nodes2.has(k));
 
-        return { added, removed, modified };
+        return { added, removed };
     }
 } 
