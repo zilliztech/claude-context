@@ -1,6 +1,6 @@
 {
     "name": "@lbruton/claude-context-mcp",
-    "version": "0.1.6",
+    "version": "0.1.7",
     "description": "Model Context Protocol integration for Claude Context",
     "type": "module",
     "main": "dist/index.js",

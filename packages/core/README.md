@@ -1,285 +1,89 @@
-# @zilliz/claude-context-core
-![](../../assets/claude-context.png)
+# @lbruton/claude-context
 
-The core indexing engine for Claude Context - a powerful tool for semantic search and analysis of codebases using vector embeddings and AI.
+> Fork of [zilliztech/claude-context](https://github.com/zilliztech/claude-context) — patched for local Milvus stability.
 
-[![npm version](https://img.shields.io/npm/v/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
-[![npm downloads](https://img.shields.io/npm/dm/@zilliz/claude-context-core.svg)](https://www.npmjs.com/package/@zilliz/claude-context-core)
+## Why this fork?
 
-> 📖 **New to Claude Context?** Check out the [main project README](../../README.md) for an overview and quick start guide.
+The upstream `@zilliz/claude-context-mcp` has recurring issues with local Milvus deployments:
 
-## Installation
+- **No fetch timeout** on REST API calls — hangs indefinitely on `DEADLINE_EXCEEDED`
+- **No gRPC connection timeout** — `MilvusClient` connects without a timeout, causing session startup failures
+- **No error differentiation** — transient vs permanent failures are treated identically
+- **`npx @latest` re-downloads every session** — pulls the buggy upstream on each new Claude Code session
 
-```bash
-npm install @zilliz/claude-context-core
-```
+This fork fixes those issues and publishes to `@lbruton/claude-context-mcp` on npm so sessions always use the patched version.
 
-### Prepare Environment Variables
-#### OpenAI API key
-See [OpenAI Documentation](https://platform.openai.com/docs/api-reference) for more details to get your API key.
-```bash
-OPENAI_API_KEY=your-openai-api-key
-```
+## Changes from upstream
 
-#### Zilliz Cloud configuration
-Get a free Milvus vector database on Zilliz Cloud. 
+1. **30s fetch timeout** on all REST API requests (`AbortSignal.timeout`)
+2. **30s gRPC connection timeout** on `MilvusClient` initialization
+3. **Better error logging** — timeout vs error differentiated in log output
+4. **Rebranded to `@lbruton/` npm scope** — `@lbruton/claude-context-core` + `@lbruton/claude-context-mcp`
 
-Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get a free Serverless cluster.
+## Installation (Claude Code MCP)
 
-![](../../assets/signup_and_create_cluster.jpeg)
+In `~/.claude/.mcp.json`:
 
-After creating your cluster, open your Zilliz Cloud console and copy both the **public endpoint** and your **API key**.  
-These will be used as `your-zilliz-cloud-public-endpoint` and `your-zilliz-cloud-api-key` in the configuration examples.
-
-![Zilliz Cloud Dashboard](../../assets/zilliz_cloud_dashboard.jpeg)
-
-Keep both values handy for the configuration steps below.
-
-If you need help creating your free vector database or finding these values, see the [Zilliz Cloud documentation](https://docs.zilliz.com/docs/create-cluster) for detailed instructions.
-
-```bash
-MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint
-MILVUS_TOKEN=your-zilliz-cloud-api-key
-``` 
-
-> 💡 **Tip**: For easier configuration management across different usage scenarios, consider using [global environment variables](../../docs/getting-started/environment-variables.md).
-
-## Quick Start
-
-```typescript
-import { 
-  Context, 
-  OpenAIEmbedding, 
-  MilvusVectorDatabase 
-} from '@zilliz/claude-context-core';
-
-// Initialize embedding provider
-const embedding = new OpenAIEmbedding({
-  apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key',
-  model: 'text-embedding-3-small'
-});
-
-// Initialize vector database
-const vectorDatabase = new MilvusVectorDatabase({
-  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-  token: process.env.MILVUS_TOKEN || ''
-});
-
-// Create context instance
-const context = new Context({
-  embedding,
-  vectorDatabase
-});
-
-// Index a codebase
-const stats = await context.indexCodebase('./my-project', (progress) => {
-  console.log(`${progress.phase} - ${progress.percentage}%`);
-});
-
-console.log(`Indexed ${stats.indexedFiles} files with ${stats.totalChunks} chunks`);
-
-// Search the codebase
-const results = await context.semanticSearch(
-  './my-project',
-  'function that handles user authentication',
-  5
-);
-
-results.forEach(result => {
-  console.log(`${result.relativePath}:${result.startLine}-${result.endLine}`);
-  console.log(`Score: ${result.score}`);
-  console.log(result.content);
-});
-```
-
-## Features
-
-- **Multi-language Support**: Index TypeScript, JavaScript, Python, Java, C++, and many other programming languages
-- **Semantic Search**: Find code using natural language queries powered by AI embeddings
-- **Flexible Architecture**: Pluggable embedding providers and vector databases
-- **Smart Chunking**: Intelligent code splitting that preserves context and structure
-- **Batch Processing**: Efficient processing of large codebases with progress tracking
-- **Pattern Matching**: Built-in ignore patterns for common build artifacts and dependencies
-- **Incremental File Synchronization**: Efficient change detection using Merkle trees to only re-index modified files
-
-## Embedding Providers
-
-- **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002`)
-- **VoyageAI Embeddings** - High-quality embeddings optimized for code (`voyage-code-3`, `voyage-3.5`, etc.)
-- **Gemini Embeddings** - Google's embedding models (`gemini-embedding-001`)
-- **Ollama Embeddings** - Local embedding models via Ollama
-
-## Vector Database Support
-
-- **Milvus/Zilliz Cloud** - High-performance vector database
-
-## Code Splitters
-
-- **AST Code Splitter** - AST-based code splitting with automatic fallback (default)
-- **LangChain Code Splitter** - Character-based code chunking
-
-## Configuration
-
-### ContextConfig
-
-```typescript
-interface ContextConfig {
-  embedding?: Embedding;           // Embedding provider
-  vectorDatabase?: VectorDatabase; // Vector database instance (required)
-  codeSplitter?: Splitter;        // Code splitting strategy
-  supportedExtensions?: string[]; // File extensions to index
-  ignorePatterns?: string[];      // Patterns to ignore
-  customExtensions?: string[];    // Custom extensions from MCP
-  customIgnorePatterns?: string[]; // Custom ignore patterns from MCP
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@lbruton/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "sk-...",
+        "EMBEDDING_PROVIDER": "OpenAI",
+        "EMBEDDING_MODEL": "text-embedding-3-small",
+        "MILVUS_ADDRESS": "192.168.1.81:19530"
+      },
+      "startupTimeoutMs": 30000
+    }
+  }
 }
 ```
 
-### Supported File Extensions (Default)
+## Environment Variables
 
-```typescript
-[
-  // Programming languages
-  '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
-  '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
-  // Text and markup files  
-  '.md', '.markdown', '.ipynb'
-]
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MILVUS_ADDRESS` | Yes | Milvus gRPC endpoint (e.g., `localhost:19530`) |
+| `OPENAI_API_KEY` | Yes* | OpenAI API key for embeddings |
+| `EMBEDDING_PROVIDER` | No | `OpenAI` (default), `VoyageAI`, `Gemini`, `Ollama` |
+| `EMBEDDING_MODEL` | No | Model name (default: `text-embedding-3-small`) |
+| `MILVUS_TOKEN` | No | Zilliz Cloud token (not needed for local Milvus) |
+
+*Required when using OpenAI embeddings (default).
+
+## Local Milvus Setup
+
+This fork is designed for local Milvus Standalone. Run Milvus via Docker:
+
+```bash
+# Milvus Standalone (includes etcd + minio)
+docker compose -f docker-compose-milvus.yml up -d
 ```
 
-### Default Ignore Patterns
+Or use an existing Milvus instance on your network — just set `MILVUS_ADDRESS` to point to it.
 
-- Build and dependency directories: `node_modules/**`, `dist/**`, `build/**`, `out/**`, `target/**`
-- Version control: `.git/**`, `.svn/**`, `.hg/**`
-- IDE files: `.vscode/**`, `.idea/**`, `*.swp`, `*.swo`
-- Cache directories: `.cache/**`, `__pycache__/**`, `.pytest_cache/**`, `coverage/**`
-- Minified files: `*.min.js`, `*.min.css`, `*.bundle.js`, `*.map`
-- Log and temp files: `logs/**`, `tmp/**`, `temp/**`, `*.log`
-- Environment files: `.env`, `.env.*`, `*.local`
+## Building from source
 
-## API Reference
-
-### Context
-
-#### Methods
-
-- `indexCodebase(path, progressCallback?, forceReindex?)` - Index an entire codebase
-- `reindexByChange(path, progressCallback?)` - Incrementally re-index only changed files
-- `semanticSearch(path, query, topK?, threshold?, filterExpr?)` - Search indexed code semantically
-- `hasIndex(path)` - Check if codebase is already indexed
-- `clearIndex(path, progressCallback?)` - Remove index for a codebase
-- `updateIgnorePatterns(patterns)` - Update ignore patterns
-- `addCustomIgnorePatterns(patterns)` - Add custom ignore patterns
-- `addCustomExtensions(extensions)` - Add custom file extensions
-- `updateEmbedding(embedding)` - Switch embedding provider
-- `updateVectorDatabase(vectorDB)` - Switch vector database
-- `updateSplitter(splitter)` - Switch code splitter
-
-### Search Results
-
-```typescript
-interface SemanticSearchResult {
-  content: string;      // Code content
-  relativePath: string; // File path relative to codebase root
-  startLine: number;    // Starting line number
-  endLine: number;      // Ending line number
-  language: string;     // Programming language
-  score: number;        // Similarity score (0-1)
-}
+```bash
+pnpm install
+pnpm build:core
+pnpm build:mcp
 ```
 
+## Publishing
 
-## Examples
-
-### Using VoyageAI Embeddings
-
-```typescript
-import { Context, MilvusVectorDatabase, VoyageAIEmbedding } from '@zilliz/claude-context-core';
-
-// Initialize with VoyageAI embedding provider
-const embedding = new VoyageAIEmbedding({
-  apiKey: process.env.VOYAGEAI_API_KEY || 'your-voyageai-api-key',
-  model: 'voyage-code-3'
-});
-
-const vectorDatabase = new MilvusVectorDatabase({
-  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-  token: process.env.MILVUS_TOKEN || ''
-});
-
-const context = new Context({
-  embedding,
-  vectorDatabase
-});
+```bash
+pnpm release:core
+pnpm release:mcp
 ```
-
-### Custom File Filtering
-
-```typescript
-const context = new Context({
-  embedding,
-  vectorDatabase,
-  supportedExtensions: ['.ts', '.js', '.py', '.java'],
-  ignorePatterns: [
-    'node_modules/**',
-    'dist/**',
-    '*.spec.ts',
-    '*.test.js'
-  ]
-});
-```
-
-## File Synchronization Architecture
-
-Claude Context implements an intelligent file synchronization system that efficiently tracks and processes only the files that have changed since the last indexing operation. This dramatically improves performance when working with large codebases.
-
-![File Synchronization Architecture](../../assets/file_synchronizer.png)
-
-### How It Works
-
-The file synchronization system uses a **Merkle tree-based approach** combined with SHA-256 file hashing to detect changes:
-
-#### 1. File Hashing
-- Each file in the codebase is hashed using SHA-256
-- File hashes are computed based on file content, not metadata
-- Hashes are stored with relative file paths for consistency across different environments
-
-#### 2. Merkle Tree Construction
-- All file hashes are organized into a Merkle tree structure
-- The tree provides a single root hash that represents the entire codebase state
-- Any change to any file will cause the root hash to change
-
-#### 3. Snapshot Management
-- File synchronization state is persisted to `~/.context/merkle/` directory
-- Each codebase gets a unique snapshot file based on its absolute path hash
-- Snapshots contain both file hashes and serialized Merkle tree data
-
-#### 4. Change Detection Process
-1. **Quick Check**: Compare current Merkle root hash with stored snapshot
-2. **Detailed Analysis**: If root hashes differ, perform file-by-file comparison
-3. **Change Classification**: Categorize changes into three types:
-   - **Added**: New files that didn't exist before
-   - **Modified**: Existing files with changed content
-   - **Removed**: Files that were deleted from the codebase
-
-#### 5. Incremental Updates
-- Only process files that have actually changed
-- Update vector database entries only for modified chunks
-- Remove entries for deleted files
-- Add entries for new files
-
-
-## Contributing
-
-This package is part of the Claude Context monorepo. Please see:
-- [Main Contributing Guide](../../CONTRIBUTING.md) - General contribution guidelines
-- [Core Package Contributing](CONTRIBUTING.md) - Specific development guide for this package
-
-## Related Packages
-
-- **[@claude-context/mcp](../mcp)** - MCP server that uses this core engine
-- **[VSCode Extension](../vscode-extension)** - VSCode extension built on this core
-
 
 ## License
 
-MIT - See [LICENSE](../../LICENSE) for details
+MIT — same as upstream.
+
+## Upstream
+
+Original project: [zilliztech/claude-context](https://github.com/zilliztech/claude-context)
