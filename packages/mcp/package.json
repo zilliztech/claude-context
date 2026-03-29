@@ -1,5 +1,5 @@
 {
-    "name": "@zilliz/claude-context-mcp",
+    "name": "@lbruton/claude-context-mcp",
     "version": "0.1.6",
     "description": "Model Context Protocol integration for Claude Context",
     "type": "module",
@@ -18,7 +18,7 @@
         "prepublishOnly": "pnpm build"
     },
     "dependencies": {
-        "@zilliz/claude-context-core": "workspace:*",
+        "@lbruton/claude-context-core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.12.1",
         "zod": "^3.25.55"
     },
@@ -33,7 +33,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/zilliztech/claude-context.git",
+        "url": "https://github.com/lbruton/claude-context.git",
         "directory": "packages/mcp"
     },
     "license": "MIT",

@@ -46,6 +46,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             password: milvusConfig.password,
             token: milvusConfig.token,
             ssl: milvusConfig.ssl || false,
+            timeout: 30000, // 30s connection timeout — prevents DEADLINE_EXCEEDED hangs
         });
     }
 

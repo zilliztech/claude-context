@@ -13,7 +13,7 @@
         "build:milvus": "echo 'build:milvus script not implemented'"
     },
     "dependencies": {
-        "@zilliz/claude-context-core": "workspace:*"
+        "@lbruton/claude-context-core": "workspace:*"
     },
     "overrides": {
         "@zilliz/milvus2-sdk-node": false

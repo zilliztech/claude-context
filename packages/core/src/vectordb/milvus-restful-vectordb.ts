@@ -159,6 +159,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         const requestOptions: RequestInit = {
             method,
             headers,
+            signal: AbortSignal.timeout(30000), // 30s timeout — prevents DEADLINE_EXCEEDED hangs
         };
 
         if (data && method === 'POST') {
@@ -175,12 +176,14 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             const result: any = await response.json();
 
             if (result.code !== 0 && result.code !== 200) {
-                throw new Error(`Milvus API error: ${result.message || 'Unknown error'}`);
+                throw new Error(`Milvus API error (code ${result.code}): ${result.message || 'Unknown error'}`);
             }
 
             return result;
-        } catch (error) {
-            console.error(`[MilvusRestfulDB] Milvus REST API request failed:`, error);
+        } catch (error: any) {
+            const isTimeout = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+            const label = isTimeout ? 'timeout' : 'error';
+            console.error(`[MilvusRestfulDB] REST API ${label} on ${method} ${endpoint}:`, error?.message || error);
             throw error;
         }
     }
