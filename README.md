@@ -1,5 +1,7 @@
 # @lbruton/claude-context
 
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/6be742df2b9347efa36fa7befbb04c95)](https://app.codacy.com/gh/lbruton/claude-context/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+
 > Actively maintained fork of [zilliztech/claude-context](https://github.com/zilliztech/claude-context) — hardened for self-hosted Milvus deployments.
 
 ## Why this fork?
