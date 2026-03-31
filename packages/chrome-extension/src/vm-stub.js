@@ -1,1 +1,0 @@
-// This file is intentionally left blank to act as a stub for the 'vm' module in the browser environment. 

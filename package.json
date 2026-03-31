@@ -6,11 +6,9 @@
     "scripts": {
         "build": "pnpm -r --filter='!./examples/*' build && pnpm -r --filter='./examples/*' build",
         "build:core": "pnpm --filter @lbruton/claude-context-core build",
-        "build:vscode": "pnpm --filter semanticcodesearch compile",
         "build:mcp": "pnpm --filter @lbruton/claude-context-mcp build",
         "dev": "pnpm -r dev",
         "dev:core": "pnpm --filter @lbruton/claude-context-core dev",
-        "dev:vscode": "pnpm --filter semanticcodesearch watch",
         "dev:mcp": "pnpm --filter @lbruton/claude-context-mcp dev",
         "clean": "pnpm -r clean",
         "lint": "pnpm -r lint",
@@ -18,25 +16,17 @@
         "typecheck": "pnpm -r run typecheck",
         "release:core": "pnpm --filter @lbruton/claude-context-core... run build && pnpm --filter @lbruton/claude-context-core publish --access public --no-git-checks",
         "release:mcp": "pnpm --filter @lbruton/claude-context-mcp... run build && pnpm --filter @lbruton/claude-context-mcp publish --access public --no-git-checks",
-        "release:vscode": "pnpm --filter @lbruton/claude-context-core build && pnpm --filter semanticcodesearch run webpack && pnpm --filter semanticcodesearch release",
         "example:basic": "pnpm --filter claude-context-basic-example start",
         "benchmark": "node scripts/build-benchmark.js"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@typescript-eslint/eslint-plugin": "^8.31.1",
-        "@typescript-eslint/parser": "^8.31.1",
-        "assert": "^2.1.0",
-        "browserify-zlib": "^0.2.0",
-        "eslint": "^9.25.1",
-        "https-browserify": "^1.0.0",
-        "os-browserify": "^0.3.0",
-        "rimraf": "^6.0.1",
-        "stream-http": "^3.2.0",
-        "tree-sitter-cli": "^0.25.6",
-        "typescript": "^5.8.3",
-        "url": "^0.11.4",
-        "vm-browserify": "^1.1.2"
+        "@types/node": "^20.19.37",
+        "@typescript-eslint/eslint-plugin": "^8.58.0",
+        "@typescript-eslint/parser": "^8.58.0",
+        "eslint": "^9.39.4",
+        "rimraf": "^6.1.3",
+        "tree-sitter-cli": "^0.25.10",
+        "typescript": "^5.9.3"
     },
     "engines": {
         "node": ">=20.0.0",
@@ -45,6 +35,13 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/lbruton/claude-context.git"
+    },
+    "pnpm": {
+        "overrides": {
+            "@langchain/core": ">=0.3.80",
+            "langsmith": ">=0.4.6",
+            "qs": ">=6.14.2"
+        }
     },
     "license": "MIT",
     "author": "Cheney Zhang <277584121@qq.com>"
