@@ -1,0 +1,14 @@
+---
+exclude_paths:
+  - "node_modules/**"
+  - "dist/**"
+  - "examples/**"
+  - ".claude/**"
+  - "assets/**"
+  - "docs/**"
+
+engines:
+  opengrep:
+    exclude_paths:
+      - "**/*.test.ts"
+      - "**/__tests__/**"

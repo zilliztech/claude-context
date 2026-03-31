@@ -1,3 +1,4 @@
+// nosemgrep: ai.typescript.detect-openai.detect-openai
 import OpenAI from 'openai';
 import { Embedding, EmbeddingVector } from './base-embedding';
 
@@ -16,7 +17,7 @@ export class OpenAIEmbedding extends Embedding {
     constructor(config: OpenAIEmbeddingConfig) {
         super();
         this.config = config;
-        this.client = new OpenAI({
+        this.client = new OpenAI({ // nosemgrep: ai.typescript.detect-openai.detect-openai
             apiKey: config.apiKey,
             baseURL: config.baseURL,
         });
