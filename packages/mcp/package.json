@@ -19,13 +19,13 @@
     },
     "dependencies": {
         "@lbruton/claude-context-core": "workspace:*",
-        "@modelcontextprotocol/sdk": "^1.12.1",
-        "zod": "^3.25.55"
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "zod": "^3.25.76"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
-        "tsx": "^4.19.4",
-        "typescript": "^5.0.0"
+        "@types/node": "^20.19.37",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.3"
     },
     "files": [
         "dist",

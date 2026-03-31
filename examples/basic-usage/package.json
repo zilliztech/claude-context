@@ -12,10 +12,10 @@
         "@lbruton/claude-context-core": "workspace:*"
     },
     "devDependencies": {
-        "tsx": "^4.0.0",
-        "typescript": "^5.0.0",
-        "@types/node": "^20.0.0",
-        "dotenv": "^16.0.0"
+        "@types/node": "^20.19.37",
+        "dotenv": "^16.6.1",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.3"
     },
     "private": true
 }
