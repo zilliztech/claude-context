@@ -823,4 +823,25 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         console.warn('[MilvusRestfulDB] ⚠️  checkCollectionLimit not implemented for REST API - returning true');
         return true;
     }
+
+    async getCollectionRowCount(collectionName: string): Promise<number> {
+        try {
+            const hasCol = await this.hasCollection(collectionName);
+            if (!hasCol) {
+                return 0;
+            }
+
+            const response = await this.makeRequest(
+                '/v2/vectordb/collections/get_stats',
+                'POST',
+                { collectionName }
+            );
+
+            const rowCount = response?.data?.rowCount ?? response?.data?.row_count;
+            return typeof rowCount === 'number' ? rowCount : parseInt(rowCount, 10) || 0;
+        } catch (error) {
+            console.error(`[MilvusRestfulDB] Error getting row count for '${collectionName}':`, error);
+            return 0;
+        }
+    }
 }

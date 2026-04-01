@@ -781,4 +781,44 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw error;
         }
     }
+
+    async getCollectionRowCount(collectionName: string): Promise<number> {
+        await this.ensureInitialized();
+
+        if (!this.client) {
+            throw new Error('MilvusClient is not initialized after ensureInitialized().');
+        }
+
+        try {
+            const hasCol = await this.client.hasCollection({ collection_name: collectionName });
+            if (!hasCol.value) {
+                return 0;
+            }
+
+            const result = await this.client.getCollectionStatistics({
+                collection_name: collectionName,
+            });
+
+            if (result.status.error_code !== 'Success') {
+                console.warn(`[MilvusDB] Failed to get stats for '${collectionName}': ${result.status.reason}`);
+                return 0;
+            }
+
+            // row_count is returned in the stats data array
+            const rowCountStat = result.data?.rows_count ?? result.stats?.find((s: any) => s.key === 'row_count');
+            if (typeof rowCountStat === 'number') {
+                return rowCountStat;
+            }
+            if (rowCountStat && typeof rowCountStat === 'object' && 'value' in rowCountStat) {
+                return parseInt(rowCountStat.value, 10) || 0;
+            }
+
+            // Fallback: parse from data.row_count if available
+            const rc = (result as any).data?.row_count;
+            return typeof rc === 'number' ? rc : parseInt(rc, 10) || 0;
+        } catch (error) {
+            console.error(`[MilvusDB] Error getting row count for '${collectionName}':`, error);
+            return 0;
+        }
+    }
 }
