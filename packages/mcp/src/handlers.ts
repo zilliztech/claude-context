@@ -19,6 +19,76 @@ export class ToolHandlers {
     }
 
     /**
+     * Query Milvus for actual collection stats to use in snapshot recovery,
+     * instead of hardcoding indexedFiles: 0, totalChunks: 0.
+     */
+    private async getCollectionStats(codebasePath: string): Promise<{ indexedFiles: number; totalChunks: number }> {
+        try {
+            const collectionName = this.context.getCollectionName(codebasePath);
+            const rowCount = await this.context.getVectorDatabase().getCollectionRowCount(collectionName);
+            // We can't distinguish files from chunks without querying metadata,
+            // but rowCount == totalChunks is accurate. For indexedFiles we return
+            // 0 only if the collection is truly empty; otherwise use a sentinel
+            // that indicates "unknown but non-zero" — the snapshot will be
+            // corrected on the next full index.
+            if (rowCount > 0) {
+                return { indexedFiles: rowCount, totalChunks: rowCount };
+            }
+        } catch (error) {
+            console.warn(`[SNAPSHOT-RECOVERY] Failed to query Milvus stats for '${codebasePath}':`, error);
+        }
+        return { indexedFiles: 0, totalChunks: 0 };
+    }
+
+    /**
+     * Validate snapshot entries that claim status='indexed' but have 0 files/chunks.
+     * These entries are typically left behind by interrupted indexing or buggy recovery
+     * paths. If Milvus actually has data, update the snapshot with real stats.
+     * If Milvus has no data either, remove the stale entry.
+     */
+    private async validateSnapshotZeroEntries(): Promise<void> {
+        try {
+            const indexedCodebases = this.snapshotManager.getIndexedCodebases();
+            let hasChanges = false;
+
+            for (const codebasePath of indexedCodebases) {
+                const info = this.snapshotManager.getCodebaseInfo(codebasePath);
+                if (!info || info.status !== 'indexed') continue;
+
+                // Only validate entries with suspiciously zero stats
+                if ('indexedFiles' in info && info.indexedFiles === 0 &&
+                    'totalChunks' in info && info.totalChunks === 0) {
+
+                    const hasVectorIndex = await this.context.hasIndex(codebasePath);
+                    if (hasVectorIndex) {
+                        const stats = await this.getCollectionStats(codebasePath);
+                        if (stats.totalChunks > 0) {
+                            console.log(`[SNAPSHOT-VALIDATE] Fixing 0/0 entry for '${codebasePath}' — Milvus has ${stats.totalChunks} chunks`);
+                            this.snapshotManager.setCodebaseIndexed(codebasePath, {
+                                ...stats,
+                                status: 'completed' as const
+                            });
+                            hasChanges = true;
+                        }
+                    } else {
+                        // Snapshot says indexed with 0/0, but Milvus has no collection — remove stale entry
+                        console.warn(`[SNAPSHOT-VALIDATE] Removing stale 0/0 entry for '${codebasePath}' — no Milvus collection found`);
+                        this.snapshotManager.removeCodebaseCompletely(codebasePath);
+                        hasChanges = true;
+                    }
+                }
+            }
+
+            if (hasChanges) {
+                this.snapshotManager.saveCodebaseSnapshot();
+                console.log(`[SNAPSHOT-VALIDATE] Snapshot updated after 0/0 validation`);
+            }
+        } catch (error) {
+            console.warn(`[SNAPSHOT-VALIDATE] Error during 0/0 validation (non-fatal):`, error);
+        }
+    }
+
+    /**
      * Sync indexed codebases from Zilliz Cloud collections
      * This method fetches all collections from the vector database,
      * extracts codebasePath from collection description (preferred) or falls back
@@ -149,13 +219,13 @@ export class ToolHandlers {
             // Add cloud codebases that are missing from local snapshot (recovery)
             for (const cloudCodebase of cloudCodebases) {
                 if (!localCodebases.has(cloudCodebase)) {
+                    const stats = await this.getCollectionStats(cloudCodebase);
                     this.snapshotManager.setCodebaseIndexed(cloudCodebase, {
-                        indexedFiles: 0,
-                        totalChunks: 0,
+                        ...stats,
                         status: 'completed' as const
                     });
                     hasChanges = true;
-                    console.log(`[SYNC-CLOUD] ➕ Recovered codebase from cloud: ${cloudCodebase}`);
+                    console.log(`[SYNC-CLOUD] ➕ Recovered codebase from cloud: ${cloudCodebase} (${stats.totalChunks} chunks from Milvus)`);
                 }
             }
 
@@ -181,6 +251,9 @@ export class ToolHandlers {
         const customIgnorePatterns = ignorePatterns || [];
 
         try {
+            // Validate any 0/0 snapshot entries against actual Milvus state
+            await this.validateSnapshotZeroEntries();
+
             // Sync indexed codebases from cloud first
             await this.syncIndexedCodebasesFromCloud();
 
@@ -243,7 +316,8 @@ export class ToolHandlers {
             if (snapshotHasIndex !== vectorDbHasIndex) {
                 if (vectorDbHasIndex && !snapshotHasIndex) {
                     console.warn(`[INDEX-VALIDATION] Recovering missing snapshot for '${absolutePath}'`);
-                    this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' as const });
+                    const recoveredStats = await this.getCollectionStats(absolutePath);
+                    this.snapshotManager.setCodebaseIndexed(absolutePath, { ...recoveredStats, status: 'completed' as const });
                     this.snapshotManager.saveCodebaseSnapshot();
                 } else if (!vectorDbHasIndex && snapshotHasIndex) {
                     console.warn(`[INDEX-VALIDATION] Clearing stale snapshot for '${absolutePath}'`);
@@ -462,6 +536,9 @@ export class ToolHandlers {
         const resultLimit = limit || 10;
 
         try {
+            // Validate any 0/0 snapshot entries against actual Milvus state
+            await this.validateSnapshotZeroEntries();
+
             // Sync indexed codebases from cloud first
             await this.syncIndexedCodebasesFromCloud();
 
@@ -502,7 +579,8 @@ export class ToolHandlers {
                 const hasVectorIndex = await this.context.hasIndex(absolutePath);
                 if (hasVectorIndex) {
                     console.warn(`[SEARCH] Snapshot missing but VectorDB has index for '${absolutePath}', recovering snapshot`);
-                    this.snapshotManager.setCodebaseIndexed(absolutePath, { indexedFiles: 0, totalChunks: 0, status: 'completed' as const });
+                    const recoveredStats = await this.getCollectionStats(absolutePath);
+                    this.snapshotManager.setCodebaseIndexed(absolutePath, { ...recoveredStats, status: 'completed' as const });
                     this.snapshotManager.saveCodebaseSnapshot();
                     // Continue with search (don't return error)
                 } else {

@@ -138,6 +138,14 @@ export interface VectorDatabase {
      * Returns true if collection can be created, false if limit exceeded
      */
     checkCollectionLimit(): Promise<boolean>;
+
+    /**
+     * Get the number of entities (rows) in a collection.
+     * Used by snapshot recovery to get actual stats instead of hardcoding zeros.
+     * @param collectionName Collection name
+     * @returns Number of entities in the collection, or 0 if collection doesn't exist
+     */
+    getCollectionRowCount(collectionName: string): Promise<number>;
 }
 
 /**
