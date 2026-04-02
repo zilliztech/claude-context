@@ -19,8 +19,6 @@ import {
     HybridSearchResult,
     COLLECTION_LIMIT_MESSAGE
 } from './types';
-import { ClusterManager } from './zilliz-utils';
-
 export interface MilvusRestfulConfig {
     address?: string;
     token?: string;
@@ -71,7 +69,31 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
     private async initialize(): Promise<void> {
         const resolvedAddress = await this.resolveAddress();
-        await this.initializeClient(resolvedAddress);
+        const maxRetries = 5;
+        const baseDelay = 2000; // 2s, 4s, 8s, 16s, 32s
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                await this.initializeClient(resolvedAddress);
+                // Probe the connection — initializeClient only sets baseUrl, doesn't make a network call
+                await this.verifyConnection();
+                console.log(`[MilvusRestfulDB] Connected to Milvus REST API at ${resolvedAddress}`);
+                return;
+            } catch (error: any) {
+                const msg = error?.message || error?.name || error?.toString() || '';
+                const isRetryable =
+                    /ECONNREFUSED|ETIMEDOUT|TimeoutError|AbortError|fetch failed/i.test(msg);
+
+                if (!isRetryable || attempt === maxRetries) {
+                    console.error(`[MilvusRestfulDB] Failed to connect to Milvus at ${resolvedAddress} after ${attempt} attempt(s): ${msg}`);
+                    throw error;
+                }
+
+                const delay = baseDelay * Math.pow(2, attempt - 1);
+                console.warn(`[MilvusRestfulDB] Connection attempt ${attempt}/${maxRetries} failed (${msg}). Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
     }
 
     private async initializeClient(address: string): Promise<void> {
@@ -82,27 +104,26 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
 
         this.baseUrl = processedAddress.replace(/\/$/, '') + '/v2/vectordb';
-
-        console.log(`🔌 Connecting to Milvus REST API at: ${processedAddress}`);
     }
 
     /**
-     * Resolve address from config or token
-     * Common logic for both gRPC and REST implementations
+     * Lightweight connectivity check used during initialization retry loop.
+     */
+    private async verifyConnection(): Promise<void> {
+        await this.makeRequest('/collections/list', 'POST', {});
+    }
+
+    /**
+     * Resolve address from config. Cloud auto-resolution has been removed in this fork.
      */
     protected async resolveAddress(): Promise<string> {
-        let finalConfig = { ...this.config };
-
-        // If address is not provided, get it using token
-        if (!finalConfig.address && finalConfig.token) {
-            finalConfig.address = await ClusterManager.getAddressFromToken(finalConfig.token);
+        if (this.config.address) {
+            return this.config.address;
         }
-
-        if (!finalConfig.address) {
-            throw new Error('Address is required and could not be resolved from token');
-        }
-
-        return finalConfig.address;
+        throw new Error(
+            'MILVUS_ADDRESS is required. Set it to host:port (e.g., 192.168.1.81:19530). ' +
+            'Cloud auto-resolution has been removed in this fork.'
+        );
     }
 
     /**
@@ -825,5 +846,13 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         // For now, always return true to maintain compatibility
         console.warn('[MilvusRestfulDB] ⚠️  checkCollectionLimit not implemented for REST API - returning true');
         return true;
+    }
+
+    /**
+     * Verify Milvus REST connection is healthy.
+     */
+    async healthCheck(): Promise<void> {
+        await this.ensureInitialized();
+        await this.makeRequest('/collections/list', 'POST', {});
     }
 }
