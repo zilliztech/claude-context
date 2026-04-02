@@ -50,7 +50,7 @@ In `~/.claude/.mcp.json`:
 | `OPENAI_API_KEY` | Yes* | OpenAI API key for embeddings |
 | `EMBEDDING_PROVIDER` | No | `OpenAI` (default), `VoyageAI`, `Gemini`, `Ollama` |
 | `EMBEDDING_MODEL` | No | Model name (default: `text-embedding-3-small`) |
-| `MILVUS_TOKEN` | No | Zilliz Cloud token (not needed for local Milvus) |
+| `MILVUS_TOKEN` | No | Milvus authentication token (optional) |
 
 *Required when using OpenAI embeddings (default).
 
