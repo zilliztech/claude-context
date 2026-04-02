@@ -34,6 +34,7 @@ import { ToolHandlers } from "./handlers.js";
 class ContextMcpServer {
     private server: Server;
     private context: Context;
+    private vectorDatabase: MilvusVectorDatabase;
     private snapshotManager: SnapshotManager;
     private syncManager: SyncManager;
     private toolHandlers: ToolHandlers;
@@ -60,7 +61,7 @@ class ContextMcpServer {
         logEmbeddingProviderInfo(config, embedding);
 
         // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
+        this.vectorDatabase = new MilvusVectorDatabase({
             address: config.milvusAddress,
             ...(config.milvusToken && { token: config.milvusToken })
         });
@@ -68,7 +69,7 @@ class ContextMcpServer {
         // Initialize Claude Context
         this.context = new Context({
             embedding,
-            vectorDatabase
+            vectorDatabase: this.vectorDatabase
         });
 
         // Initialize managers
@@ -246,20 +247,22 @@ This tool is versatile and can be used before completing various tasks to retrie
     }
 
     async start() {
-        console.log('[SYNC-DEBUG] MCP server start() method called');
-        console.log('Starting Context MCP server...');
+        // Verify Milvus connection before accepting MCP clients
+        console.log('[MCP] Verifying Milvus connection...');
+        try {
+            await this.vectorDatabase.healthCheck();
+            console.log('[MCP] Milvus connection verified.');
+        } catch (error: any) {
+            console.error(`[MCP] FATAL: Milvus health check failed: ${error?.message}`);
+            process.exit(1);
+        }
 
         const transport = new StdioServerTransport();
-        console.log('[SYNC-DEBUG] StdioServerTransport created, attempting server connection...');
-
         await this.server.connect(transport);
-        console.log("MCP server started and listening on stdio.");
-        console.log('[SYNC-DEBUG] Server connection established successfully');
+        console.log('[MCP] Server started and listening on stdio.');
 
         // Start background sync after server is connected
-        console.log('[SYNC-DEBUG] Initializing background sync...');
         this.syncManager.startBackgroundSync();
-        console.log('[SYNC-DEBUG] MCP server initialization complete');
     }
 }
 

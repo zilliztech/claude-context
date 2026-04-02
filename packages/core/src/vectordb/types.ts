@@ -138,10 +138,15 @@ export interface VectorDatabase {
      * Returns true if collection can be created, false if limit exceeded
      */
     checkCollectionLimit(): Promise<boolean>;
+
+    /**
+     * Verify the Milvus connection is healthy
+     */
+    healthCheck(): Promise<void>;
 }
 
 /**
  * Special error message for collection limit exceeded
  * This allows us to distinguish it from other errors across all Milvus implementations
  */
-export const COLLECTION_LIMIT_MESSAGE = "[Error]: Your Zilliz Cloud account has hit its collection limit. To continue creating collections, you'll need to expand your capacity. We recommend visiting https://zilliz.com/pricing to explore options for dedicated or serverless clusters."; 
+export const COLLECTION_LIMIT_MESSAGE = "[Error]: Your Milvus instance has hit its collection limit. Drop unused collections or increase the limit in your Milvus configuration."; 

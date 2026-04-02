@@ -60,7 +60,7 @@ importers:
         specifier: ^1.47.0
         version: 1.47.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))
       '@langchain/core':
-        specifier: ^1.1.38
+        specifier: '>=0.3.80'
         version: 1.1.38(@opentelemetry/api@1.9.1)(openai@5.23.2(ws@5.2.4)(zod@3.25.76))(ws@5.2.4)
       '@zilliz/milvus2-sdk-node':
         specifier: ^2.6.12

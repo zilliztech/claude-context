@@ -16,7 +16,7 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     // Vector database configuration
-    milvusAddress?: string; // Optional, can be auto-resolved from token
+    milvusAddress?: string; // Required for self-hosted Milvus (bare host:port)
     milvusToken?: string;
 }
 
@@ -128,8 +128,8 @@ export function createMcpConfig(): ContextMcpConfig {
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
-        // Vector database configuration - address can be auto-resolved from token
-        milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
+        // Vector database configuration
+        milvusAddress: envManager.get('MILVUS_ADDRESS'),
         milvusToken: envManager.get('MILVUS_TOKEN')
     };
 
@@ -143,7 +143,7 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
-    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || '[NOT SET — REQUIRED]'}`);
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -200,26 +200,23 @@ Environment Variables:
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
   
   Vector Database Configuration:
-  MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
-  MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  MILVUS_ADDRESS          Required. Bare host:port for Milvus (e.g., 192.168.1.81:19530)
+  MILVUS_TOKEN            Optional. Authentication only (no cloud resolution)
 
 Examples:
-  # Start MCP server with OpenAI (default) and explicit Milvus address
+  # Start MCP server with OpenAI (default)
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @lbruton/claude-context-mcp@latest
-  
+
   # Start MCP server with OpenAI and specific model
-  OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @lbruton/claude-context-mcp@latest
-  
-  # Start MCP server with VoyageAI and specific model
-  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx EMBEDDING_MODEL=voyage-3-large MILVUS_TOKEN=your-token npx @lbruton/claude-context-mcp@latest
-  
-  # Start MCP server with Gemini and specific model
-  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @lbruton/claude-context-mcp@latest
-  
-  # Start MCP server with Ollama and specific model (using OLLAMA_MODEL)
-  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @lbruton/claude-context-mcp@latest
-  
-  # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
-  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @lbruton/claude-context-mcp@latest
+  OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_ADDRESS=192.168.1.81:19530 npx @lbruton/claude-context-mcp@latest
+
+  # Start MCP server with VoyageAI
+  EMBEDDING_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx MILVUS_ADDRESS=localhost:19530 npx @lbruton/claude-context-mcp@latest
+
+  # Start MCP server with Gemini
+  EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx MILVUS_ADDRESS=localhost:19530 npx @lbruton/claude-context-mcp@latest
+
+  # Start MCP server with Ollama
+  EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_ADDRESS=localhost:19530 npx @lbruton/claude-context-mcp@latest
         `);
 } 

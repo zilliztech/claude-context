@@ -13,14 +13,4 @@ export {
 
 // Implementation class exports
 export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
-export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
-export {
-    ClusterManager,
-    ZillizConfig,
-    Project,
-    Cluster,
-    CreateFreeClusterRequest,
-    CreateFreeClusterResponse,
-    CreateFreeClusterWithDetailsResponse,
-    DescribeClusterResponse
-} from './zilliz-utils'; 
+export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb'; 
