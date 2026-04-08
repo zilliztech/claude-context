@@ -392,7 +392,7 @@ export class ToolHandlers {
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
             const ignorePatterns = this.context.getIgnorePatterns() || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
-            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns);
+            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, this.context.getSupportedExtensions());
             await synchronizer.initialize();
 
             // Store synchronizer in the context (let context manage collection names)

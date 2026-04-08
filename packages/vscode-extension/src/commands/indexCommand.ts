@@ -75,7 +75,11 @@ export class IndexCommand {
                 // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
                 const { FileSynchronizer } = await import("@zilliz/claude-context-core");
-                const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.context.getIgnorePatterns() || []);
+                const synchronizer = new FileSynchronizer(
+                    selectedFolder.uri.fsPath,
+                    this.context.getIgnorePatterns() || [],
+                    this.context.getSupportedExtensions() || []
+                );
                 await synchronizer.initialize();
                 // Store synchronizer in the context's internal map using the collection name from context
                 await this.context.getPreparedCollection(selectedFolder.uri.fsPath);

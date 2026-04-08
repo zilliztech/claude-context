@@ -324,7 +324,7 @@ export class Context {
             await this.loadIgnorePatterns(codebasePath);
 
             // To be safe, let's initialize if it's not there.
-            const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns);
+            const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns, this.supportedExtensions);
             await newSynchronizer.initialize();
             this.synchronizers.set(collectionName, newSynchronizer);
         }
