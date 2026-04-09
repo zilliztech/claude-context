@@ -18,6 +18,7 @@ import {
 } from './vectordb';
 import { SemanticSearchResult } from './types';
 import { envManager } from './utils/env-manager';
+import { canonicalCodebasePath, normalizeRelativePath } from './utils/path';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -233,8 +234,8 @@ export class Context {
      */
     public getCollectionName(codebasePath: string): string {
         const isHybrid = this.getIsHybrid();
-        const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
+        const canonicalPath = canonicalCodebasePath(codebasePath);
+        const hash = crypto.createHash('md5').update(canonicalPath).digest('hex');
         const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
         return `${prefix}_${hash.substring(0, 8)}`;
     }
@@ -382,8 +383,9 @@ export class Context {
     }
 
     private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
+        const normalized = normalizeRelativePath(relativePath);
         // Escape backslashes for Milvus query expression (Windows path compatibility)
-        const escapedPath = relativePath.replace(/\\/g, '\\\\');
+        const escapedPath = normalized.replace(/\\/g, '\\\\');
         const results = await this.vectorDatabase.query(
             collectionName,
             `relativePath == "${escapedPath}"`,
@@ -822,7 +824,7 @@ export class Context {
                     throw new Error(`Missing filePath in chunk metadata at index ${index}`);
                 }
 
-                const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
+                const relativePath = normalizeRelativePath(path.relative(codebasePath, chunk.metadata.filePath));
                 const fileExtension = path.extname(chunk.metadata.filePath);
                 const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
 
@@ -852,7 +854,7 @@ export class Context {
                     throw new Error(`Missing filePath in chunk metadata at index ${index}`);
                 }
 
-                const relativePath = path.relative(codebasePath, chunk.metadata.filePath);
+                const relativePath = normalizeRelativePath(path.relative(codebasePath, chunk.metadata.filePath));
                 const fileExtension = path.extname(chunk.metadata.filePath);
                 const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
 
