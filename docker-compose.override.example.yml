@@ -1,0 +1,11 @@
+# Copy to docker-compose.override.yml and adjust paths.
+# Each codebase mount must use the SAME path as source and destination
+# because the indexer stores absolute paths.
+#
+# Example:
+#   - /home/user/projects/myapp:/home/user/projects/myapp:ro
+services:
+  claude-context:
+    volumes:
+      - /path/to/codebase1:/path/to/codebase1:ro
+      - /path/to/codebase2:/path/to/codebase2:ro

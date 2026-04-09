@@ -608,13 +608,61 @@ For LangChain/LangGraph integration examples, see [this example](https://github.
 <details>
 <summary><strong>Other MCP Clients</strong></summary>
 
-The server uses stdio transport and follows the standard MCP protocol. It can be integrated with any MCP-compatible client by running:
+The server uses stdio transport by default and follows the standard MCP protocol. It can be integrated with any MCP-compatible client by running:
 
 ```bash
 npx @zilliz/claude-context-mcp@latest
 ```
 
 </details>
+
+### SSE Transport (Shared Server)
+
+By default, each MCP client spawns its own `claude-context-mcp` process via stdio. When using multiple clients (e.g., multiple IDE tabs), this leads to duplicated processes, each consuming CPU and memory independently.
+
+**SSE transport** lets you run a **single shared server** that multiple clients connect to over HTTP, eliminating resource duplication.
+
+#### Start the SSE server
+
+```bash
+# Via CLI flags
+npx @zilliz/claude-context-mcp@latest --transport sse --port 8000
+
+# Via environment variables
+MCP_TRANSPORT=sse MCP_PORT=8000 npx @zilliz/claude-context-mcp@latest
+```
+
+#### Connect clients via SSE
+
+Configure your MCP client to connect to the running SSE server instead of spawning a new process:
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
+
+#### Docker
+
+```bash
+docker build -t claude-context-mcp .
+docker run -d --name claude-context-mcp \
+  -p 8000:8000 \
+  -e EMBEDDING_PROVIDER=OpenAI \
+  -e OPENAI_API_KEY=your-key \
+  -e MILVUS_TOKEN=your-token \
+  claude-context-mcp
+```
+
+| Environment Variable | Description                      | Default |
+| -------------------- | -------------------------------- | ------- |
+| `MCP_TRANSPORT`      | Transport mode: `stdio` or `sse` | `stdio` |
+| `MCP_PORT`           | Port for SSE server              | `8000`  |
 
 ## Features
 
