@@ -33,7 +33,7 @@ If Step 1 doesn't reveal the issue, collect detailed debug information:
 - If you use Cursor-like GUI IDEs, find the MCP logs in the Output panel, e.g. Cursor:
   1. Open the Output panel in Cursor (⌘⇧U)
   2. Select "MCP Logs" from the dropdown
-  3. See [Cursor MCP FAQ](https://docs.cursor.com/en/context/mcp#faq) for details
+  3. See [Cursor MCP FAQ](https://cursor.com/docs/context/mcp) for details
 
 **Check your MCP Client Setting:**
 If logs don't solve the problem, note:
@@ -57,7 +57,7 @@ If you locate the problem at [Step 1](#step-1-check-indexing-status-first) or [S
   /mcp refresh
   ```
   For more details, see [this PR](https://github.com/google-gemini/gemini-cli/pull/4566).
-- **Cursor and other GUI IDEs**: Look for a toggle icon or restart button to restart the MCP connection. e.g. [Cursor MCP FAQ](https://docs.cursor.com/en/context/mcp#faq)
+- **Cursor and other GUI IDEs**: Look for a toggle icon or restart button to restart the MCP connection. e.g. [Cursor MCP FAQ](https://cursor.com/docs/context/mcp)
 
 After reconnecting, test if your issue is resolved and the system works normally.
 
