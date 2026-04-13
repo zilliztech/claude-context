@@ -43,7 +43,37 @@ You can seamlessly use queries like `index this codebase` or `search the main fu
 - **Background Code Synchronization**: Continuously monitors for changes and automatically re-indexes modified parts
 - **Context-Aware Operations**: All indexing and search operations are scoped to the current project context
 
+**Important path detail:** Claude Context keys each indexed codebase by its absolute path. If you index the same repository through different paths (for example, a symlinked path, a second clone, or a mounted path), those are treated as separate indexed codebases.
+
 This makes it effortless to work across multiple projects while maintaining isolated, up-to-date indexes for each codebase.
+
+## Q: Why does `get_indexing_status` jump quickly to 10% or feel coarse?
+
+**A:** The percentage is a **phase-based progress indicator**, not a live fraction of indexed files.
+
+In practice, Claude Context moves through broad stages:
+
+- collection preparation
+- file scanning
+- file processing, chunking, embedding, and insertion
+
+The status output can therefore jump quickly to around `10%` once setup is complete, even for very large repositories. That is expected behavior.
+
+For the full background workflow, see [Asynchronous Indexing Workflow](../dive-deep/asynchronous-indexing-workflow.md).
+
+## Q: Why does `get_indexing_status` show `0 files, 0 chunks` for a completed codebase?
+
+**A:** `get_indexing_status` reads the MCP snapshot metadata, not a live aggregate directly from the vector database.
+
+If a completed entry shows `0 files, 0 chunks`, the most common explanation is that the local snapshot metadata is stale or was created before final statistics were refreshed.
+
+What to do:
+
+1. Make sure you are checking the **same absolute path** that you originally indexed.
+2. If the entry still shows zero counts, run `clear_index` for that path.
+3. Re-run `index_codebase` for that exact absolute path.
+
+This refreshes the stored file/chunk totals used by `get_indexing_status`.
 
 ## Q: How does Claude Context compare to other coding tools like Serena, Context7, or DeepWiki?
 
