@@ -18,6 +18,7 @@ export interface ContextMcpConfig {
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    milvusDatabase?: string; // Optional, defaults to 'default'
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -111,6 +112,7 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
+    console.log(`[DEBUG]   MILVUS_DB: ${envManager.get('MILVUS_DB') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: ContextMcpConfig = {
@@ -130,7 +132,8 @@ export function createMcpConfig(): ContextMcpConfig {
         ollamaHost: envManager.get('OLLAMA_HOST'),
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        milvusDatabase: envManager.get('MILVUS_DB') // Optional, defaults to 'default'
     };
 
     return config;
@@ -144,6 +147,7 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
     console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Milvus Database: ${config.milvusDatabase || 'default'}`);
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -202,6 +206,7 @@ Environment Variables:
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  MILVUS_DB               Milvus database name (optional, defaults to 'default')
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
