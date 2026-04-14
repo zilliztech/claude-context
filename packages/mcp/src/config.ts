@@ -18,6 +18,7 @@ export interface ContextMcpConfig {
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    zillizProjectName?: string; // Optional, defaults to 'Default Project'
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -130,7 +131,8 @@ export function createMcpConfig(): ContextMcpConfig {
         ollamaHost: envManager.get('OLLAMA_HOST'),
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        zillizProjectName: envManager.get('ZILLIZ_PROJECT_NAME') // Optional, defaults to 'Default Project'
     };
 
     return config;
