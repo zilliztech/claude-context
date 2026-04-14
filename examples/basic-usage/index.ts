@@ -1,4 +1,4 @@
-import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
+import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, PostgresVectorDatabase, AstCodeSplitter, LangChainCodeSplitter, OllamaEmbedding, OpenAIEmbedding } from '@zilliz/claude-context-core';
 import { envManager } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
@@ -15,29 +15,48 @@ async function main() {
 
     try {
         // 1. Choose Vector Database implementation
-        // Set to true to use RESTful API (for environments without gRPC support)
-        // Set to false to use gRPC (default, more efficient)
-        const useRestfulApi = false;
-        const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
-        const milvusToken = envManager.get('MILVUS_TOKEN');
+        const vectorDbProvider = envManager.get('VECTOR_DATABASE_PROVIDER')?.toLowerCase() || 'milvus';
+        const useRestfulApi = envManager.get('MILVUS_USE_RESTFUL') === 'true';
         const splitterType = envManager.get('SPLITTER_TYPE')?.toLowerCase() || 'ast';
 
-        console.log(`🔧 Using ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
-        console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);
+        console.log(`🔧 Using vector database provider: ${vectorDbProvider}`);
 
         let vectorDatabase;
-        if (useRestfulApi) {
-            // Use RESTful implementation (for environments without gRPC support)
-            vectorDatabase = new MilvusRestfulVectorDatabase({
-                address: milvusAddress,
-                ...(milvusToken && { token: milvusToken })
-            });
+        if (vectorDbProvider === 'postgres') {
+            // Use PostgreSQL with pgvector
+            const postgresConfig = {
+                connectionString: envManager.get('POSTGRES_CONNECTION_STRING'),
+                host: envManager.get('POSTGRES_HOST') || 'localhost',
+                port: envManager.get('POSTGRES_PORT') ? parseInt(envManager.get('POSTGRES_PORT')!) : 5432,
+                database: envManager.get('POSTGRES_DATABASE') || 'postgres',
+                username: envManager.get('POSTGRES_USERNAME') || 'postgres',
+                password: envManager.get('POSTGRES_PASSWORD'),
+                ssl: envManager.get('POSTGRES_SSL') === 'true'
+            };
+
+            console.log(`🔌 Connecting to PostgreSQL at: ${postgresConfig.connectionString || `${postgresConfig.host}:${postgresConfig.port}/${postgresConfig.database}`}`);
+            vectorDatabase = new PostgresVectorDatabase(postgresConfig);
         } else {
-            // Use gRPC implementation (default, more efficient)
-            vectorDatabase = new MilvusVectorDatabase({
-                address: milvusAddress,
-                ...(milvusToken && { token: milvusToken })
-            });
+            // Use Milvus (default)
+            const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
+            const milvusToken = envManager.get('MILVUS_TOKEN');
+
+            console.log(`🔧 Using ${useRestfulApi ? 'RESTful API' : 'gRPC'} implementation`);
+            console.log(`🔌 Connecting to Milvus at: ${milvusAddress}`);
+
+            if (useRestfulApi) {
+                // Use RESTful implementation (for environments without gRPC support)
+                vectorDatabase = new MilvusRestfulVectorDatabase({
+                    address: milvusAddress,
+                    ...(milvusToken && { token: milvusToken })
+                });
+            } else {
+                // Use gRPC implementation (default, more efficient)
+                vectorDatabase = new MilvusVectorDatabase({
+                    address: milvusAddress,
+                    ...(milvusToken && { token: milvusToken })
+                });
+            }
         }
 
         // 2. Create Context instance
@@ -47,7 +66,26 @@ async function main() {
         } else {
             codeSplitter = new AstCodeSplitter(2500, 300);
         }
+
+        console.log('🔧 Using embedding provider: ', envManager.get('EMBEDDING_PROVIDER'));
+        let embedding;
+        const embeddingProvider = envManager.get('EMBEDDING_PROVIDER')?.toLowerCase() || 'openai';
+        if (embeddingProvider === 'ollama') {
+            console.log('🔧 Using Ollama embedding provider');
+            embedding = new OllamaEmbedding({
+                host: envManager.get('OLLAMA_HOST') || 'http://127.0.0.1:11434',
+                model: envManager.get('EMBEDDING_MODEL') || 'all-minilm'
+            });
+        } else {
+            embedding = new OpenAIEmbedding({
+                model: 'text-embedding-3-small',
+                apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
+                baseURL: envManager.get('OPENAI_BASE_URL') || 'https://api.openai.com/v1'
+            });
+        }
+
         const context = new Context({
+            embedding,
             vectorDatabase,
             codeSplitter,
             supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp', '.go', '.rs']
@@ -119,8 +157,17 @@ async function main() {
             console.log('\n💡 Environment Variables:');
             console.log('   - OPENAI_API_KEY: Your OpenAI API key (required)');
             console.log('   - OPENAI_BASE_URL: Custom OpenAI API endpoint (optional)');
+            console.log('   - VECTOR_DATABASE_PROVIDER: Vector database provider - "milvus" or "postgres" (default: milvus)');
             console.log('   - MILVUS_ADDRESS: Milvus server address (default: localhost:19530)');
             console.log('   - MILVUS_TOKEN: Milvus authentication token (optional)');
+            console.log('   - MILVUS_USE_RESTFUL: Use Milvus REST API instead of gRPC (true/false, default: false)');
+            console.log('   - POSTGRES_CONNECTION_STRING: PostgreSQL connection string (e.g., postgresql://user:pass@localhost:5432/db)');
+            console.log('   - POSTGRES_HOST: PostgreSQL host (default: localhost)');
+            console.log('   - POSTGRES_PORT: PostgreSQL port (default: 5432)');
+            console.log('   - POSTGRES_DATABASE: PostgreSQL database name (default: postgres)');
+            console.log('   - POSTGRES_USERNAME: PostgreSQL username (default: postgres)');
+            console.log('   - POSTGRES_PASSWORD: PostgreSQL password');
+            console.log('   - POSTGRES_SSL: Enable SSL connection (true/false, default: false)');
             console.log('   - SPLITTER_TYPE: Code splitter type - "ast" or "langchain" (default: ast)');
         }
 

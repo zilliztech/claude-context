@@ -21,6 +21,7 @@
         "langchain": "^0.3.27",
         "ollama": "^0.5.16",
         "openai": "^5.1.1",
+        "pg": "^8.11.3",
         "tree-sitter": "^0.21.1",
         "tree-sitter-cpp": "^0.22.0",
         "tree-sitter-go": "^0.21.0",
@@ -38,6 +39,7 @@
         "@types/fs-extra": "^11.0.0",
         "@types/jest": "^30.0.0",
         "@types/mock-fs": "^4.13.4",
+        "@types/pg": "^8.10.9",
         "jest": "^30.0.0",
         "mock-fs": "^5.5.0",
         "ts-jest": "^29.4.0"
