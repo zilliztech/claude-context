@@ -10,13 +10,15 @@ export class FileSynchronizer {
     private rootDir: string;
     private snapshotPath: string;
     private ignorePatterns: string[];
+    private supportedExtensions: string[];
 
-    constructor(rootDir: string, ignorePatterns: string[] = []) {
+    constructor(rootDir: string, ignorePatterns: string[] = [], supportedExtensions: string[] = []) {
         this.rootDir = rootDir;
         this.snapshotPath = this.getSnapshotPath(rootDir);
         this.fileHashes = new Map();
         this.merkleDAG = new MerkleDAG();
         this.ignorePatterns = ignorePatterns;
+        this.supportedExtensions = supportedExtensions;
     }
 
     private getSnapshotPath(codebasePath: string): string {
@@ -81,6 +83,10 @@ export class FileSynchronizer {
             } else if (stat.isFile()) {
                 // Verify it's really a file and not ignored
                 if (!this.shouldIgnore(relativePath, false)) {
+                    const ext = path.extname(entry.name);
+                    if (this.supportedExtensions.length > 0 && !this.supportedExtensions.includes(ext)) {
+                        continue;
+                    }
                     try {
                         const hash = await this.hashFile(fullPath);
                         fileHashes.set(relativePath, hash);
