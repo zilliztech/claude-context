@@ -2,6 +2,14 @@ import * as vscode from 'vscode';
 import { Context } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
+/** Progress callback parameter type */
+interface ProgressInfo {
+    phase: string;
+    current: number;
+    total: number;
+    percentage: number;
+}
+
 export class IndexCommand {
     private context: Context;
 
@@ -66,7 +74,7 @@ export class IndexCommand {
                 // Clear existing index first
                 await this.context.clearIndex(
                     selectedFolder.uri.fsPath,
-                    (progressInfo) => {
+                    (progressInfo: ProgressInfo) => {
                         // Clear index progress is usually fast, just show the message
                         progress.report({ increment: 0, message: progressInfo.phase });
                     }
@@ -85,7 +93,7 @@ export class IndexCommand {
                 // Start indexing with progress callback
                 indexStats = await this.context.indexCodebase(
                     selectedFolder.uri.fsPath,
-                    (progressInfo) => {
+                    (progressInfo: ProgressInfo) => {
                         // Calculate increment from last reported percentage
                         const increment = progressInfo.percentage - lastPercentage;
                         lastPercentage = progressInfo.percentage;
@@ -156,7 +164,7 @@ export class IndexCommand {
             }, async (progress) => {
                 await this.context.clearIndex(
                     workspaceFolders[0].uri.fsPath,
-                    (progressInfo) => {
+                    (progressInfo: ProgressInfo) => {
                         progress.report({
                             increment: progressInfo.percentage,
                             message: progressInfo.phase
