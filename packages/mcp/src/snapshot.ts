@@ -45,6 +45,7 @@ export class SnapshotManager {
                 console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
             } else {
                 console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
+                this.recentlyRemoved.add(codebasePath);
             }
         }
 
@@ -66,6 +67,7 @@ export class SnapshotManager {
                 // Don't add to validIndexingCodebases - treat as not indexed
             } else {
                 console.warn(`[SNAPSHOT-DEBUG] Interrupted indexing codebase no longer exists: ${codebasePath}`);
+                this.recentlyRemoved.add(codebasePath);
             }
         }
 
@@ -103,6 +105,7 @@ export class SnapshotManager {
         for (const [codebasePath, info] of Object.entries(snapshot.codebases)) {
             if (!fs.existsSync(codebasePath)) {
                 console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
+                this.recentlyRemoved.add(codebasePath);
                 continue;
             }
 
@@ -359,6 +362,16 @@ export class SnapshotManager {
         codebasePath: string,
         stats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }
     ): void {
+        // Defensive guard: 0/0 + completed is a known-bad state that causes an
+        // infinite force-reindex loop — the client reads it as "not indexed",
+        // triggers force=true, deletes real data, and rewrites 0/0. Refuse to
+        // persist this combination regardless of who called us. See Issue #295.
+        if (stats.indexedFiles === 0 && stats.totalChunks === 0 && stats.status === 'completed') {
+            console.error(`[SNAPSHOT] Refusing to write 0/0+completed for '${codebasePath}' — invalid state. Stack trace:`);
+            console.trace();
+            return;
+        }
+
         // Add to indexed list if not already there
         if (!this.indexedCodebases.includes(codebasePath)) {
             this.indexedCodebases.push(codebasePath);

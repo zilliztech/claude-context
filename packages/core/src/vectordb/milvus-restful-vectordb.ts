@@ -823,4 +823,48 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         console.warn('[MilvusRestfulDB] ⚠️  checkCollectionLimit not implemented for REST API - returning true');
         return true;
     }
+
+    /**
+     * Get the number of entities (rows) in a collection.
+     * Returns -1 on any failure (collection missing, RPC error, malformed response).
+     * -1 means "unknown" — callers must NOT treat it as "empty".
+     *
+     * Uses count(*) via /entities/query rather than /collections/get_stats: stats
+     * are computed from sealed segments and lag recent inserts (returning 0 for
+     * a freshly-indexed but unflushed collection), while count(*) reads the real
+     * current state. A stale 0 would fool recovery into thinking the collection
+     * is truly empty and cause Issue #295-style false-negative "not indexed"
+     * errors even when data exists.
+     */
+    async getCollectionRowCount(collectionName: string): Promise<number> {
+        await this.ensureInitialized();
+        try {
+            const restfulConfig = this.config as MilvusRestfulConfig;
+
+            const hasResponse = await this.makeRequest('/collections/has', 'POST', {
+                collectionName,
+                dbName: restfulConfig.database
+            });
+            if (!hasResponse.data?.has) return -1;
+
+            // count(*) requires the collection to be loaded.
+            await this.ensureLoaded(collectionName);
+
+            const response = await this.makeRequest('/entities/query', 'POST', {
+                collectionName,
+                dbName: restfulConfig.database,
+                outputFields: ['count(*)'],
+            });
+
+            const row = response?.data?.[0];
+            if (!row) return -1;
+            const raw = row['count(*)'] ?? row['count'];
+            if (raw === undefined || raw === null) return -1;
+            const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+            return Number.isFinite(n) && n >= 0 ? n : -1;
+        } catch (error) {
+            console.error(`[MilvusRestfulDB] ❌ Error in count(*) query for '${collectionName}':`, error);
+            return -1;
+        }
+    }
 }

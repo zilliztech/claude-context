@@ -781,4 +781,49 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw error;
         }
     }
+
+    /**
+     * Get the number of entities (rows) in a collection.
+     * Returns -1 on any failure (collection missing, RPC error, malformed response).
+     * -1 means "unknown" — callers must NOT treat it as "empty".
+     *
+     * Uses count(*) via query() rather than getCollectionStatistics(): stats are
+     * computed from sealed segments and lag recent inserts (returning 0 for a
+     * freshly-indexed but unflushed collection), while count(*) reads the real
+     * current state. A stale 0 would fool recovery into thinking the collection
+     * is truly empty and cause Issue #295-style false-negative "not indexed"
+     * errors even when data exists.
+     */
+    async getCollectionRowCount(collectionName: string): Promise<number> {
+        await this.ensureInitialized();
+        if (!this.client) return -1;
+        try {
+            const hasCol = await this.client.hasCollection({ collection_name: collectionName });
+            if (!hasCol.value) return -1;
+
+            // count(*) requires the collection to be loaded.
+            await this.ensureLoaded(collectionName);
+
+            const result = await this.client.query({
+                collection_name: collectionName,
+                output_fields: ['count(*)'],
+                expr: '',
+            });
+            if (result.status.error_code !== 'Success') {
+                console.warn(`[MilvusDB] count(*) query failed for '${collectionName}': ${result.status.reason}`);
+                return -1;
+            }
+
+            // Shape observed: { data: [{ "count(*)": "<number-as-string>" }] }
+            const row = result.data?.[0] as Record<string, any> | undefined;
+            if (!row) return -1;
+            const raw = row['count(*)'] ?? row['count'];
+            if (raw === undefined || raw === null) return -1;
+            const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+            return Number.isFinite(n) && n >= 0 ? n : -1;
+        } catch (error) {
+            console.error(`[MilvusDB] Error in count(*) query for '${collectionName}':`, error);
+            return -1;
+        }
+    }
 }
