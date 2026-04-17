@@ -40,12 +40,14 @@ export class MilvusVectorDatabase implements VectorDatabase {
     private async initializeClient(address: string): Promise<void> {
         const milvusConfig = this.config as MilvusConfig;
         console.log('🔌 Connecting to vector database at: ', address);
+        const timeoutMs = Number(process.env.MILVUS_TIMEOUT_MS) || 60000;
         this.client = new MilvusClient({
             address: address,
             username: milvusConfig.username,
             password: milvusConfig.password,
             token: milvusConfig.token,
             ssl: milvusConfig.ssl || false,
+            timeout: timeoutMs,
         });
     }
 
@@ -742,42 +744,15 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        const collectionName = `dummy_collection_${Date.now()}`;
-        const createCollectionParams = {
-            collection_name: collectionName,
-            description: 'Test collection for limit check',
-            fields: [
-                {
-                    name: 'id',
-                    data_type: DataType.VarChar,
-                    max_length: 512,
-                    is_primary_key: true,
-                },
-                {
-                    name: 'vector',
-                    data_type: DataType.FloatVector,
-                    dim: 128,
-                }
-            ]
-        };
-
         try {
-            await this.client.createCollection(createCollectionParams);
-            // Immediately drop the collection after successful creation
-            if (await this.client.hasCollection({ collection_name: collectionName })) {
-                await this.client.dropCollection({
-                    collection_name: collectionName,
-                });
-            }
-            return true;
+            const response = await this.client.listCollections();
+            const maxCollections = Number(process.env.MILVUS_MAX_COLLECTIONS) || 4;
+            return response.data.length < maxCollections;
         } catch (error: any) {
-            // Check if the error message contains the collection limit exceeded pattern
             const errorMessage = error.message || error.toString() || '';
             if (/exceeded the limit number of collections/i.test(errorMessage)) {
-                // Return false for collection limit exceeded
                 return false;
             }
-            // Re-throw other errors as-is
             throw error;
         }
     }
