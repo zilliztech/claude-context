@@ -16,8 +16,17 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     // Vector database configuration
+    vectorDatabaseProvider: 'milvus' | 'postgres';
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    // PostgreSQL configuration
+    postgresConnectionString?: string;
+    postgresHost?: string;
+    postgresPort?: number;
+    postgresDatabase?: string;
+    postgresUsername?: string;
+    postgresPassword?: string;
+    postgresSSL?: boolean;
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -110,7 +119,9 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   VECTOR_DATABASE_PROVIDER: ${envManager.get('VECTOR_DATABASE_PROVIDER') || 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
+    console.log(`[DEBUG]   POSTGRES_CONNECTION_STRING: ${envManager.get('POSTGRES_CONNECTION_STRING') ? 'SET' : 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: ContextMcpConfig = {
@@ -128,9 +139,18 @@ export function createMcpConfig(): ContextMcpConfig {
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
-        // Vector database configuration - address can be auto-resolved from token
+        // Vector database configuration
+        vectorDatabaseProvider: (envManager.get('VECTOR_DATABASE_PROVIDER') as 'milvus' | 'postgres') || 'milvus',
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        // PostgreSQL configuration
+        postgresConnectionString: envManager.get('POSTGRES_CONNECTION_STRING'),
+        postgresHost: envManager.get('POSTGRES_HOST'),
+        postgresPort: envManager.get('POSTGRES_PORT') ? parseInt(envManager.get('POSTGRES_PORT')!) : undefined,
+        postgresDatabase: envManager.get('POSTGRES_DATABASE'),
+        postgresUsername: envManager.get('POSTGRES_USERNAME'),
+        postgresPassword: envManager.get('POSTGRES_PASSWORD'),
+        postgresSSL: envManager.get('POSTGRES_SSL') === 'true'
     };
 
     return config;
@@ -143,7 +163,15 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
-    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Vector Database Provider: ${config.vectorDatabaseProvider}`);
+
+    // Log vector database configuration
+    if (config.vectorDatabaseProvider === 'postgres') {
+        console.log(`[MCP]   PostgreSQL Connection: ${config.postgresConnectionString ? '✅ Connection string configured' :
+            (config.postgresHost ? `${config.postgresHost}:${config.postgresPort || 5432}/${config.postgresDatabase || 'postgres'}` : '❌ Not configured')}`);
+    } else {
+        console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    }
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -200,12 +228,27 @@ Environment Variables:
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
   
   Vector Database Configuration:
+  VECTOR_DATABASE_PROVIDER Vector database provider: milvus, postgres (default: milvus)
+  
+  Milvus Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  
+  PostgreSQL Configuration:
+  POSTGRES_CONNECTION_STRING PostgreSQL connection string (e.g., postgresql://user:pass@localhost:5432/db)
+  POSTGRES_HOST           PostgreSQL host (default: localhost)
+  POSTGRES_PORT           PostgreSQL port (default: 5432)
+  POSTGRES_DATABASE       PostgreSQL database name (default: postgres)
+  POSTGRES_USERNAME       PostgreSQL username (default: postgres)
+  POSTGRES_PASSWORD       PostgreSQL password
+  POSTGRES_SSL            Enable SSL connection (true/false, default: false)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with OpenAI and PostgreSQL
+  OPENAI_API_KEY=sk-xxx VECTOR_DATABASE_PROVIDER=postgres POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost:5432/db npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with OpenAI and specific model
   OPENAI_API_KEY=sk-xxx EMBEDDING_MODEL=text-embedding-3-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
