@@ -22,9 +22,16 @@ export class QdrantVectorDatabase implements VectorDatabase {
         this.config = config;
         const url = config.url || 'http://localhost:6333';
         console.log(`🔌 Connecting to Qdrant at: ${url}`);
+
+        // Auto-detect port for HTTPS URLs without explicit port
+        const parsedUrl = new URL(url);
+        const needsPort = parsedUrl.protocol === 'https:' && !config.url?.match(/:\d+$/);
+
         this.client = new QdrantClient({
             url,
+            ...(needsPort && { port: 443 }),
             ...(config.apiKey && { apiKey: config.apiKey }),
+            checkCompatibility: false,
         });
     }
 

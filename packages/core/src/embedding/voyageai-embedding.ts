@@ -1,4 +1,5 @@
 import { VoyageAIClient } from 'voyageai';
+import OpenAI from 'openai';
 import { Embedding, EmbeddingVector } from './base-embedding';
 
 export interface VoyageAIEmbeddingConfig {
@@ -8,7 +9,9 @@ export interface VoyageAIEmbeddingConfig {
 }
 
 export class VoyageAIEmbedding extends Embedding {
-    private client: VoyageAIClient;
+    private client: VoyageAIClient | null = null;
+    private openaiClient: OpenAI | null = null;
+    private useOpenAICompat: boolean;
     private config: VoyageAIEmbeddingConfig;
     private dimension: number = 1024; // Default dimension for voyage-code-3
     private inputType: 'document' | 'query' = 'document';
@@ -17,10 +20,21 @@ export class VoyageAIEmbedding extends Embedding {
     constructor(config: VoyageAIEmbeddingConfig) {
         super();
         this.config = config;
-        this.client = new VoyageAIClient({
-            apiKey: config.apiKey,
-            ...(config.baseURL && { environment: config.baseURL }),
-        });
+
+        // When baseURL is set (e.g., MongoDB Atlas endpoint), use OpenAI-compatible SDK
+        // because MongoDB's VoyageAI endpoint only accepts OpenAI-compatible format
+        this.useOpenAICompat = !!config.baseURL;
+
+        if (this.useOpenAICompat) {
+            this.openaiClient = new OpenAI({
+                apiKey: config.apiKey,
+                baseURL: config.baseURL,
+            });
+        } else {
+            this.client = new VoyageAIClient({
+                apiKey: config.apiKey,
+            });
+        }
 
         // Set dimension and context length based on different models
         this.updateModelSettings(config.model || 'voyage-code-3');
@@ -56,7 +70,20 @@ export class VoyageAIEmbedding extends Embedding {
         const processedText = this.preprocessText(text);
         const model = this.config.model || 'voyage-code-3';
 
-        const response = await this.client.embed({
+        if (this.useOpenAICompat && this.openaiClient) {
+            const response = await this.openaiClient.embeddings.create({
+                model: model,
+                input: processedText,
+                encoding_format: 'float',
+            });
+            this.dimension = response.data[0].embedding.length;
+            return {
+                vector: response.data[0].embedding,
+                dimension: this.dimension
+            };
+        }
+
+        const response = await this.client!.embed({
             input: processedText,
             model: model,
             inputType: this.inputType,
@@ -76,7 +103,20 @@ export class VoyageAIEmbedding extends Embedding {
         const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model || 'voyage-code-3';
 
-        const response = await this.client.embed({
+        if (this.useOpenAICompat && this.openaiClient) {
+            const response = await this.openaiClient.embeddings.create({
+                model: model,
+                input: processedTexts,
+                encoding_format: 'float',
+            });
+            this.dimension = response.data[0].embedding.length;
+            return response.data.map((item) => ({
+                vector: item.embedding,
+                dimension: this.dimension
+            }));
+        }
+
+        const response = await this.client!.embed({
             input: processedTexts,
             model: model,
             inputType: this.inputType,
@@ -125,8 +165,8 @@ export class VoyageAIEmbedding extends Embedding {
     /**
      * Get client instance (for advanced usage)
      */
-    getClient(): VoyageAIClient {
-        return this.client;
+    getClient(): VoyageAIClient | OpenAI | null {
+        return this.useOpenAICompat ? this.openaiClient : this.client;
     }
 
     /**
