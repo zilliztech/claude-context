@@ -10,6 +10,7 @@ export interface ContextMcpConfig {
     openaiApiKey?: string;
     openaiBaseUrl?: string;
     voyageaiApiKey?: string;
+    voyageaiBaseUrl?: string;
     geminiApiKey?: string;
     geminiBaseUrl?: string;
     // Ollama configuration
@@ -123,6 +124,7 @@ export function createMcpConfig(): ContextMcpConfig {
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
         openaiBaseUrl: envManager.get('OPENAI_BASE_URL'),
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
+        voyageaiBaseUrl: envManager.get('VOYAGEAI_BASE_URL'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
         geminiBaseUrl: envManager.get('GEMINI_BASE_URL'),
         // Ollama configuration
@@ -155,6 +157,9 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             break;
         case 'VoyageAI':
             console.log(`[MCP]   VoyageAI API Key: ${config.voyageaiApiKey ? '✅ Configured' : '❌ Missing'}`);
+            if (config.voyageaiBaseUrl) {
+                console.log(`[MCP]   VoyageAI Base URL: ${config.voyageaiBaseUrl}`);
+            }
             break;
         case 'Gemini':
             console.log(`[MCP]   Gemini API Key: ${config.geminiApiKey ? '✅ Configured' : '❌ Missing'}`);
