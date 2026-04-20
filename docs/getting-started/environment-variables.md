@@ -47,6 +47,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 |----------|-------------|---------|
 | `MILVUS_TOKEN` | Milvus authentication token. Get [Zilliz Personal API Key](https://github.com/zilliztech/claude-context/blob/master/assets/signup_and_get_apikey.png) | Recommended |
 | `MILVUS_ADDRESS` | Milvus server address. Optional when using Zilliz Personal API Key | Auto-resolved from token |
+| `MILVUS_DB` | Milvus database name to use | `default` |
 
 ### Ollama (Optional)
 | Variable | Description | Default |
@@ -74,6 +75,7 @@ EMBEDDING_PROVIDER=OpenAI
 OPENAI_API_KEY=sk-your-openai-api-key
 EMBEDDING_MODEL=text-embedding-3-small
 MILVUS_TOKEN=your-zilliz-cloud-api-key
+MILVUS_DB=default
 EOF
 ```
 
