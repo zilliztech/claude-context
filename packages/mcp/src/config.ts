@@ -19,8 +19,11 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     // Vector database configuration
+    vectordbProvider: 'milvus' | 'qdrant';
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    qdrantUrl?: string;
+    qdrantApiKey?: string;
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -138,9 +141,12 @@ export function createMcpConfig(): ContextMcpConfig {
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
-        // Vector database configuration - address can be auto-resolved from token
-        milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        // Vector database configuration
+        vectordbProvider: (envManager.get('VECTORDB_PROVIDER') as 'milvus' | 'qdrant') || 'milvus',
+        milvusAddress: envManager.get('MILVUS_ADDRESS'),
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        qdrantUrl: envManager.get('QDRANT_URL'),
+        qdrantApiKey: envManager.get('QDRANT_API_KEY')
     };
 
     return config;
@@ -153,7 +159,13 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Server: ${config.name} v${config.version}`);
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
-    console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Vector DB Provider: ${config.vectordbProvider}`);
+    if (config.vectordbProvider === 'qdrant') {
+        console.log(`[MCP]   Qdrant URL: ${config.qdrantUrl || 'http://localhost:6333'}`);
+        console.log(`[MCP]   Qdrant API Key: ${config.qdrantApiKey ? '✅ Configured' : 'Not set (local mode)'}`);
+    } else {
+        console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    }
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -218,8 +230,11 @@ Environment Variables:
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
   
   Vector Database Configuration:
+  VECTORDB_PROVIDER       Vector database provider: milvus, qdrant (default: milvus)
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  QDRANT_URL              Qdrant server URL (default: http://localhost:6333)
+  QDRANT_API_KEY          Qdrant API key (optional, for Qdrant Cloud)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
