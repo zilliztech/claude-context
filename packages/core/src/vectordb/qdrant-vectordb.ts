@@ -117,11 +117,27 @@ export class QdrantVectorDatabase implements VectorDatabase {
         return result.collections.map((c) => c.name);
     }
 
+    /**
+     * Convert a string ID to UUID format for Qdrant.
+     */
+    private toUUID(id: string): string {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+            return id;
+        }
+        // If 32-char hex (MD5), format as UUID
+        if (/^[0-9a-f]{32}$/i.test(id)) {
+            return `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20, 32)}`;
+        }
+        // Otherwise hash to MD5 and format
+        const hash = require('crypto').createHash('md5').update(id).digest('hex');
+        return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+    }
+
     async insert(collectionName: string, documents: VectorDocument[]): Promise<void> {
         if (documents.length === 0) return;
 
         const points = documents.map((doc) => ({
-            id: doc.id,
+            id: this.toUUID(doc.id),
             vector: doc.vector,
             payload: {
                 content: doc.content,
@@ -143,7 +159,7 @@ export class QdrantVectorDatabase implements VectorDatabase {
         if (documents.length === 0) return;
 
         const points = documents.map((doc) => ({
-            id: doc.id,
+            id: this.toUUID(doc.id),
             vector: {
                 dense: doc.vector,
             },
@@ -226,7 +242,7 @@ export class QdrantVectorDatabase implements VectorDatabase {
 
         await this.client.delete(collectionName, {
             wait: true,
-            points: ids,
+            points: ids.map((id) => this.toUUID(id)),
         });
     }
 
