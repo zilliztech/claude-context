@@ -198,7 +198,7 @@ Environment Variables:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
-  VOYAGEAI_BASE_URL       VoyageAI API base URL (optional, e.g. https://ai.mongodb.com/v1 for MongoDB Atlas keys)
+  VOYAGEAI_BASE_URL       VoyageAI API base URL (optional, for custom endpoints)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
   
