@@ -111,6 +111,7 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   VOYAGEAI_BASE_URL: ${envManager.get('VOYAGEAI_BASE_URL') || 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
@@ -197,6 +198,7 @@ Environment Variables:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
+  VOYAGEAI_BASE_URL       VoyageAI API base URL (optional, e.g. https://ai.mongodb.com/v1 for MongoDB Atlas keys)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
   
