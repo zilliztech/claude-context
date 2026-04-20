@@ -74,6 +74,8 @@ export class VoyageAIEmbedding extends Embedding {
             const response = await this.openaiClient.embeddings.create({
                 model: model,
                 input: processedText,
+                // @ts-ignore - MongoDB VoyageAI endpoint supports input_type
+                input_type: this.inputType,
             });
             this.dimension = response.data[0].embedding.length;
             return {
@@ -106,7 +108,8 @@ export class VoyageAIEmbedding extends Embedding {
             const response = await this.openaiClient.embeddings.create({
                 model: model,
                 input: processedTexts,
-                encoding_format: 'float',
+                // @ts-ignore - MongoDB VoyageAI endpoint supports input_type
+                input_type: this.inputType,
             });
             this.dimension = response.data[0].embedding.length;
             return response.data.map((item) => ({
