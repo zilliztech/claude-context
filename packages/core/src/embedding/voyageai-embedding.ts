@@ -47,24 +47,6 @@ export class VoyageAIEmbedding extends Embedding {
         }
     }
 
-    private updateDimensionForModel(model: string): void {
-        const supportedModels = VoyageAIEmbedding.getSupportedModels();
-        const modelInfo = supportedModels[model];
-
-        if (modelInfo) {
-            if (typeof modelInfo.dimension === 'string') {
-                // Parse default dimension from string like "512 (default), 128, 256"
-                const match = modelInfo.dimension.match(/^(\d+)/);
-                this.dimension = match ? parseInt(match[1], 10) : 1024;
-            } else {
-                this.dimension = modelInfo.dimension;
-            }
-        } else {
-            // Use default dimension for unknown models
-            this.dimension = 1024;
-        }
-    }
-
     async detectDimension(): Promise<number> {
         // VoyageAI doesn't need dynamic detection, return configured dimension
         return this.dimension;
