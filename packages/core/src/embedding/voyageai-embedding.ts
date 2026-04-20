@@ -74,7 +74,6 @@ export class VoyageAIEmbedding extends Embedding {
             const response = await this.openaiClient.embeddings.create({
                 model: model,
                 input: processedText,
-                encoding_format: 'float',
             });
             this.dimension = response.data[0].embedding.length;
             return {
