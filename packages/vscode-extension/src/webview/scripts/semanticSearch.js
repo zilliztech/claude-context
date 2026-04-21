@@ -63,9 +63,27 @@ class SemanticSearchController {
         this.settingsButton.addEventListener('click', () => this.showSettingsView());
         this.backButton.addEventListener('click', () => this.showSearchView());
 
-        this.searchInput.addEventListener('keypress', (e) => {
+        this.searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 this.performSearch();
+            }
+        });
+
+        this.extFilterInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.performSearch();
+            }
+        });
+
+        this.resultsList.addEventListener('click', (e) => {
+            const item = e.target.closest('.result-item');
+            if (item) {
+                this.openFile(
+                    item.dataset.path,
+                    Number(item.dataset.line),
+                    Number(item.dataset.startLine),
+                    Number(item.dataset.endLine)
+                );
             }
         });
 
@@ -81,9 +99,6 @@ class SemanticSearchController {
 
         // Handle messages from extension
         window.addEventListener('message', (event) => this.handleMessage(event));
-
-        // Check index status on load
-        window.addEventListener('load', () => this.checkIndexStatus());
     }
 
     /**
@@ -134,6 +149,7 @@ class SemanticSearchController {
         // Add default providers if not already loaded
         this.initializeDefaultProviders();
         this.requestConfig();
+        setTimeout(() => this.providerSelect.focus(), 0);
     }
 
     /**
@@ -142,6 +158,7 @@ class SemanticSearchController {
     showSearchView() {
         this.settingsView.style.display = 'none';
         this.searchView.style.display = 'block';
+        setTimeout(() => this.searchInput.focus(), 0);
     }
 
     /**
@@ -214,15 +231,29 @@ class SemanticSearchController {
      * @param {number} rank - Result rank (1-indexed)
      * @returns {string} HTML string
      */
+    escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     createResultHTML(result, rank) {
+        const startLine = result.startLine || result.line;
+        const endLine = result.endLine || result.line;
         return `
-            <div class="result-item" onclick="searchController.openFile('${result.relativePath}', ${result.line}, ${result.startLine}, ${result.endLine})">
+            <div class="result-item"
+                 data-path="${this.escapeHtml(result.relativePath)}"
+                 data-line="${Number(result.line) || 0}"
+                 data-start-line="${Number(startLine) || 0}"
+                 data-end-line="${Number(endLine) || 0}">
                 <div class="result-file">
-                    <span class="result-filename">${result.file}</span>
-                    <span class="result-line">Lines ${result.startLine || result.line}-${result.endLine || result.line}</span>
+                    <span class="result-filename">${this.escapeHtml(result.file)}</span>
+                    <span class="result-line">Lines ${startLine}-${endLine}</span>
                 </div>
-                <div class="result-preview">${result.preview}</div>
-                <div class="result-context">${result.context}</div>
+                <div class="result-preview">${this.escapeHtml(result.preview)}</div>
+                <div class="result-context">${this.escapeHtml(result.context)}</div>
                 <div class="result-rank" style="margin-top: 8px; text-align: right;">Rank: ${rank}</div>
             </div>
         `;
