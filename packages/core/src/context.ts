@@ -432,7 +432,13 @@ export class Context {
 
             // 1. Generate query vector
             console.log(`[Context] 🔍 Generating embeddings for query: "${query}"`);
-            const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+            this.embedding.setMode('query');
+            let queryEmbedding: EmbeddingVector;
+            try {
+                queryEmbedding = await this.embedding.embed(query);
+            } finally {
+                this.embedding.setMode('document');
+            }
             console.log(`[Context] ✅ Generated embedding vector with dimension: ${queryEmbedding.vector.length}`);
             console.log(`[Context] 🔍 First 5 embedding values: [${queryEmbedding.vector.slice(0, 5).join(', ')}]`);
 
@@ -491,7 +497,13 @@ export class Context {
         } else {
             // Regular semantic search
             // 1. Generate query vector
-            const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+            this.embedding.setMode('query');
+            let queryEmbedding: EmbeddingVector;
+            try {
+                queryEmbedding = await this.embedding.embed(query);
+            } finally {
+                this.embedding.setMode('document');
+            }
 
             // 2. Search in vector database
             const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(

@@ -165,6 +165,13 @@ export class VoyageAIEmbedding extends Embedding {
     }
 
     /**
+     * Set embedding mode — maps to VoyageAI input_type for better retrieval.
+     */
+    override setMode(mode: 'document' | 'query'): void {
+        this.inputType = mode;
+    }
+
+    /**
      * Get client instance (for advanced usage)
      */
     getClient(): VoyageAIClient | OpenAI | null {

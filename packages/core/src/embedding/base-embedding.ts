@@ -73,4 +73,12 @@ export abstract class Embedding {
      * @returns Provider name
      */
     abstract getProvider(): string;
+
+    /**
+     * Set embedding mode for providers that distinguish document vs query embeddings.
+     * Default no-op — providers that support input_type (e.g., VoyageAI) override this.
+     */
+    setMode(_mode: 'document' | 'query'): void {
+        // No-op by default
+    }
 } 
