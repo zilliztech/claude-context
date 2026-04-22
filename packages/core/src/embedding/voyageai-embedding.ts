@@ -29,9 +29,10 @@ export class VoyageAIEmbedding extends Embedding {
         const modelInfo = supportedModels[model];
 
         if (modelInfo) {
-            // If dimension is a string (indicating variable dimension), use default value 1024
             if (typeof modelInfo.dimension === 'string') {
-                this.dimension = 1024; // Default dimension
+                // Parse default dimension from string like "1024 (default), 256, 512, 2048"
+                const match = modelInfo.dimension.match(/^(\d+)/);
+                this.dimension = match ? parseInt(match[1], 10) : 1024;
             } else {
                 this.dimension = modelInfo.dimension;
             }
