@@ -101,7 +101,7 @@ You can use the following configuration to configure the MCP server with a devel
 
 ### Claude Code Development Mode Configuration
 ```bash
-claude mcp add claude-context -e OPENAI_API_KEY=sk-your-openai-api-key -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- node PATH_TO_CLAUDECONTEXT/packages/mcp/dist/index.js
+claude mcp add claude-context -e OPENAI_API_KEY=sk-your-openai-api-key -e MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint -e MILVUS_TOKEN=your-zilliz-cloud-api-key -- node PATH_TO_CLAUDECONTEXT/packages/mcp/dist/index.js
 ```
 And then you can start Claude Code with `claude --debug` to see the MCP server logs.
 
@@ -115,4 +115,4 @@ Use all three MCP tools:
 ## Questions?
 
 - **General questions**: See [main contributing guide](../../CONTRIBUTING.md)
-- **MCP-specific issues**: Open an issue with the `mcp` label 
+- **MCP-specific issues**: Open an issue with the `mcp` label
