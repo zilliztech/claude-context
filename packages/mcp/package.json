@@ -9,20 +9,24 @@
     "scripts": {
         "build": "pnpm clean && tsc --build --force",
         "dev": "tsx --watch src/index.ts",
+        "dev:http": "tsx --watch src/index-http.ts",
         "clean": "rimraf dist",
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
         "typecheck": "tsc --noEmit",
         "start": "tsx src/index.ts",
+        "start:http": "tsx src/index-http.ts",
         "start:with-env": "OPENAI_API_KEY=${OPENAI_API_KEY:your-api-key-here} MILVUS_ADDRESS=${MILVUS_ADDRESS:localhost:19530} tsx src/index.ts",
         "prepublishOnly": "pnpm build"
     },
     "dependencies": {
         "@zilliz/claude-context-core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.12.1",
+        "express": "^4.21.2",
         "zod": "^3.25.55"
     },
     "devDependencies": {
+        "@types/express": "^4.17.21",
         "@types/node": "^20.0.0",
         "tsx": "^4.19.4",
         "typescript": "^5.0.0"
