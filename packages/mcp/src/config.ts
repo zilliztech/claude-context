@@ -257,6 +257,15 @@ Environment Variables:
                           The per-codebase pathHash is preserved so multiple
                           codebases stay distinct under the same override.
 
+  MCP Sync Configuration:
+  CLAUDE_CONTEXT_BACKGROUND_SYNC
+                          Enable/disable startup + periodic background sync
+                          for indexed codebases (default: true). Set to false
+                          to disable polling while keeping trigger-based sync.
+  CLAUDE_CONTEXT_SYNC_INTERVAL_MS
+                          Background sync interval in milliseconds when enabled
+                          (default: 300000).
+
   Sync Trigger Watcher:
   CLAUDE_CONTEXT_TRIGGER_WATCHER
                           Enable/disable the ~/.context/.sync-trigger filesystem
@@ -288,5 +297,8 @@ Examples:
 
   # Start MCP server with a human-readable collection name override
   OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with background sync enabled every minute
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CLAUDE_CONTEXT_BACKGROUND_SYNC=true CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000 npx @zilliz/claude-context-mcp@latest
         `);
 }

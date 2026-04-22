@@ -6,8 +6,55 @@ import { SnapshotManager } from "./snapshot.js";
 import type { RequestSplitterType } from "./config.js";
 import { createRequestSplitter, resolveRequestSplitterType } from "./splitter.js";
 
+const DEFAULT_INITIAL_SYNC_DELAY_MS = 5_000;
+const DEFAULT_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const MIN_SYNC_INTERVAL_MS = 1_000;
 const DEFAULT_SYNC_LOCK_STALE_MS = 10 * 60 * 1000;
 const SYNC_LOCK_STALE_ENV = "CLAUDE_CONTEXT_SYNC_LOCK_STALE_MS";
+
+function isBackgroundSyncEnabled(): boolean {
+    const value = envManager.get("CLAUDE_CONTEXT_BACKGROUND_SYNC");
+    if (!value) {
+        return true;
+    }
+
+    switch (value.trim().toLowerCase()) {
+        case "1":
+        case "true":
+        case "yes":
+        case "on":
+            return true;
+        case "0":
+        case "false":
+        case "no":
+        case "off":
+            return false;
+        default:
+            console.warn(
+                `[SYNC-DEBUG] Invalid CLAUDE_CONTEXT_BACKGROUND_SYNC value '${value}'. ` +
+                "Expected true/false. Background sync will remain enabled."
+            );
+            return true;
+    }
+}
+
+function getBackgroundSyncIntervalMs(): number {
+    const value = envManager.get("CLAUDE_CONTEXT_SYNC_INTERVAL_MS");
+    if (!value) {
+        return DEFAULT_SYNC_INTERVAL_MS;
+    }
+
+    const intervalMs = Number.parseInt(value, 10);
+    if (!Number.isFinite(intervalMs) || intervalMs < MIN_SYNC_INTERVAL_MS) {
+        console.warn(
+            `[SYNC-DEBUG] Invalid CLAUDE_CONTEXT_SYNC_INTERVAL_MS value '${value}'. ` +
+            `Falling back to ${DEFAULT_SYNC_INTERVAL_MS}ms.`
+        );
+        return DEFAULT_SYNC_INTERVAL_MS;
+    }
+
+    return intervalMs;
+}
 
 export class SyncManager {
     private context: Context;
@@ -226,15 +273,18 @@ export class SyncManager {
     public startBackgroundSync(): void {
         console.log('[SYNC-DEBUG] startBackgroundSync() called');
 
-        // Set up the trigger file watcher FIRST, independent of polling. Polling may
-        // be gated off by other configuration (e.g. opt-in CLAUDE_CONTEXT_BACKGROUND_SYNC
-        // discussed in #285 / #314); the watcher is the on-demand counterpart and should
-        // remain available so external tools (Claude Code PostToolUse hooks, CI scripts)
-        // can still request a sync by touching ~/.context/.sync-trigger.
+        // Set up the trigger file watcher first, independent of polling.
         this.setupTriggerWatcher();
 
+        if (!isBackgroundSyncEnabled()) {
+            console.log('[SYNC-DEBUG] Background sync is disabled via CLAUDE_CONTEXT_BACKGROUND_SYNC=false.');
+            return;
+        }
+
+        const syncIntervalMs = getBackgroundSyncIntervalMs();
+
         // Execute initial sync immediately after a short delay to let server initialize
-        console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
+        console.log(`[SYNC-DEBUG] Scheduling initial sync in ${DEFAULT_INITIAL_SYNC_DELAY_MS}ms...`);
         setTimeout(async () => {
             console.log('[SYNC-DEBUG] Executing initial sync after server startup');
             try {
@@ -248,14 +298,14 @@ export class SyncManager {
                     // Do not re-throw here: this callback runs via setTimeout with no caller to propagate to.
                 }
             }
-        }, 5000); // Initial sync after 5 seconds
+        }, DEFAULT_INITIAL_SYNC_DELAY_MS);
 
         // Periodically check for file changes and update the index
-        console.log('[SYNC-DEBUG] Setting up periodic sync every 5 minutes (300000ms)');
+        console.log(`[SYNC-DEBUG] Setting up periodic sync every ${syncIntervalMs}ms`);
         const syncInterval = setInterval(() => {
             console.log('[SYNC-DEBUG] Executing scheduled periodic sync');
             this.handleSyncIndex();
-        }, 5 * 60 * 1000); // every 5 minutes
+        }, syncIntervalMs);
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
     }

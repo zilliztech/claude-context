@@ -227,6 +227,22 @@ Notes:
 - Triggered syncs go through the same global cross-process lock as background sync, so when multiple MCP processes share `$HOME` only one process performs the work per trigger.
 - The trigger file's *contents* are ignored — only the modification event matters.
 
+#### Background Sync Configuration (Optional)
+
+By default, the MCP server runs startup + periodic background sync for compatibility with existing installations. The global cross-process sync lock ensures only one local MCP process performs a sync cycle at a time.
+
+You can tune or disable periodic polling with environment variables:
+
+```bash
+# Default: true. Set to false to disable startup + periodic polling.
+CLAUDE_CONTEXT_BACKGROUND_SYNC=false
+
+# Optional: control how often sync runs (default: 300000 = 5 minutes)
+CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000
+```
+
+For multi-instance local stdio setups, set `CLAUDE_CONTEXT_BACKGROUND_SYNC=false` and keep the trigger watcher enabled. That avoids idle polling while still allowing external tools to request immediate re-indexing by touching `~/.context/.sync-trigger`.
+
 ## Usage with MCP Clients
 
 <details>
