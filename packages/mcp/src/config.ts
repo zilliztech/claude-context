@@ -203,6 +203,10 @@ Environment Variables:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
 
+  MCP Sync Configuration:
+  CLAUDE_CONTEXT_BACKGROUND_SYNC   Enable background sync for indexed codebases (default: false)
+  CLAUDE_CONTEXT_SYNC_INTERVAL_MS  Background sync interval in milliseconds when enabled (default: 300000)
+
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
@@ -221,5 +225,8 @@ Examples:
   
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with background sync enabled every minute
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CLAUDE_CONTEXT_BACKGROUND_SYNC=true CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000 npx @zilliz/claude-context-mcp@latest
         `);
-} 
+}
