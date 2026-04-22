@@ -94,14 +94,19 @@ export interface ContextConfig {
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
+    collectionNameOverride?: string; // Optional: custom collection name suffix
 }
 
 export class Context {
+    private static readonly MAX_COLLECTION_NAME_LENGTH = 255;
+
     private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: Splitter;
     private supportedExtensions: string[];
     private ignorePatterns: string[];
+    private collectionNameOverride?: string;
+    private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
 
     constructor(config: ContextConfig = {}) {
@@ -144,6 +149,7 @@ export class Context {
         ];
         // Remove duplicates
         this.ignorePatterns = [...new Set(allIgnorePatterns)];
+        this.collectionNameOverride = config.collectionNameOverride;
 
         console.log(`[Context] 🔧 Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
         if (envCustomExtensions.length > 0) {
@@ -233,10 +239,58 @@ export class Context {
      */
     public getCollectionName(codebasePath: string): string {
         const isHybrid = this.getIsHybrid();
-        const normalizedPath = path.resolve(codebasePath);
-        const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
         const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
-        return `${prefix}_${hash.substring(0, 8)}`;
+        const normalizedPath = path.resolve(codebasePath);
+        const pathHash = crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
+
+        // Overrides always keep the per-codebase `_<pathHash>` suffix so that multiple
+        // codebases indexed by the same MCP server can't collapse into one collection.
+        const configOverride = this.getValidOverrideValue(this.collectionNameOverride);
+        if (configOverride) {
+            const suffix = this.sanitizeCollectionNameSuffix(configOverride, prefix, pathHash, 'Context config');
+            return `${prefix}_${suffix}`;
+        }
+
+        const envOverride = this.getValidOverrideValue(envManager.get('CODE_CHUNKS_COLLECTION_NAME_OVERRIDE'));
+        if (envOverride) {
+            const suffix = this.sanitizeCollectionNameSuffix(envOverride, prefix, pathHash, 'CODE_CHUNKS_COLLECTION_NAME_OVERRIDE');
+            return `${prefix}_${suffix}`;
+        }
+
+        return `${prefix}_${pathHash}`;
+    }
+
+    private getValidOverrideValue(value?: string): string | undefined {
+        if (!value) {
+            return undefined;
+        }
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    }
+
+    private sanitizeCollectionNameSuffix(value: string, prefix: string, pathHash: string, source: string): string {
+        const hashSuffix = `_${pathHash}`;
+        // Leave room for both the prefix and the trailing `_<pathHash>` disambiguator.
+        const maxReadableLength = Context.MAX_COLLECTION_NAME_LENGTH - `${prefix}_`.length - hashSuffix.length;
+        const normalized = value.trim();
+        let sanitized = normalized.replace(/[^A-Za-z0-9_]/g, '_');
+        sanitized = sanitized.slice(0, Math.max(0, maxReadableLength));
+
+        if (sanitized.length === 0) {
+            sanitized = 'custom';
+        }
+
+        const full = `${sanitized}${hashSuffix}`;
+
+        if (sanitized !== normalized) {
+            const warningKey = `${source}:${normalized}:${sanitized}`;
+            if (!this.warnedOverrideSanitization.has(warningKey)) {
+                console.warn(`[Context] ⚠️ Sanitized collection name override from "${normalized}" to "${sanitized}" (${source}); final suffix "${full}"`);
+                this.warnedOverrideSanitization.add(warningKey);
+            }
+        }
+
+        return full;
     }
 
     /**
