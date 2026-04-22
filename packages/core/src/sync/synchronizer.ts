@@ -236,8 +236,8 @@ export class FileSynchronizer {
         // Compare the DAGs
         const changes = MerkleDAG.compare(this.merkleDAG, newMerkleDAG);
 
-        // If there are any changes in the DAG, we should also do a file-level comparison
-        if (changes.added.length > 0 || changes.removed.length > 0 || changes.modified.length > 0) {
+        // If there are any changes in the DAG, do a file-level comparison
+        if (changes.added.length > 0 || changes.removed.length > 0) {
             console.log('[Synchronizer] Merkle DAG has changed. Comparing file states...');
             const fileChanges = this.compareStates(this.fileHashes, newFileHashes);
 
