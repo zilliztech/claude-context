@@ -183,6 +183,22 @@ CUSTOM_IGNORE_PATTERNS=temp/**,*.backup,private/**,uploads/**
 
 These settings work in combination with tool parameters - patterns from both sources will be merged together.
 
+#### Background Sync Configuration (Optional)
+
+By default, the MCP server does **not** run background sync. This avoids duplicated rescans when multiple local MCP sessions are open at the same time.
+
+If you want automatic reindexing, enable it explicitly:
+
+```bash
+# Opt in to startup + periodic background sync
+CLAUDE_CONTEXT_BACKGROUND_SYNC=true
+
+# Optional: control how often sync runs (default: 300000 = 5 minutes)
+CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000
+```
+
+This is most useful when you run Claude Context as a single long-lived MCP server. For per-session local stdio setups, leaving background sync disabled usually avoids unnecessary CPU churn.
+
 ## Usage with MCP Clients
 
 <details>
