@@ -20,10 +20,12 @@
     "dependencies": {
         "@zilliz/claude-context-core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.12.1",
+        "pg": "^8.11.3",
         "zod": "^3.25.55"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
+        "@types/pg": "^8.10.9",
         "tsx": "^4.19.4",
         "typescript": "^5.0.0"
     },

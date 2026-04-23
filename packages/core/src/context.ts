@@ -108,7 +108,7 @@ export class Context {
         // Initialize services
         this.embedding = config.embedding || new OpenAIEmbedding({
             apiKey: envManager.get('OPENAI_API_KEY') || 'your-openai-api-key',
-            model: 'text-embedding-3-small',
+            model: envManager.get('EMBEDDING_MODEL') || 'text-embedding-3-small',
             ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
         });
 
@@ -967,6 +967,8 @@ export class Context {
             } else {
                 console.log('📄 No ignore files found, keeping existing patterns');
             }
+
+            console.log(`[Context] 🔍 Ignore patterns: ${this.ignorePatterns.join(', ')}`);
         } catch (error) {
             console.warn(`[Context] ⚠️ Failed to load ignore patterns: ${error}`);
             // Continue with existing patterns on error - don't reset them
