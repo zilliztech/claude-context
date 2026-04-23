@@ -394,19 +394,28 @@ export class MilvusVectorDatabase implements VectorDatabase {
             return [];
         }
 
-        return searchResult.results.map((result: any) => ({
-            document: {
-                id: result.id,
-                vector: queryVector,
-                content: result.content,
-                relativePath: result.relativePath,
-                startLine: result.startLine,
-                endLine: result.endLine,
-                fileExtension: result.fileExtension,
-                metadata: JSON.parse(result.metadata || '{}'),
-            },
-            score: result.score,
-        }));
+        return searchResult.results.map((result: any) => {
+            let metadata = {};
+            try {
+                metadata = JSON.parse(result.metadata || '{}');
+            } catch (error) {
+                console.warn(`[MilvusDB] Failed to parse metadata for item ${result.id}:`, error);
+            }
+
+            return {
+                document: {
+                    id: result.id,
+                    vector: queryVector,
+                    content: result.content,
+                    relativePath: result.relativePath,
+                    startLine: result.startLine,
+                    endLine: result.endLine,
+                    fileExtension: result.fileExtension,
+                    metadata,
+                },
+                score: result.score,
+            };
+        });
     }
 
     async delete(collectionName: string, ids: string[]): Promise<void> {

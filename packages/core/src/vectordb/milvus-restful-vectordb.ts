@@ -774,20 +774,29 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             console.log(`[MilvusRestfulDB] ✅ Found ${results.length} results from hybrid search`);
 
             // Transform response to HybridSearchResult format
-            return results.map((result: any) => ({
-                document: {
-                    id: result.id,
-                    content: result.content,
-                    vector: [], // Vector not returned in search results
-                    sparse_vector: [], // Vector not returned in search results
-                    relativePath: result.relativePath,
-                    startLine: result.startLine,
-                    endLine: result.endLine,
-                    fileExtension: result.fileExtension,
-                    metadata: JSON.parse(result.metadata || '{}'),
-                },
-                score: result.score || result.distance || 0,
-            }));
+            return results.map((result: any) => {
+                let metadata = {};
+                try {
+                    metadata = JSON.parse(result.metadata || '{}');
+                } catch (error) {
+                    console.warn(`[MilvusRestfulDB] Failed to parse metadata for item ${result.id}:`, error);
+                }
+
+                return {
+                    document: {
+                        id: result.id,
+                        content: result.content,
+                        vector: [], // Vector not returned in search results
+                        sparse_vector: [], // Vector not returned in search results
+                        relativePath: result.relativePath,
+                        startLine: result.startLine,
+                        endLine: result.endLine,
+                        fileExtension: result.fileExtension,
+                        metadata,
+                    },
+                    score: result.score || result.distance || 0,
+                };
+            });
 
         } catch (error) {
             console.error(`[MilvusRestfulDB] ❌ Failed to perform hybrid search on collection '${collectionName}':`, error);
