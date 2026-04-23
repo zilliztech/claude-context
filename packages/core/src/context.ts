@@ -94,6 +94,7 @@ export interface ContextConfig {
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
+    maxDepth?: number; // Maximum directory traversal depth (default: unlimited)
 }
 
 export class Context {
@@ -102,6 +103,7 @@ export class Context {
     private codeSplitter: Splitter;
     private supportedExtensions: string[];
     private ignorePatterns: string[];
+    private maxDepth: number = Infinity;
     private synchronizers = new Map<string, FileSynchronizer>();
 
     constructor(config: ContextConfig = {}) {
@@ -662,7 +664,7 @@ export class Context {
     private async getCodeFiles(codebasePath: string): Promise<string[]> {
         const files: string[] = [];
 
-        const traverseDirectory = async (currentPath: string) => {
+        const traverseDirectory = async (currentPath: string, currentDepth: number = 0) => {
             const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
 
             for (const entry of entries) {
@@ -674,7 +676,10 @@ export class Context {
                 }
 
                 if (entry.isDirectory()) {
-                    await traverseDirectory(fullPath);
+                    if (currentDepth >= this.maxDepth) {
+                        continue;
+                    }
+                    await traverseDirectory(fullPath, currentDepth + 1);
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
                     if (this.supportedExtensions.includes(ext)) {

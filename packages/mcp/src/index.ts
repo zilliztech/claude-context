@@ -68,7 +68,8 @@ class ContextMcpServer {
         // Initialize Claude Context
         this.context = new Context({
             embedding,
-            vectorDatabase
+            vectorDatabase,
+            ...(config.maxDepth !== undefined && { maxDepth: config.maxDepth })
         });
 
         // Initialize managers
