@@ -166,6 +166,7 @@ export class Context {
         this.embeddingCache = new EmbeddingCache(cacheModel);
         if (this.embeddingCache.isEnabled()) {
             console.log(`[Context] 💾 Embedding cache enabled for model: ${cacheModel}`);
+            this.embeddingCache.cleanup().catch(() => {});
         }
     }
 

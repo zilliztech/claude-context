@@ -88,4 +88,45 @@ export class EmbeddingCache {
     isEnabled(): boolean {
         return this.enabled;
     }
+
+    /**
+     * Delete cache files not modified in the last maxAgeDays days.
+     * Runs async, best-effort — errors are silently ignored.
+     */
+    async cleanup(maxAgeDays?: number): Promise<void> {
+        if (!this.enabled) return;
+
+        const days = maxAgeDays ?? parseInt(envManager.get('EMBEDDING_CACHE_MAX_AGE_DAYS') || '30', 10);
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        let deleted = 0;
+
+        try {
+            const prefixDirs = fs.readdirSync(this.cacheDir);
+            for (const prefix of prefixDirs) {
+                const prefixPath = path.join(this.cacheDir, prefix);
+                if (!fs.statSync(prefixPath).isDirectory()) continue;
+
+                const files = fs.readdirSync(prefixPath);
+                for (const file of files) {
+                    const filePath = path.join(prefixPath, file);
+                    const stat = fs.statSync(filePath);
+                    if (stat.mtimeMs < cutoff) {
+                        fs.unlinkSync(filePath);
+                        deleted++;
+                    }
+                }
+
+                // Remove empty prefix dirs
+                if (fs.readdirSync(prefixPath).length === 0) {
+                    fs.rmdirSync(prefixPath);
+                }
+            }
+
+            if (deleted > 0) {
+                console.log(`[Cache] 🧹 Cleaned up ${deleted} stale cache files (>${days} days old)`);
+            }
+        } catch {
+            // Best-effort cleanup
+        }
+    }
 }
