@@ -68,7 +68,8 @@ class ContextMcpServer {
         // Initialize Claude Context
         this.context = new Context({
             embedding,
-            vectorDatabase
+            vectorDatabase,
+            collectionNameOverride: config.collectionNameOverride
         });
 
         // Initialize managers

@@ -186,6 +186,17 @@ CUSTOM_IGNORE_PATTERNS=temp/**,*.backup,private/**,uploads/**
 
 These settings work in combination with tool parameters - patterns from both sources will be merged together.
 
+#### Custom Collection Name (Optional)
+
+Use this when you want a human-readable prefix on collection names in Milvus/Zilliz instead of the bare hash:
+
+```bash
+# Creates code_chunks_my_project_<pathHash> or hybrid_code_chunks_my_project_<pathHash>
+CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project
+```
+
+The per-codebase `<pathHash>` suffix is preserved even when the override is set, so the same MCP server can still index multiple repos without collapsing them onto one collection. The override value is sanitized to letters, numbers, and underscores, and truncated to keep the full name within Milvus's 255-char limit. If you unset the variable later, Claude Context switches back to the plain `code_chunks_<pathHash>` naming.
+
 ## Usage with MCP Clients
 
 <details>
