@@ -97,8 +97,11 @@ export class QdrantVectorDatabase implements VectorDatabase {
                 size: dimension,
                 distance: 'Cosine',
             },
+            quantization_config: {
+                scalar: { type: 'int8', quantile: 0.99, always_ram: true },
+            },
         });
-        console.log(`[Qdrant] ✅ Collection '${collectionName}' created (dimension: ${dimension})`);
+        console.log(`[Qdrant] ✅ Collection '${collectionName}' created (dimension: ${dimension}, quantized: int8)`);
 
         // Create payload indexes for common filter fields
         await this.createPayloadIndexes(collectionName);
@@ -120,6 +123,9 @@ export class QdrantVectorDatabase implements VectorDatabase {
             },
             sparse_vectors: {
                 sparse: {},
+            },
+            quantization_config: {
+                scalar: { type: 'int8', quantile: 0.99, always_ram: true },
             },
         });
         console.log(`[Qdrant] ✅ Hybrid collection '${collectionName}' created (dimension: ${dimension})`);
