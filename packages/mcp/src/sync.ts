@@ -1,4 +1,6 @@
 import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import { Context, FileSynchronizer } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 
@@ -139,5 +141,38 @@ export class SyncManager {
         }, 5 * 60 * 1000); // every 5 minutes
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
+
+        // Set up trigger file watcher for instant re-index (e.g., from Claude Code hooks)
+        this.setupTriggerWatcher();
+    }
+
+    /**
+     * Watch for trigger file changes to enable instant re-index.
+     * Claude Code PostToolUse hooks can touch ~/.context/.sync-trigger
+     * after Write/Edit operations to trigger immediate re-indexing.
+     */
+    private setupTriggerWatcher(): void {
+        const contextDir = path.join(os.homedir(), '.context');
+        const triggerFile = '.sync-trigger';
+        let debounceTimer: NodeJS.Timeout | null = null;
+
+        try {
+            // Ensure context dir exists before watching (snapshot manager
+            // also creates it, but be defensive in case watcher starts first).
+            fs.mkdirSync(contextDir, { recursive: true });
+
+            fs.watch(contextDir, (event, filename) => {
+                if (filename === triggerFile) {
+                    if (debounceTimer) clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        console.log('[SYNC] 🔔 Trigger file detected, starting instant re-index...');
+                        this.handleSyncIndex();
+                    }, 2000);
+                }
+            });
+            console.log(`[SYNC-DEBUG] Trigger watcher active on ${contextDir}/${triggerFile}`);
+        } catch (error) {
+            console.warn(`[SYNC-DEBUG] Could not set up trigger watcher: ${error}`);
+        }
     }
 } 
