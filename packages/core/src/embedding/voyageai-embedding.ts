@@ -149,7 +149,7 @@ export class VoyageAIEmbedding extends Embedding {
                 description: 'Optimized for latency and cost'
             },
             'voyage-4-nano': {
-                dimension: '512 (default), 128, 256',
+                dimension: '1024 (default), 256, 512, 2048',
                 contextLength: 32000,
                 description: 'Open-weight model, smallest and fastest'
             },
