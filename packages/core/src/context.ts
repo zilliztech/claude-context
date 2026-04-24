@@ -536,12 +536,13 @@ export class Context {
                 score: result.score
             }));
 
-            console.log(`[Context] ✅ Found ${results.length} relevant hybrid results`);
-            if (results.length > 0) {
-                console.log(`[Context] 🔍 Top result score: ${results[0].score}, path: ${results[0].relativePath}`);
+            const dedupedResults = this.deduplicateResults(results);
+            console.log(`[Context] ✅ Found ${results.length} results, ${dedupedResults.length} after dedup`);
+            if (dedupedResults.length > 0) {
+                console.log(`[Context] 🔍 Top result score: ${dedupedResults[0].score}, path: ${dedupedResults[0].relativePath}`);
             }
 
-            return results;
+            return dedupedResults;
         } else {
             // Regular semantic search
             // 1. Generate query vector
@@ -564,9 +565,35 @@ export class Context {
                 score: result.score
             }));
 
-            console.log(`[Context] ✅ Found ${results.length} relevant results`);
-            return results;
+            const dedupedResults = this.deduplicateResults(results);
+            console.log(`[Context] ✅ Found ${results.length} results, ${dedupedResults.length} after dedup`);
+            return dedupedResults;
         }
+    }
+
+    /**
+     * Deduplicate search results by file + line range overlap.
+     * Keeps higher-scored result when two results from the same file overlap >50%.
+     */
+    private deduplicateResults(results: SemanticSearchResult[]): SemanticSearchResult[] {
+        const kept: SemanticSearchResult[] = [];
+
+        for (const result of results) {
+            const overlaps = kept.some((existing) => {
+                if (existing.relativePath !== result.relativePath) return false;
+                const overlapStart = Math.max(existing.startLine, result.startLine);
+                const overlapEnd = Math.min(existing.endLine, result.endLine);
+                if (overlapStart >= overlapEnd) return false;
+                const overlapSize = overlapEnd - overlapStart;
+                const resultSize = result.endLine - result.startLine;
+                return resultSize > 0 && overlapSize / resultSize > 0.5;
+            });
+            if (!overlaps) {
+                kept.push(result);
+            }
+        }
+
+        return kept;
     }
 
     /**
