@@ -291,15 +291,18 @@ export class QdrantVectorDatabase implements VectorDatabase {
         const sparseVector = this.computeSparseVector(queryText);
 
         // Hybrid search with RRF fusion: prefetch dense + sparse, fuse results
+        // Qdrant query API uses 'using' field for named vectors, not nested {name, vector}
         const results = await this.client.query(collectionName, {
             prefetch: [
                 {
-                    query: { name: 'dense', vector: denseRequest.data as number[] },
+                    query: denseRequest.data as number[],
+                    using: 'dense',
                     limit: limit * 3,
                     ...(filter && { filter }),
                 },
                 {
-                    query: { name: 'sparse', vector: sparseVector },
+                    query: sparseVector as any,
+                    using: 'sparse',
                     limit: limit * 3,
                     ...(filter && { filter }),
                 },
