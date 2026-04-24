@@ -707,20 +707,29 @@ export class MilvusVectorDatabase implements VectorDatabase {
             console.log(`[MilvusDB] ✅ Found ${searchResult.results.length} results from hybrid search`);
 
             // Transform results to HybridSearchResult format
-            return searchResult.results.map((result: any) => ({
-                document: {
-                    id: result.id,
-                    content: result.content,
-                    vector: [],
-                    sparse_vector: [],
-                    relativePath: result.relativePath,
-                    startLine: result.startLine,
-                    endLine: result.endLine,
-                    fileExtension: result.fileExtension,
-                    metadata: JSON.parse(result.metadata || '{}'),
-                },
-                score: result.score,
-            }));
+            return searchResult.results.map((result: any) => {
+                let metadata = {};
+                try {
+                    metadata = JSON.parse(result.metadata || '{}');
+                } catch (error) {
+                    console.warn(`[MilvusDB] Failed to parse metadata for item ${result.id}:`, error);
+                }
+
+                return {
+                    document: {
+                        id: result.id,
+                        content: result.content,
+                        vector: [],
+                        sparse_vector: [],
+                        relativePath: result.relativePath,
+                        startLine: result.startLine,
+                        endLine: result.endLine,
+                        fileExtension: result.fileExtension,
+                        metadata,
+                    },
+                    score: result.score,
+                };
+            });
 
         } catch (error) {
             console.error(`[MilvusDB] ❌ Failed to perform hybrid search on collection '${collectionName}':`, error);

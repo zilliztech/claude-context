@@ -19,6 +19,7 @@ Run this single command to add Claude Context to Claude Code:
 ```bash
 claude mcp add claude-context \
   -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint \
   -e MILVUS_TOKEN=your-zilliz-cloud-api-key \
   -- npx @zilliz/claude-context-mcp@latest
 ```
