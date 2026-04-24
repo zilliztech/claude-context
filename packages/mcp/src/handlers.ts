@@ -938,6 +938,8 @@ export class ToolHandlers {
                 };
             }
 
+            await this.syncIndexedCodebasesFromCloud();
+
             // Check indexing status using new status system
             const status = this.snapshotManager.getCodebaseStatus(absolutePath);
             const info = this.snapshotManager.getCodebaseInfo(absolutePath);
