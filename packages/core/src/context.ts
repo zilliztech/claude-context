@@ -6,7 +6,8 @@ import {
 import {
     Embedding,
     EmbeddingVector,
-    OpenAIEmbedding
+    OpenAIEmbedding,
+    EmbeddingCache
 } from './embedding';
 import {
     VectorDatabase,
@@ -108,6 +109,7 @@ export class Context {
     private collectionNameOverride?: string;
     private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
+    private embeddingCache: EmbeddingCache | null = null;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -157,6 +159,13 @@ export class Context {
         }
         if (envCustomIgnorePatterns.length > 0) {
             console.log(`[Context] 🚫 Loaded ${envCustomIgnorePatterns.length} custom ignore patterns from environment: ${envCustomIgnorePatterns.join(', ')}`);
+        }
+
+        // Initialize embedding cache
+        const cacheModel = `${this.embedding.getProvider()}_${this.embedding.getDimension()}`;
+        this.embeddingCache = new EmbeddingCache(cacheModel);
+        if (this.embeddingCache.isEnabled()) {
+            console.log(`[Context] 💾 Embedding cache enabled for model: ${cacheModel}`);
         }
     }
 
@@ -570,6 +579,35 @@ export class Context {
     }
 
     /**
+     * Embed batch with disk cache. Only calls API for uncached chunks.
+     */
+    private async cachedEmbedBatch(contents: string[]): Promise<EmbeddingVector[]> {
+        if (!this.embeddingCache || !this.embeddingCache.isEnabled()) {
+            return this.embedding.embedBatch(contents);
+        }
+
+        const { results, uncachedIndices } = this.embeddingCache.getBatch(contents);
+
+        if (uncachedIndices.length === 0) {
+            console.log(`[Cache] ✅ All ${contents.length} embeddings from cache`);
+            return results as EmbeddingVector[];
+        }
+
+        const uncachedTexts = uncachedIndices.map(i => contents[i]);
+        const newEmbeddings = await this.embedding.embedBatch(uncachedTexts);
+
+        for (let j = 0; j < uncachedIndices.length; j++) {
+            results[uncachedIndices[j]] = newEmbeddings[j];
+            this.embeddingCache.set(contents[uncachedIndices[j]], newEmbeddings[j]);
+        }
+
+        const hitRate = ((contents.length - uncachedIndices.length) / contents.length * 100).toFixed(0);
+        console.log(`[Cache] ${hitRate}% hit (${contents.length - uncachedIndices.length}/${contents.length} cached, ${uncachedIndices.length} embedded)`);
+
+        return results as EmbeddingVector[];
+    }
+
+    /**
      * Check if index exists for codebase
      * @param codebasePath Codebase path to check
      * @returns Whether index exists
@@ -865,9 +903,9 @@ export class Context {
     private async processChunkBatch(chunks: CodeChunk[], codebasePath: string): Promise<void> {
         const isHybrid = this.getIsHybrid();
 
-        // Generate embedding vectors
+        // Generate embedding vectors (with cache)
         const chunkContents = chunks.map(chunk => chunk.content);
-        const embeddings = await this.embedding.embedBatch(chunkContents);
+        const embeddings = await this.cachedEmbedBatch(chunkContents);
 
         if (isHybrid === true) {
             // Create hybrid vector documents
