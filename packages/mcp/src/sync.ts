@@ -126,7 +126,7 @@ export class SyncManager {
                     console.log('[SYNC-DEBUG] Collection not yet established, this is expected for new cluster users. Will retry on next sync cycle.');
                 } else {
                     console.error('[SYNC-DEBUG] Initial sync failed with unexpected error:', error);
-                    throw error;
+                    // Do not re-throw here: this callback runs via setTimeout with no caller to propagate to.
                 }
             }
         }, 5000); // Initial sync after 5 seconds
