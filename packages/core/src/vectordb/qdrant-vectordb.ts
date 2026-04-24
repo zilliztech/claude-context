@@ -18,6 +18,56 @@ export class QdrantVectorDatabase implements VectorDatabase {
     private config: QdrantConfig;
     private client: QdrantClient;
 
+    /**
+     * Tokenize text into words for BM25 sparse vector generation.
+     * Simple but effective: lowercase, split on non-alphanumeric, remove short tokens.
+     */
+    private tokenize(text: string): string[] {
+        return text
+            .toLowerCase()
+            .split(/[^a-z0-9_]+/)
+            .filter((t) => t.length > 1);
+    }
+
+    /**
+     * Simple hash function to map tokens to sparse vector indices.
+     * Uses FNV-1a for fast, low-collision hashing.
+     */
+    private hashToken(token: string): number {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < token.length; i++) {
+            hash ^= token.charCodeAt(i);
+            hash = (hash * 0x01000193) >>> 0;
+        }
+        // Keep indices in reasonable range (0 to 2^30)
+        return hash & 0x3fffffff;
+    }
+
+    /**
+     * Compute TF-based sparse vector from text for BM25-like matching.
+     * Uses term frequency with sublinear scaling: 1 + log(tf).
+     */
+    private computeSparseVector(text: string): { indices: number[]; values: number[] } {
+        const tokens = this.tokenize(text);
+        const tf = new Map<number, number>();
+
+        for (const token of tokens) {
+            const idx = this.hashToken(token);
+            tf.set(idx, (tf.get(idx) || 0) + 1);
+        }
+
+        const indices: number[] = [];
+        const values: number[] = [];
+
+        for (const [idx, count] of tf.entries()) {
+            indices.push(idx);
+            // Sublinear TF scaling: 1 + log(tf) to dampen high-frequency terms
+            values.push(1 + Math.log(count));
+        }
+
+        return { indices, values };
+    }
+
     constructor(config: QdrantConfig) {
         this.config = config;
         const url = config.url || 'http://localhost:6333';
@@ -158,20 +208,24 @@ export class QdrantVectorDatabase implements VectorDatabase {
     async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
         if (documents.length === 0) return;
 
-        const points = documents.map((doc) => ({
-            id: this.toUUID(doc.id),
-            vector: {
-                dense: doc.vector,
-            },
-            payload: {
-                content: doc.content,
-                relativePath: doc.relativePath,
-                startLine: doc.startLine,
-                endLine: doc.endLine,
-                fileExtension: doc.fileExtension,
-                ...doc.metadata,
-            },
-        }));
+        const points = documents.map((doc) => {
+            const sparse = this.computeSparseVector(doc.content);
+            return {
+                id: this.toUUID(doc.id),
+                vector: {
+                    dense: doc.vector,
+                    sparse: sparse,
+                },
+                payload: {
+                    content: doc.content,
+                    relativePath: doc.relativePath,
+                    startLine: doc.startLine,
+                    endLine: doc.endLine,
+                    fileExtension: doc.fileExtension,
+                    ...doc.metadata,
+                },
+            };
+        });
 
         await this.client.upsert(collectionName, {
             wait: true,
@@ -201,39 +255,63 @@ export class QdrantVectorDatabase implements VectorDatabase {
         searchRequests: HybridSearchRequest[],
         options?: HybridSearchOptions
     ): Promise<HybridSearchResult[]> {
-        // For hybrid search, use the dense vector request
-        // Qdrant's fusion-based query API requires prefetch
         const limit = options?.limit || 10;
         const filter = options?.filterExpr ? this.parseFilterExpr(options.filterExpr) : undefined;
 
-        // Find the dense vector request
+        // Find dense vector and text query from search requests
         const denseRequest = searchRequests.find((r) => r.anns_field === 'vector');
+        const sparseRequest = searchRequests.find((r) => r.anns_field === 'sparse_vector');
+
         if (!denseRequest || !Array.isArray(denseRequest.data)) {
-            // Fallback: use first request with array data
             const fallback = searchRequests.find((r) => Array.isArray(r.data));
-            if (!fallback) {
-                return [];
-            }
-            const results = await this.search(collectionName, fallback.data as number[], {
+            if (!fallback) return [];
+            return this.search(collectionName, fallback.data as number[], {
                 topK: limit,
                 ...(options?.filterExpr && { filterExpr: options.filterExpr }),
             });
-            return results;
         }
 
-        const results = await this.client.search(collectionName, {
-            vector: {
-                name: 'dense',
-                vector: denseRequest.data as number[],
-            },
+        // Build sparse query vector from text if available
+        const queryText = sparseRequest && typeof sparseRequest.data === 'string'
+            ? sparseRequest.data
+            : null;
+
+        if (!queryText) {
+            // No text for sparse search — fall back to dense-only
+            const results = await this.client.search(collectionName, {
+                vector: { name: 'dense', vector: denseRequest.data as number[] },
+                limit,
+                with_payload: true,
+                ...(filter && { filter }),
+            });
+            return results.map((r) => ({ document: this.pointToDocument(r), score: r.score }));
+        }
+
+        // Compute sparse vector from query text for BM25-like matching
+        const sparseVector = this.computeSparseVector(queryText);
+
+        // Hybrid search with RRF fusion: prefetch dense + sparse, fuse results
+        const results = await this.client.query(collectionName, {
+            prefetch: [
+                {
+                    query: { name: 'dense', vector: denseRequest.data as number[] },
+                    limit: limit * 3,
+                    ...(filter && { filter }),
+                },
+                {
+                    query: { name: 'sparse', vector: sparseVector },
+                    limit: limit * 3,
+                    ...(filter && { filter }),
+                },
+            ],
+            query: { fusion: 'rrf' } as any,
             limit,
             with_payload: true,
-            ...(filter && { filter }),
         });
 
-        return results.map((result) => ({
-            document: this.pointToDocument(result),
-            score: result.score,
+        return results.points.map((point) => ({
+            document: this.pointToDocument(point),
+            score: point.score || 0,
         }));
     }
 
