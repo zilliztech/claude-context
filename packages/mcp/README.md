@@ -159,6 +159,9 @@ Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configurati
 
 ```bash
 MILVUS_TOKEN=your-zilliz-cloud-api-key
+
+# Optional: increase timeout for Milvus collection-limit pre-check on slow clusters (default: 15000)
+MILVUS_COLLECTION_LIMIT_CHECK_TIMEOUT_MS=30000
 ```
 
 #### Embedding Batch Size
