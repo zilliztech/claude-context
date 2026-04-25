@@ -583,9 +583,10 @@ export class Context {
                 if (existing.relativePath !== result.relativePath) return false;
                 const overlapStart = Math.max(existing.startLine, result.startLine);
                 const overlapEnd = Math.min(existing.endLine, result.endLine);
-                if (overlapStart >= overlapEnd) return false;
-                const overlapSize = overlapEnd - overlapStart;
-                const resultSize = result.endLine - result.startLine;
+                if (overlapStart > overlapEnd) return false;
+                // Line ranges are inclusive (endLine = startLine + N - 1).
+                const overlapSize = overlapEnd - overlapStart + 1;
+                const resultSize = result.endLine - result.startLine + 1;
                 return resultSize > 0 && overlapSize / resultSize > 0.5;
             });
             if (!overlaps) {
