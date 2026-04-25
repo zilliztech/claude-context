@@ -123,7 +123,12 @@ def clone_repo(repo, root_dir, token):
     repo_dir = Path(root_dir, f"repo__{repo.replace('/', '__')}")
 
     if not repo_dir.exists():
-        repo_url = f"https://{token}@github.com/{repo}.git"
+        repo_url = f"https://github.com/{repo}.git"
+        clone_kwargs = {}
+        if token:
+            clone_kwargs["multi_options"] = [
+                f"-c http.extraheader=AUTHORIZATION: bearer {token}"
+            ]
         logger.info(f"Cloning {repo} {os.getpid()}")
-        Repo.clone_from(repo_url, repo_dir)
+        Repo.clone_from(repo_url, repo_dir, **clone_kwargs)
     return repo_dir
