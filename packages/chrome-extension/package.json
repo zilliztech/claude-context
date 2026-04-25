@@ -10,7 +10,10 @@
         "lint": "eslint src --ext .ts,.tsx",
         "lint:fix": "eslint src --ext .ts,.tsx --fix",
         "typecheck": "tsc --noEmit",
-        "build:milvus": "echo 'build:milvus script not implemented'"
+        "build:milvus": "echo 'build:milvus script not implemented'",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
         "@zilliz/claude-context-core": "workspace:*"
@@ -19,6 +22,9 @@
         "@zilliz/milvus2-sdk-node": false
     },
     "devDependencies": {
+        "@vitest/coverage-v8": "^2.0.0",
+        "happy-dom": "^14.0.0",
+        "vitest": "^2.0.0",
         "@types/chrome": "^0.0.246",
         "@types/node": "^20.0.0",
         "assert": "^2.1.0",

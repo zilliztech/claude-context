@@ -4,7 +4,7 @@
   "version": "1.0",
   "description": "Index GitHub repository code and perform vector search.",
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "action": {
     "default_icon": {
