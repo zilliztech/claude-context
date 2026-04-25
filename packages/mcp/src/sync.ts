@@ -8,6 +8,8 @@ export class SyncManager {
     private context: Context;
     private snapshotManager: SnapshotManager;
     private isSyncing: boolean = false;
+    private triggerWatcher: fs.FSWatcher | null = null;
+    private triggerDebounceTimer: NodeJS.Timeout | null = null;
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
@@ -152,27 +154,72 @@ export class SyncManager {
      * after Write/Edit operations to trigger immediate re-indexing.
      */
     private setupTriggerWatcher(): void {
+        // Guard against double-initialization (hot reload, repeated test setup).
+        if (this.triggerWatcher) {
+            console.log('[SYNC-DEBUG] Trigger watcher already active, skipping re-init');
+            return;
+        }
+
         const contextDir = path.join(os.homedir(), '.context');
         const triggerFile = '.sync-trigger';
-        let debounceTimer: NodeJS.Timeout | null = null;
+        const triggerPath = path.join(contextDir, triggerFile);
 
         try {
             // Ensure context dir exists before watching (snapshot manager
             // also creates it, but be defensive in case watcher starts first).
             fs.mkdirSync(contextDir, { recursive: true });
 
-            fs.watch(contextDir, (event, filename) => {
-                if (filename === triggerFile) {
-                    if (debounceTimer) clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => {
-                        console.log('[SYNC] 🔔 Trigger file detected, starting instant re-index...');
-                        this.handleSyncIndex();
-                    }, 2000);
-                }
+            // Pass encoding so `filename` is consistently a string across platforms
+            // (default can be Buffer on some Node builds).
+            const watcher = fs.watch(contextDir, { encoding: 'utf8' }, (_event, filename) => {
+                // With encoding: 'utf8', filename is `string | null`. null happens on
+                // some platforms when the underlying event lacks a name; treat as no-op.
+                if (typeof filename !== 'string' || filename !== triggerFile) return;
+
+                if (this.triggerDebounceTimer) clearTimeout(this.triggerDebounceTimer);
+                this.triggerDebounceTimer = setTimeout(() => {
+                    console.log('[SYNC] 🔔 Trigger file detected, starting instant re-index...');
+                    // Fire-and-forget with explicit catch so an unhandled rejection
+                    // can't crash the process from inside the setTimeout callback.
+                    void this.handleSyncIndex().catch((error) => {
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        if (errorMessage.includes('Failed to query collection')) {
+                            console.log('[SYNC-DEBUG] Collection not yet established during trigger sync; will retry on next cycle.');
+                        } else {
+                            console.error('[SYNC-DEBUG] Triggered sync failed with unexpected error:', error);
+                        }
+                    });
+                }, 2000);
             });
-            console.log(`[SYNC-DEBUG] Trigger watcher active on ${contextDir}/${triggerFile}`);
+
+            // fs.watch can emit `error` asynchronously (e.g. dir deleted, fs unmounted).
+            // Without a listener this would crash the process.
+            watcher.on('error', (err) => {
+                console.warn('[SYNC-DEBUG] Trigger watcher error:', err instanceof Error ? err.message : String(err));
+                this.stopTriggerWatcher();
+            });
+
+            this.triggerWatcher = watcher;
+            console.log(`[SYNC-DEBUG] Trigger watcher active on ${triggerPath}`);
         } catch (error) {
-            console.warn(`[SYNC-DEBUG] Could not set up trigger watcher: ${error}`);
+            if (error instanceof Error) {
+                console.warn('[SYNC-DEBUG] Could not set up trigger watcher:', error.message);
+                if (error.stack) console.warn(error.stack);
+            } else {
+                console.warn('[SYNC-DEBUG] Could not set up trigger watcher:', String(error));
+            }
         }
     }
-} 
+
+    /** Stop the watcher (idempotent). Useful for tests or graceful shutdown. */
+    public stopTriggerWatcher(): void {
+        if (this.triggerDebounceTimer) {
+            clearTimeout(this.triggerDebounceTimer);
+            this.triggerDebounceTimer = null;
+        }
+        if (this.triggerWatcher) {
+            try { this.triggerWatcher.close(); } catch { /* already closed */ }
+            this.triggerWatcher = null;
+        }
+    }
+}
