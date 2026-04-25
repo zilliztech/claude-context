@@ -26,7 +26,7 @@ import { FileSynchronizer } from './sync/synchronizer';
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
     '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
-    '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
+    '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm', '.dart',
     // Text and markup files
     '.md', '.markdown', '.ipynb',
     // '.txt',  '.json', '.yaml', '.yml', '.xml', '.html', '.htm',
