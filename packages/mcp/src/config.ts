@@ -226,6 +226,12 @@ Environment Variables:
                           The per-codebase pathHash is preserved so multiple
                           codebases stay distinct under the same override.
 
+  Advanced Configuration:
+  EMBEDDING_BATCH_SIZE    Batch size for processing (default: 100)
+  CHUNK_LIMIT             Maximum number of chunks to process during indexing (default: 450000)
+  HYBRID_MODE             Enable hybrid search (default: true)
+  SPLITTER_TYPE           Code splitter type: ast, langchain (default: ast)
+
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
