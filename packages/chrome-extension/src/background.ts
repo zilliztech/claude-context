@@ -1,9 +1,11 @@
-// Chrome Extension Background Script with Milvus Integration
-// This replaces the IndexedDB-based storage with Milvus RESTful API
+// Chrome Extension Background Script with Vector Database Integration
+// Supports both Milvus and Qdrant — chosen via VECTORDB_PROVIDER setting.
 
 import { ChromeMilvusAdapter, CodeChunk } from './milvus/chromeMilvusAdapter';
 import { MilvusConfigManager } from './config/milvusConfig';
 import { IndexedRepoManager, IndexedRepository } from './storage/indexedRepoManager';
+import { createVectorDBAdapter, getVectorDBProvider } from './vectordb/adapterFactory';
+import type { VectorDBAdapter } from './vectordb/types';
 
 export { };
 
@@ -85,41 +87,51 @@ class EmbeddingModel {
     }
 }
 class MilvusVectorDB {
-    private adapter: ChromeMilvusAdapter;
+    // Kept name for backward compatibility with the rest of background.ts;
+    // the adapter underneath may be Milvus or Qdrant depending on settings.
+    private adapter: VectorDBAdapter | null = null;
     public readonly repoCollectionName: string;
 
     constructor(repoId: string) {
         this.repoCollectionName = `chrome_repo_${repoId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        this.adapter = new ChromeMilvusAdapter(this.repoCollectionName);
     }
 
     async initialize(): Promise<void> {
         try {
+            this.adapter = await createVectorDBAdapter(this.repoCollectionName);
             await this.adapter.initialize();
             const exists = await this.adapter.collectionExists();
             if (!exists) {
                 await this.adapter.createCollection(EMBEDDING_DIM);
             }
         } catch (error) {
-            console.error('Failed to initialize Milvus:', error);
+            const provider = await getVectorDBProvider();
+            console.error(`Failed to initialize ${provider}:`, error);
             throw error;
         }
+    }
+
+    private getAdapter(): VectorDBAdapter {
+        if (!this.adapter) {
+            throw new Error('Vector DB adapter not initialized; call initialize() first');
+        }
+        return this.adapter;
     }
 
     async addChunks(chunks: CodeChunk[]): Promise<void> {
         if (chunks.length === 0) return;
 
         try {
-            await this.adapter.insertChunks(chunks);
+            await this.getAdapter().insertChunks(chunks);
         } catch (error) {
-            console.error('Failed to add chunks to Milvus:', error);
+            console.error('Failed to add chunks to vector DB:', error);
             throw error;
         }
     }
 
     async searchSimilar(queryVector: number[], limit: number = 20): Promise<CodeChunk[]> {
         try {
-            const results = await this.adapter.searchSimilar(queryVector, limit, 0.3);
+            const results = await this.getAdapter().searchSimilar(queryVector, limit, 0.3);
 
             return results.map(result => ({
                 id: result.id,
@@ -140,21 +152,21 @@ class MilvusVectorDB {
 
     async clear(): Promise<void> {
         try {
-            await this.adapter.clearCollection();
+            await this.getAdapter().clearCollection();
             // Recreate the collection
-            await this.adapter.createCollection(EMBEDDING_DIM);
+            await this.getAdapter().createCollection(EMBEDDING_DIM);
         } catch (error) {
-            console.error('Failed to clear Milvus collection:', error);
+            console.error('Failed to clear vector DB collection:', error);
             throw error;
         }
     }
 
     async getStats(): Promise<{ totalChunks: number } | null> {
         try {
-            const stats = await this.adapter.getCollectionStats();
+            const stats = await this.getAdapter().getCollectionStats();
             return stats ? { totalChunks: stats.totalEntities } : null;
         } catch (error) {
-            console.error('Failed to get Milvus stats:', error);
+            console.error('Failed to get vector DB stats:', error);
             return null;
         }
     }
@@ -402,15 +414,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleTestMilvusConnection(sendResponse: Function) {
     try {
-        console.log('Testing Milvus connection...');
+        const provider = await getVectorDBProvider();
+        console.log(`Testing ${provider} connection...`);
 
-        const adapter = new ChromeMilvusAdapter('test_connection');
+        const adapter = await createVectorDBAdapter('test_connection');
         const connected = await adapter.testConnection();
 
-        console.log('Milvus connection test completed successfully');
+        console.log(`${provider} connection test completed successfully`);
         sendResponse({ success: true, connected: true });
     } catch (error) {
-        console.error('Milvus connection test failed:', error);
+        console.error('Vector DB connection test failed:', error);
 
         let errorMessage = 'Unknown error';
         if (error instanceof Error) {

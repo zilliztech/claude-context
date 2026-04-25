@@ -155,6 +155,17 @@
             </div>
 
             <div class="form-group">
+                <h3 class="h4 mb-2">Vector Database</h3>
+                <label for="vectordb-provider" class="d-block mb-1">Provider</label>
+                <select id="vectordb-provider" class="form-control">
+                    <option value="milvus">Milvus</option>
+                    <option value="qdrant">Qdrant</option>
+                </select>
+                <p class="note">Pick which vector DB to use. Milvus and Qdrant are mutually exclusive — only the selected
+                    provider's settings are read at runtime.</p>
+            </div>
+
+            <fieldset id="milvus-fields" class="form-group">
                 <h3 class="h4 mb-2">Milvus Configuration</h3>
                 <p class="note mb-3">Configure your Milvus vector database connection. Leave blank to use local storage
                     fallback.</p>
@@ -164,20 +175,32 @@
                     placeholder="http://localhost:19530">
                 <p class="note">The address of your Milvus server (e.g., http://localhost:19530 or
                     https://your-cloud-instance.com)</p>
-            </div>
 
-            <div class="form-group">
-                <label for="milvus-token" class="d-block mb-1">Milvus Token (Optional)</label>
+                <label for="milvus-token" class="d-block mb-1 mt-3">Milvus Token (Optional)</label>
                 <input type="password" id="milvus-token" class="form-control width-full"
                     placeholder="Your Milvus authentication token">
                 <p class="note">Authentication token for Milvus (required for cloud instances)</p>
-            </div>
 
-            <div class="form-group">
-                <label for="milvus-database" class="d-block mb-1">Milvus Database</label>
+                <label for="milvus-database" class="d-block mb-1 mt-3">Milvus Database</label>
                 <input type="text" id="milvus-database" class="form-control" value="default" placeholder="default">
                 <p class="note">Database name in Milvus (default: "default")</p>
-            </div>
+            </fieldset>
+
+            <fieldset id="qdrant-fields" class="form-group" style="display:none">
+                <h3 class="h4 mb-2">Qdrant Configuration</h3>
+                <p class="note mb-3">Configure your Qdrant vector database connection.</p>
+
+                <label for="qdrant-url" class="d-block mb-1">Qdrant URL</label>
+                <input type="url" id="qdrant-url" class="form-control width-full"
+                    placeholder="http://localhost:6333">
+                <p class="note">Full URL of your Qdrant server (e.g., http://localhost:6333 or
+                    https://your-cluster.qdrant.io).</p>
+
+                <label for="qdrant-api-key" class="d-block mb-1 mt-3">Qdrant API Key (Optional)</label>
+                <input type="password" id="qdrant-api-key" class="form-control width-full"
+                    placeholder="Your Qdrant API key">
+                <p class="note">Required for Qdrant Cloud and any deployment with API key auth enabled.</p>
+            </fieldset>
 
 
 

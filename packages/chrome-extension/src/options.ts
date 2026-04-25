@@ -15,35 +15,54 @@ function addDebugInfo(message: string) {
 function saveOptions() {
     const tokenInput = document.getElementById('github-token') as HTMLInputElement;
     const openaiInput = document.getElementById('openai-token') as HTMLInputElement;
-    
+
+    // Vector DB provider selector
+    const providerSelect = document.getElementById('vectordb-provider') as HTMLSelectElement | null;
+    const vectordbProvider = (providerSelect?.value === 'qdrant' ? 'qdrant' : 'milvus');
+
     // Milvus configuration inputs
     const milvusAddressInput = document.getElementById('milvus-address') as HTMLInputElement;
     const milvusTokenInput = document.getElementById('milvus-token') as HTMLInputElement;
     const milvusDatabaseInput = document.getElementById('milvus-database') as HTMLInputElement;
-    
+
+    // Qdrant configuration inputs
+    const qdrantUrlInput = document.getElementById('qdrant-url') as HTMLInputElement | null;
+    const qdrantApiKeyInput = document.getElementById('qdrant-api-key') as HTMLInputElement | null;
+
     if (tokenInput) {
         const token = tokenInput.value;
         const openaiToken = openaiInput.value;
-        
+
         // Milvus configuration
         const milvusAddress = milvusAddressInput.value;
         const milvusToken = milvusTokenInput.value;
         const milvusDatabase = milvusDatabaseInput.value || 'default';
-        
-        // Validate Milvus address format if provided
-        if (milvusAddress && !isValidUrl(milvusAddress)) {
+
+        // Qdrant configuration
+        const qdrantUrl = qdrantUrlInput?.value ?? '';
+        const qdrantApiKey = qdrantApiKeyInput?.value ?? '';
+
+        // Validate the address for the active provider
+        if (vectordbProvider === 'milvus' && milvusAddress && !isValidUrl(milvusAddress)) {
             alert('Please enter a valid Milvus server address (e.g., http://localhost:19530)');
             return;
         }
-        
-        addDebugInfo(`Saving settings: githubToken=${token ? '***' : 'empty'}, openaiToken=${openaiToken ? '***' : 'empty'}, milvusAddress=${milvusAddress}`);
-        
+        if (vectordbProvider === 'qdrant' && qdrantUrl && !isValidUrl(qdrantUrl)) {
+            alert('Please enter a valid Qdrant URL (e.g., http://localhost:6333)');
+            return;
+        }
+
+        addDebugInfo(`Saving settings: provider=${vectordbProvider}, githubToken=${token ? '***' : 'empty'}, openaiToken=${openaiToken ? '***' : 'empty'}`);
+
         chrome.storage.sync.set({
             githubToken: token,
             openaiToken: openaiToken,
+            vectordbProvider: vectordbProvider,
             milvusAddress: milvusAddress,
             milvusToken: milvusToken,
-            milvusDatabase: milvusDatabase
+            milvusDatabase: milvusDatabase,
+            qdrantUrl: qdrantUrl,
+            qdrantApiKey: qdrantApiKey
         }, () => {
             if (chrome.runtime.lastError) {
                 const errorMsg = `Error saving settings: ${chrome.runtime.lastError.message}`;
@@ -92,33 +111,58 @@ function restoreOptions() {
     chrome.storage.sync.get({
         githubToken: '',
         openaiToken: '',
+        vectordbProvider: 'milvus',
         milvusAddress: '',
         milvusToken: '',
-        milvusDatabase: 'default'
+        milvusDatabase: 'default',
+        qdrantUrl: '',
+        qdrantApiKey: ''
     }, (items) => {
         if (chrome.runtime.lastError) {
             addDebugInfo(`Error loading settings: ${chrome.runtime.lastError.message}`);
             return;
         }
-        
-        addDebugInfo(`Restoring options: githubToken=${items.githubToken ? '***' : 'empty'}, openaiToken=${items.openaiToken ? '***' : 'empty'}, milvusAddress=${items.milvusAddress || 'empty'}`);
-        
+
+        addDebugInfo(`Restoring options: provider=${items.vectordbProvider}, githubToken=${items.githubToken ? '***' : 'empty'}, openaiToken=${items.openaiToken ? '***' : 'empty'}`);
+
         // Set basic configuration
         const githubTokenInput = document.getElementById('github-token') as HTMLInputElement;
         const openaiTokenInput = document.getElementById('openai-token') as HTMLInputElement;
-        
+
         // Set Milvus configuration
         const milvusAddressInput = document.getElementById('milvus-address') as HTMLInputElement;
         const milvusTokenInput = document.getElementById('milvus-token') as HTMLInputElement;
         const milvusDatabaseInput = document.getElementById('milvus-database') as HTMLInputElement;
-        
+
+        // Set Qdrant configuration
+        const qdrantUrlInput = document.getElementById('qdrant-url') as HTMLInputElement | null;
+        const qdrantApiKeyInput = document.getElementById('qdrant-api-key') as HTMLInputElement | null;
+
+        // Provider selector + visibility toggle
+        const providerSelect = document.getElementById('vectordb-provider') as HTMLSelectElement | null;
+        if (providerSelect) {
+            providerSelect.value = items.vectordbProvider === 'qdrant' ? 'qdrant' : 'milvus';
+            applyProviderVisibility(providerSelect.value);
+            providerSelect.addEventListener('change', () => applyProviderVisibility(providerSelect.value));
+        }
+
         if (githubTokenInput) githubTokenInput.value = items.githubToken || '';
         if (openaiTokenInput) openaiTokenInput.value = items.openaiToken || '';
-        
+
         if (milvusAddressInput) milvusAddressInput.value = items.milvusAddress || '';
         if (milvusTokenInput) milvusTokenInput.value = items.milvusToken || '';
         if (milvusDatabaseInput) milvusDatabaseInput.value = items.milvusDatabase || 'default';
+
+        if (qdrantUrlInput) qdrantUrlInput.value = items.qdrantUrl || '';
+        if (qdrantApiKeyInput) qdrantApiKeyInput.value = items.qdrantApiKey || '';
     });
+}
+
+function applyProviderVisibility(provider: string) {
+    const milvusFields = document.getElementById('milvus-fields');
+    const qdrantFields = document.getElementById('qdrant-fields');
+    if (milvusFields) milvusFields.style.display = provider === 'qdrant' ? 'none' : '';
+    if (qdrantFields) qdrantFields.style.display = provider === 'qdrant' ? '' : 'none';
 }
 
 function testMilvusConnection() {
