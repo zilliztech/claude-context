@@ -20,6 +20,7 @@ export interface ContextMcpConfig {
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    zillizProjectName?: string; // Optional, defaults to 'Default Project'
     collectionNameOverride?: string;
 }
 
@@ -140,6 +141,7 @@ export function createMcpConfig(): ContextMcpConfig {
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
+        zillizProjectName: envManager.get('ZILLIZ_PROJECT_NAME'), // Optional, defaults to 'Default Project'
         collectionNameOverride: envManager.get('CODE_CHUNKS_COLLECTION_NAME_OVERRIDE')
     };
 
@@ -154,6 +156,9 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
     console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    if (config.zillizProjectName) {
+        console.log(`[MCP]   Zilliz Project Name: ${config.zillizProjectName}`);
+    }
     if (config.collectionNameOverride) {
         console.log(`[MCP]   Collection Name Override: ✅ Configured`);
     }
@@ -219,6 +224,7 @@ Environment Variables:
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  ZILLIZ_PROJECT_NAME     Zilliz Cloud project name (optional, defaults to 'Default Project')
   CODE_CHUNKS_COLLECTION_NAME_OVERRIDE
                           Optional readable prefix for collection names.
                           Uses code_chunks_<override>_<pathHash> (or hybrid_...)
@@ -247,5 +253,8 @@ Examples:
 
   # Start MCP server with a human-readable collection name override
   OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with a custom Zilliz Cloud project name
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token ZILLIZ_PROJECT_NAME="My Custom Project" npx @zilliz/claude-context-mcp@latest
         `);
 }
