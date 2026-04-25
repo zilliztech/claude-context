@@ -144,15 +144,58 @@
 
 
             <div class="form-group">
+                <h3 class="h4 mb-2">Embedding Provider</h3>
+                <label for="embedding-provider" class="d-block mb-1">Provider</label>
+                <select id="embedding-provider" class="form-control">
+                    <option value="OpenAI">OpenAI</option>
+                    <option value="VoyageAI">VoyageAI</option>
+                    <option value="Gemini">Google Gemini</option>
+                    <option value="OpenRouter">OpenRouter</option>
+                </select>
+
+                <label for="embedding-model" class="d-block mb-1 mt-3">Model (optional)</label>
+                <input type="text" id="embedding-model" class="form-control width-full"
+                    placeholder="Leave blank for provider default">
+                <p class="note">e.g. text-embedding-3-small (OpenAI), voyage-code-3 (VoyageAI),
+                    gemini-embedding-001 (Gemini), openai/text-embedding-3-small (OpenRouter).</p>
+            </div>
+
+            <fieldset id="openai-fields" class="form-group">
                 <label for="openai-token" class="d-block mb-1">OpenAI API Key</label>
                 <input type="password" id="openai-token" class="form-control width-full"
                     placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
                 <p class="note">
-                    This key is used to generate embeddings via the OpenAI Embedding API.
-                    <br>You can create it in your <a href="https://platform.openai.com/account/api-keys"
+                    Create one in your <a href="https://platform.openai.com/account/api-keys"
                         target="_blank">OpenAI dashboard</a>.
                 </p>
-            </div>
+            </fieldset>
+
+            <fieldset id="voyageai-fields" class="form-group" style="display:none">
+                <label for="voyageai-token" class="d-block mb-1">VoyageAI API Key</label>
+                <input type="password" id="voyageai-token" class="form-control width-full"
+                    placeholder="pa-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                <label for="voyageai-base-url" class="d-block mb-1 mt-3">Base URL (optional)</label>
+                <input type="url" id="voyageai-base-url" class="form-control width-full"
+                    placeholder="https://api.voyageai.com/v1 (or https://ai.mongodb.com/v1 for MongoDB Atlas)">
+                <p class="note">Leave blank for the default VoyageAI endpoint.
+                    Set <code>https://ai.mongodb.com/v1</code> when using a MongoDB Atlas VoyageAI key.</p>
+            </fieldset>
+
+            <fieldset id="gemini-fields" class="form-group" style="display:none">
+                <label for="gemini-token" class="d-block mb-1">Google Gemini API Key</label>
+                <input type="password" id="gemini-token" class="form-control width-full"
+                    placeholder="AIza...">
+                <p class="note">Create one in <a href="https://aistudio.google.com/apikey"
+                        target="_blank">Google AI Studio</a>.</p>
+            </fieldset>
+
+            <fieldset id="openrouter-fields" class="form-group" style="display:none">
+                <label for="openrouter-token" class="d-block mb-1">OpenRouter API Key</label>
+                <input type="password" id="openrouter-token" class="form-control width-full"
+                    placeholder="sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                <p class="note">OpenRouter routes to OpenAI-compatible models from many providers.
+                    Use a namespaced model id like <code>openai/text-embedding-3-small</code>.</p>
+            </fieldset>
 
             <div class="form-group">
                 <h3 class="h4 mb-2">Milvus Configuration</h3>

@@ -4,6 +4,8 @@
 import { ChromeMilvusAdapter, CodeChunk } from './milvus/chromeMilvusAdapter';
 import { MilvusConfigManager } from './config/milvusConfig';
 import { IndexedRepoManager, IndexedRepository } from './storage/indexedRepoManager';
+import { createEmbeddingProvider, getConfiguredProviderName } from './embedding/factory';
+import type { EmbeddingProvider } from './embedding/types';
 
 export { };
 
@@ -29,47 +31,36 @@ function cosSim(a: number[], b: number[]): number {
     return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+/**
+ * Thin wrapper around the configured EmbeddingProvider.
+ * Caches the provider instance so we don't re-read settings on every call.
+ * Settings changes from the options page should reset the cache (handled by
+ * the chrome.storage.onChanged listener at the bottom of this file).
+ */
 class EmbeddingModel {
-    private static config: { apiKey: string; model: string } | null = null;
+    private static provider: EmbeddingProvider | null = null;
 
-    private static async getConfig(): Promise<{ apiKey: string; model: string }> {
-        if (!this.config) {
-            const config = await MilvusConfigManager.getOpenAIConfig();
-            if (!config) {
-                throw new Error('OpenAI API key is not configured.');
-            }
-            this.config = config;
+    static async getProvider(): Promise<EmbeddingProvider> {
+        if (!this.provider) {
+            this.provider = await createEmbeddingProvider();
+            const name = await getConfiguredProviderName();
+            console.log(`🧠 Embedding provider initialized: ${name} (dim=${this.provider.dimension})`);
         }
-        return this.config;
+        return this.provider;
+    }
+
+    static reset(): void {
+        this.provider = null;
     }
 
     static async embedBatch(texts: string[]): Promise<number[][]> {
-        const config = await this.getConfig();
-
-        const response = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`,
-            },
-            body: JSON.stringify({
-                model: config.model,
-                input: texts,
-            }),
-        });
-
-        if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`OpenAI API error: ${response.status} - ${text}`);
-        }
-
-        const json = await response.json();
-        return json.data.map((d: any) => d.embedding as number[]);
+        const provider = await this.getProvider();
+        return provider.embedBatch(texts);
     }
 
     static async embedSingle(text: string): Promise<number[]> {
-        const results = await this.embedBatch([text]);
-        return results[0];
+        const provider = await this.getProvider();
+        return provider.embedSingle(text);
     }
 
     static async getInstance(_progress_callback: Function | undefined = undefined): Promise<(input: string | string[], options?: any) => Promise<{ data: number[] }>> {
@@ -83,6 +74,17 @@ class EmbeddingModel {
             }
         };
     }
+}
+
+// Reset cached provider when the user changes embedding settings.
+if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'sync') return;
+        const watched = ['embeddingProvider', 'embeddingModel', 'openaiToken', 'voyageaiToken', 'voyageaiBaseUrl', 'geminiToken', 'openrouterToken'];
+        if (watched.some((k) => k in changes)) {
+            EmbeddingModel.reset();
+        }
+    });
 }
 class MilvusVectorDB {
     private adapter: ChromeMilvusAdapter;

@@ -15,32 +15,53 @@ function addDebugInfo(message: string) {
 function saveOptions() {
     const tokenInput = document.getElementById('github-token') as HTMLInputElement;
     const openaiInput = document.getElementById('openai-token') as HTMLInputElement;
-    
+
+    // Embedding provider settings
+    const embeddingProviderSelect = document.getElementById('embedding-provider') as HTMLSelectElement | null;
+    const embeddingModelInput = document.getElementById('embedding-model') as HTMLInputElement | null;
+    const voyageaiTokenInput = document.getElementById('voyageai-token') as HTMLInputElement | null;
+    const voyageaiBaseUrlInput = document.getElementById('voyageai-base-url') as HTMLInputElement | null;
+    const geminiTokenInput = document.getElementById('gemini-token') as HTMLInputElement | null;
+    const openrouterTokenInput = document.getElementById('openrouter-token') as HTMLInputElement | null;
+
     // Milvus configuration inputs
     const milvusAddressInput = document.getElementById('milvus-address') as HTMLInputElement;
     const milvusTokenInput = document.getElementById('milvus-token') as HTMLInputElement;
     const milvusDatabaseInput = document.getElementById('milvus-database') as HTMLInputElement;
-    
+
     if (tokenInput) {
         const token = tokenInput.value;
         const openaiToken = openaiInput.value;
-        
+
+        const embeddingProvider = embeddingProviderSelect?.value || 'OpenAI';
+        const embeddingModel = embeddingModelInput?.value ?? '';
+        const voyageaiToken = voyageaiTokenInput?.value ?? '';
+        const voyageaiBaseUrl = voyageaiBaseUrlInput?.value ?? '';
+        const geminiToken = geminiTokenInput?.value ?? '';
+        const openrouterToken = openrouterTokenInput?.value ?? '';
+
         // Milvus configuration
         const milvusAddress = milvusAddressInput.value;
         const milvusToken = milvusTokenInput.value;
         const milvusDatabase = milvusDatabaseInput.value || 'default';
-        
+
         // Validate Milvus address format if provided
         if (milvusAddress && !isValidUrl(milvusAddress)) {
             alert('Please enter a valid Milvus server address (e.g., http://localhost:19530)');
             return;
         }
-        
-        addDebugInfo(`Saving settings: githubToken=${token ? '***' : 'empty'}, openaiToken=${openaiToken ? '***' : 'empty'}, milvusAddress=${milvusAddress}`);
-        
+
+        addDebugInfo(`Saving settings: provider=${embeddingProvider}, githubToken=${token ? '***' : 'empty'}, milvusAddress=${milvusAddress}`);
+
         chrome.storage.sync.set({
             githubToken: token,
             openaiToken: openaiToken,
+            embeddingProvider: embeddingProvider,
+            embeddingModel: embeddingModel,
+            voyageaiToken: voyageaiToken,
+            voyageaiBaseUrl: voyageaiBaseUrl,
+            geminiToken: geminiToken,
+            openrouterToken: openrouterToken,
             milvusAddress: milvusAddress,
             milvusToken: milvusToken,
             milvusDatabase: milvusDatabase
@@ -92,6 +113,12 @@ function restoreOptions() {
     chrome.storage.sync.get({
         githubToken: '',
         openaiToken: '',
+        embeddingProvider: 'OpenAI',
+        embeddingModel: '',
+        voyageaiToken: '',
+        voyageaiBaseUrl: '',
+        geminiToken: '',
+        openrouterToken: '',
         milvusAddress: '',
         milvusToken: '',
         milvusDatabase: 'default'
@@ -114,11 +141,45 @@ function restoreOptions() {
         
         if (githubTokenInput) githubTokenInput.value = items.githubToken || '';
         if (openaiTokenInput) openaiTokenInput.value = items.openaiToken || '';
-        
+
         if (milvusAddressInput) milvusAddressInput.value = items.milvusAddress || '';
         if (milvusTokenInput) milvusTokenInput.value = items.milvusToken || '';
         if (milvusDatabaseInput) milvusDatabaseInput.value = items.milvusDatabase || 'default';
+
+        // Embedding provider fields
+        const embeddingProviderSelect = document.getElementById('embedding-provider') as HTMLSelectElement | null;
+        const embeddingModelInput = document.getElementById('embedding-model') as HTMLInputElement | null;
+        const voyageaiTokenInput = document.getElementById('voyageai-token') as HTMLInputElement | null;
+        const voyageaiBaseUrlInput = document.getElementById('voyageai-base-url') as HTMLInputElement | null;
+        const geminiTokenInput = document.getElementById('gemini-token') as HTMLInputElement | null;
+        const openrouterTokenInput = document.getElementById('openrouter-token') as HTMLInputElement | null;
+
+        if (embeddingProviderSelect) {
+            embeddingProviderSelect.value = items.embeddingProvider || 'OpenAI';
+            applyEmbeddingProviderVisibility(embeddingProviderSelect.value);
+            embeddingProviderSelect.addEventListener('change', () =>
+                applyEmbeddingProviderVisibility(embeddingProviderSelect.value)
+            );
+        }
+        if (embeddingModelInput) embeddingModelInput.value = items.embeddingModel || '';
+        if (voyageaiTokenInput) voyageaiTokenInput.value = items.voyageaiToken || '';
+        if (voyageaiBaseUrlInput) voyageaiBaseUrlInput.value = items.voyageaiBaseUrl || '';
+        if (geminiTokenInput) geminiTokenInput.value = items.geminiToken || '';
+        if (openrouterTokenInput) openrouterTokenInput.value = items.openrouterToken || '';
     });
+}
+
+function applyEmbeddingProviderVisibility(provider: string) {
+    const map: Record<string, string> = {
+        OpenAI: 'openai-fields',
+        VoyageAI: 'voyageai-fields',
+        Gemini: 'gemini-fields',
+        OpenRouter: 'openrouter-fields',
+    };
+    for (const [key, id] of Object.entries(map)) {
+        const el = document.getElementById(id);
+        if (el) (el as HTMLElement).style.display = provider === key ? '' : 'none';
+    }
 }
 
 function testMilvusConnection() {
