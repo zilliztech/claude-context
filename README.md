@@ -1,6 +1,6 @@
 ![](assets/claude-context.png)
 
-> 🆕 **Looking for persistent memory for Claude Code?** Check out [memsearch Claude Code plugin](https://github.com/zilliztech/memsearch/tree/main/plugins/claude-code) — a markdown-first memory system that gives your AI agent long-term memory across sessions.
+> 🆕 **Looking for persistent memory for Claude Code?** Check out [memsearch Claude Code plugin](https://github.com/zilliztech/memsearch#for-claude-code-users) — a markdown-first memory system that gives your AI agent long-term memory across sessions.
 
 ### Your entire codebase as Claude's context
 
