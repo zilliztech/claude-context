@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { Context, FileSynchronizer } from "@zilliz/claude-context-core";
+import { Context, FileSynchronizer, envManager } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 
 export class SyncManager {
@@ -118,6 +118,13 @@ export class SyncManager {
     public startBackgroundSync(): void {
         console.log('[SYNC-DEBUG] startBackgroundSync() called');
 
+        // Set up the trigger file watcher FIRST, independent of polling. Polling may
+        // be gated off by other configuration (e.g. opt-in CLAUDE_CONTEXT_BACKGROUND_SYNC
+        // discussed in #285 / #314); the watcher is the on-demand counterpart and should
+        // remain available so external tools (Claude Code PostToolUse hooks, CI scripts)
+        // can still request a sync by touching ~/.context/.sync-trigger.
+        this.setupTriggerWatcher();
+
         // Execute initial sync immediately after a short delay to let server initialize
         console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
         setTimeout(async () => {
@@ -143,9 +150,23 @@ export class SyncManager {
         }, 5 * 60 * 1000); // every 5 minutes
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
+    }
 
-        // Set up trigger file watcher for instant re-index (e.g., from Claude Code hooks)
-        this.setupTriggerWatcher();
+    /**
+     * Read CLAUDE_CONTEXT_TRIGGER_WATCHER. Default ON — the watcher is cheap and only
+     * fires when an external process explicitly touches the trigger file. Users who want
+     * zero filesystem watching (e.g. read-only filesystems, sandboxed envs) can disable it.
+     */
+    private isTriggerWatcherEnabled(): boolean {
+        const v = (envManager.get('CLAUDE_CONTEXT_TRIGGER_WATCHER') ?? '').trim().toLowerCase();
+        if (!v) return true;
+        if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+        if (['0', 'false', 'no', 'off'].includes(v)) return false;
+        console.warn(
+            `[SYNC-DEBUG] Invalid CLAUDE_CONTEXT_TRIGGER_WATCHER value '${v}'. ` +
+            'Expected true/false. Trigger watcher will remain enabled.'
+        );
+        return true;
     }
 
     /**
@@ -154,6 +175,11 @@ export class SyncManager {
      * after Write/Edit operations to trigger immediate re-indexing.
      */
     private setupTriggerWatcher(): void {
+        if (!this.isTriggerWatcherEnabled()) {
+            console.log('[SYNC-DEBUG] Trigger watcher disabled via CLAUDE_CONTEXT_TRIGGER_WATCHER');
+            return;
+        }
+
         // Guard against double-initialization (hot reload, repeated test setup).
         if (this.triggerWatcher) {
             console.log('[SYNC-DEBUG] Trigger watcher already active, skipping re-init');
