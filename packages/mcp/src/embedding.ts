@@ -67,7 +67,7 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
             console.log(`[EMBEDDING] 🔧 Configuring Ollama with model: ${config.embeddingModel}, host: ${ollamaHost}`);
             const ollamaEmbedding = new OllamaEmbedding({
                 model: config.embeddingModel,
-                host: config.ollamaHost
+                host: ollamaHost
             });
             console.log(`[EMBEDDING] ✅ Ollama embedding instance created successfully`);
             return ollamaEmbedding;
