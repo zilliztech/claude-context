@@ -1106,11 +1106,20 @@ export class Context {
      * @returns True if path should be ignored
      */
     private matchesIgnorePattern(filePath: string, basePath: string): boolean {
+        const relativePath = path.relative(basePath, filePath);
+
+        // Always ignore dotfiles/dotdirs to stay aligned with
+        // FileSynchronizer.shouldIgnore. If these traversals diverge, files
+        // indexed here are never hashed by the synchronizer and their stale
+        // chunks linger in Milvus forever.
+        if (relativePath.split(path.sep).some(part => part.startsWith('.'))) {
+            return true;
+        }
+
         if (this.ignorePatterns.length === 0) {
             return false;
         }
 
-        const relativePath = path.relative(basePath, filePath);
         const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
 
         for (const pattern of this.ignorePatterns) {
