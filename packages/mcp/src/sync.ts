@@ -1,15 +1,108 @@
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { Context, FileSynchronizer } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
+
+const DEFAULT_SYNC_LOCK_STALE_MS = 10 * 60 * 1000;
+const SYNC_LOCK_STALE_ENV = "CLAUDE_CONTEXT_SYNC_LOCK_STALE_MS";
 
 export class SyncManager {
     private context: Context;
     private snapshotManager: SnapshotManager;
     private isSyncing: boolean = false;
+    private syncLockToken: string | null = null;
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
         this.snapshotManager = snapshotManager;
+    }
+
+    private getSyncLockPath(): string {
+        return path.join(os.homedir(), ".context", "mcp-sync.lock");
+    }
+
+    private getSyncLockStaleMs(): number {
+        const value = process.env[SYNC_LOCK_STALE_ENV];
+        if (!value) {
+            return DEFAULT_SYNC_LOCK_STALE_MS;
+        }
+
+        const staleMs = Number.parseInt(value, 10);
+        if (!Number.isFinite(staleMs) || staleMs <= 0) {
+            console.warn(`[SYNC-DEBUG] Invalid ${SYNC_LOCK_STALE_ENV} value '${value}'. Falling back to ${DEFAULT_SYNC_LOCK_STALE_MS}ms.`);
+            return DEFAULT_SYNC_LOCK_STALE_MS;
+        }
+
+        return staleMs;
+    }
+
+    private acquireGlobalSyncLock(): boolean {
+        const lockPath = this.getSyncLockPath();
+        const staleMs = this.getSyncLockStaleMs();
+        const token = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+
+        try {
+            fs.mkdirSync(lockPath);
+            fs.writeFileSync(path.join(lockPath, "owner.json"), JSON.stringify({
+                pid: process.pid,
+                token,
+                acquiredAt: new Date().toISOString()
+            }, null, 2));
+            this.syncLockToken = token;
+            console.log(`[SYNC-DEBUG] Acquired global sync lock: ${lockPath}`);
+            return true;
+        } catch (error: any) {
+            if (error?.code !== "EEXIST") {
+                console.warn(`[SYNC-DEBUG] Failed to acquire global sync lock: ${error?.message || String(error)}`);
+                return false;
+            }
+
+            try {
+                const stat = fs.statSync(lockPath);
+                if (Date.now() - stat.mtimeMs > staleMs) {
+                    const stalePath = `${lockPath}.stale-${process.pid}-${Date.now()}`;
+                    console.warn(`[SYNC-DEBUG] Reclaiming stale global sync lock: ${lockPath}`);
+                    fs.renameSync(lockPath, stalePath);
+                    fs.rmSync(stalePath, { recursive: true, force: true });
+                    fs.mkdirSync(lockPath);
+                    fs.writeFileSync(path.join(lockPath, "owner.json"), JSON.stringify({
+                        pid: process.pid,
+                        token,
+                        acquiredAt: new Date().toISOString(),
+                        recoveredStaleLock: true
+                    }, null, 2));
+                    this.syncLockToken = token;
+                    console.log(`[SYNC-DEBUG] Acquired global sync lock after stale cleanup: ${lockPath}`);
+                    return true;
+                }
+            } catch (statError: any) {
+                console.warn(`[SYNC-DEBUG] Could not inspect global sync lock: ${statError?.message || String(statError)}`);
+            }
+
+            console.log("[SYNC-DEBUG] Another MCP process is already syncing. Skipping this cycle.");
+            return false;
+        }
+    }
+
+    private releaseGlobalSyncLock(): void {
+        const lockPath = this.getSyncLockPath();
+        try {
+            const ownerPath = path.join(lockPath, "owner.json");
+            if (this.syncLockToken && fs.existsSync(ownerPath)) {
+                const owner = JSON.parse(fs.readFileSync(ownerPath, "utf8"));
+                if (owner.token && owner.token !== this.syncLockToken) {
+                    console.warn(`[SYNC-DEBUG] Global sync lock is owned by another process. Skipping release: ${lockPath}`);
+                    return;
+                }
+            }
+            fs.rmSync(lockPath, { recursive: true, force: true });
+            this.syncLockToken = null;
+            console.log(`[SYNC-DEBUG] Released global sync lock: ${lockPath}`);
+        } catch (error: any) {
+            console.warn(`[SYNC-DEBUG] Failed to release global sync lock: ${error?.message || String(error)}`);
+        }
     }
 
     public async handleSyncIndex(): Promise<void> {
@@ -27,6 +120,10 @@ export class SyncManager {
 
         if (this.isSyncing) {
             console.log('[SYNC-DEBUG] Index sync already in progress. Skipping.');
+            return;
+        }
+
+        if (!this.acquireGlobalSyncLock()) {
             return;
         }
 
@@ -106,6 +203,7 @@ export class SyncManager {
             console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
         } finally {
             this.isSyncing = false;
+            this.releaseGlobalSyncLock();
             const totalElapsed = Date.now() - syncStartTime;
             console.log(`[SYNC-DEBUG] handleSyncIndex() finished at ${new Date().toISOString()}, total duration: ${totalElapsed}ms`);
         }
@@ -140,4 +238,4 @@ export class SyncManager {
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
     }
-} 
+}
