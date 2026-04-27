@@ -58,9 +58,7 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 **System Requirements:**
 
-- Node.js >= 20.0.0 and < 24.0.0
-
-> Claude Context is not compatible with Node.js 24.0.0, you need downgrade it first if your node version is greater or equal to 24.
+- Node.js >= 20.0.0
 
 #### Configuration
 
@@ -616,7 +614,7 @@ Integrates Claude Context directly into your IDE. Provides an intuitive interfac
 
 #### Prerequisites
 
-- Node.js 20.x or 22.x
+- Node.js 20.x, 22.x, or 24.x
 - pnpm (recommended package manager)
 
 #### Cross-Platform Setup
