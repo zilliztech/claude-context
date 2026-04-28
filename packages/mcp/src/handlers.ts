@@ -449,12 +449,6 @@ export class ToolHandlers {
                 this.context.addCustomExtensions(customFileExtensions);
             }
 
-            // Add custom ignore patterns if provided (before loading file-based patterns)
-            if (customIgnorePatterns.length > 0) {
-                console.log(`[IGNORE-PATTERNS] Adding ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`);
-                this.context.addCustomIgnorePatterns(customIgnorePatterns);
-            }
-
             // Check current status and log if retrying after failure
             const currentStatus = this.snapshotManager.getCodebaseStatus(absolutePath);
             if (currentStatus === 'indexfailed') {
@@ -470,7 +464,7 @@ export class ToolHandlers {
             trackCodebasePath(absolutePath);
 
             // Start background indexing - now safe to proceed
-            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType);
+            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, customIgnorePatterns);
 
             const pathInfo = codebasePath !== absolutePath
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
@@ -506,7 +500,7 @@ export class ToolHandlers {
         }
     }
 
-    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string) {
+    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string, customIgnorePatterns: string[] = []) {
         const absolutePath = codebasePath;
         let lastSaveTime = 0; // Track last save timestamp
 
@@ -525,11 +519,12 @@ export class ToolHandlers {
             }
 
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
-            await this.context.getLoadedIgnorePatterns(absolutePath);
+            // and merge them with this request's custom ignore patterns without
+            // relying on shared Context state for this background indexing task.
+            const ignorePatterns = await this.context.getEffectiveIgnorePatterns(absolutePath, customIgnorePatterns);
 
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
-            const ignorePatterns = this.context.getIgnorePatterns() || [];
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, this.context.getSupportedExtensions());
             await synchronizer.initialize();
@@ -563,7 +558,7 @@ export class ToolHandlers {
                 }
 
                 console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
-            });
+            }, false, customIgnorePatterns);
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics

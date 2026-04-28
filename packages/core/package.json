@@ -10,7 +10,8 @@
         "clean": "rimraf dist",
         "lint": "eslint src --ext .ts",
         "lint:fix": "eslint src --ext .ts --fix",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "jest --runInBand"
     },
     "dependencies": {
         "@google/genai": "^1.9.0",

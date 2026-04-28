@@ -105,6 +105,7 @@ export class Context {
     private vectorDatabase: VectorDatabase;
     private codeSplitter: Splitter;
     private supportedExtensions: string[];
+    private baseIgnorePatterns: string[];
     private ignorePatterns: string[];
     private collectionNameOverride?: string;
     private warnedOverrideSanitization = new Set<string>();
@@ -141,15 +142,15 @@ export class Context {
         // Load custom ignore patterns from environment variables  
         const envCustomIgnorePatterns = this.getCustomIgnorePatternsFromEnv();
 
-        // Start with default ignore patterns
+        // Start with default ignore patterns and persistent config/env patterns.
         const allIgnorePatterns = [
             ...DEFAULT_IGNORE_PATTERNS,
             ...(config.ignorePatterns || []),
             ...(config.customIgnorePatterns || []),
             ...envCustomIgnorePatterns
         ];
-        // Remove duplicates
-        this.ignorePatterns = [...new Set(allIgnorePatterns)];
+        this.baseIgnorePatterns = this.dedupePatterns(allIgnorePatterns);
+        this.ignorePatterns = [...this.baseIgnorePatterns];
         this.collectionNameOverride = config.collectionNameOverride;
 
         console.log(`[Context] 🔧 Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
@@ -214,7 +215,15 @@ export class Context {
      * Public wrapper for loadIgnorePatterns private method
      */
     async getLoadedIgnorePatterns(codebasePath: string): Promise<void> {
-        return this.loadIgnorePatterns(codebasePath);
+        await this.loadIgnorePatterns(codebasePath);
+    }
+
+    /**
+     * Get the effective ignore patterns for a codebase without relying on
+     * codebase-specific patterns already stored on this Context instance.
+     */
+    async getEffectiveIgnorePatterns(codebasePath: string, additionalIgnorePatterns: string[] = []): Promise<string[]> {
+        return this.loadIgnorePatterns(codebasePath, additionalIgnorePatterns);
     }
 
     /**
@@ -304,14 +313,16 @@ export class Context {
     async indexCodebase(
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
-        forceReindex: boolean = false
+        forceReindex: boolean = false,
+        additionalIgnorePatterns: string[] = []
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
 
-        // 1. Load ignore patterns from various ignore files
-        await this.loadIgnorePatterns(codebasePath);
+        // 1. Compute ignore patterns for this codebase/request without
+        // retaining file-based patterns from previous codebases.
+        const ignorePatterns = await this.loadIgnorePatterns(codebasePath, additionalIgnorePatterns);
 
         // 2. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
@@ -320,7 +331,7 @@ export class Context {
 
         // 3. Recursively traverse codebase to get all supported files
         progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
-        const codeFiles = await this.getCodeFiles(codebasePath);
+        const codeFiles = await this.getCodeFiles(codebasePath, ignorePatterns);
         console.log(`[Context] 📁 Found ${codeFiles.length} code files`);
 
         if (codeFiles.length === 0) {
@@ -375,11 +386,11 @@ export class Context {
         const synchronizer = this.synchronizers.get(collectionName);
 
         if (!synchronizer) {
-            // Load project-specific ignore patterns before creating FileSynchronizer
-            await this.loadIgnorePatterns(codebasePath);
+            // Load project-specific ignore patterns before creating FileSynchronizer.
+            const ignorePatterns = await this.loadIgnorePatterns(codebasePath);
 
             // To be safe, let's initialize if it's not there.
-            const newSynchronizer = new FileSynchronizer(codebasePath, this.ignorePatterns, this.supportedExtensions);
+            const newSynchronizer = new FileSynchronizer(codebasePath, ignorePatterns, this.supportedExtensions);
             await newSynchronizer.initialize();
             this.synchronizers.set(collectionName, newSynchronizer);
         }
@@ -616,10 +627,8 @@ export class Context {
     updateIgnorePatterns(ignorePatterns: string[]): void {
         // Merge with default patterns and any existing custom patterns, avoiding duplicates
         const mergedPatterns = [...DEFAULT_IGNORE_PATTERNS, ...ignorePatterns];
-        const uniquePatterns: string[] = [];
-        const patternSet = new Set(mergedPatterns);
-        patternSet.forEach(pattern => uniquePatterns.push(pattern));
-        this.ignorePatterns = uniquePatterns;
+        this.baseIgnorePatterns = this.dedupePatterns(mergedPatterns);
+        this.ignorePatterns = [...this.baseIgnorePatterns];
         console.log(`[Context] 🚫 Updated ignore patterns: ${ignorePatterns.length} new + ${DEFAULT_IGNORE_PATTERNS.length} default = ${this.ignorePatterns.length} total patterns`);
     }
 
@@ -630,12 +639,10 @@ export class Context {
     addCustomIgnorePatterns(customPatterns: string[]): void {
         if (customPatterns.length === 0) return;
 
-        // Merge current patterns with new custom patterns, avoiding duplicates
-        const mergedPatterns = [...this.ignorePatterns, ...customPatterns];
-        const uniquePatterns: string[] = [];
-        const patternSet = new Set(mergedPatterns);
-        patternSet.forEach(pattern => uniquePatterns.push(pattern));
-        this.ignorePatterns = uniquePatterns;
+        // Merge persistent base patterns with new custom patterns, avoiding duplicates.
+        const mergedPatterns = [...this.baseIgnorePatterns, ...customPatterns];
+        this.baseIgnorePatterns = this.dedupePatterns(mergedPatterns);
+        this.ignorePatterns = [...this.baseIgnorePatterns];
         console.log(`[Context] 🚫 Added ${customPatterns.length} custom ignore patterns. Total: ${this.ignorePatterns.length} patterns`);
     }
 
@@ -643,7 +650,8 @@ export class Context {
      * Reset ignore patterns to defaults only
      */
     resetIgnorePatternsToDefaults(): void {
-        this.ignorePatterns = [...DEFAULT_IGNORE_PATTERNS];
+        this.baseIgnorePatterns = [...DEFAULT_IGNORE_PATTERNS];
+        this.ignorePatterns = [...this.baseIgnorePatterns];
         console.log(`[Context] 🔄 Reset ignore patterns to defaults: ${this.ignorePatterns.length} patterns`);
     }
 
@@ -714,7 +722,7 @@ export class Context {
     /**
      * Recursively get all code files in the codebase
      */
-    private async getCodeFiles(codebasePath: string): Promise<string[]> {
+    private async getCodeFiles(codebasePath: string, ignorePatterns: string[] = this.ignorePatterns): Promise<string[]> {
         const files: string[] = [];
 
         const traverseDirectory = async (currentPath: string) => {
@@ -724,7 +732,7 @@ export class Context {
                 const fullPath = path.join(currentPath, entry.name);
 
                 // Check if path matches ignore patterns
-                if (this.matchesIgnorePattern(fullPath, codebasePath)) {
+                if (this.matchesIgnorePattern(fullPath, codebasePath, ignorePatterns)) {
                     continue;
                 }
 
@@ -997,11 +1005,13 @@ export class Context {
     }
 
     /**
-     * Load ignore patterns from various ignore files in the codebase
-     * This method preserves any existing custom patterns that were added before
+     * Load ignore patterns from various ignore files in the codebase.
+     * Returns the effective patterns for the current codebase/request without
+     * allowing file-based patterns from previous codebases to leak forward.
      * @param codebasePath Path to the codebase
+     * @param additionalIgnorePatterns Ignore patterns for the current request
      */
-    private async loadIgnorePatterns(codebasePath: string): Promise<void> {
+    private async loadIgnorePatterns(codebasePath: string, additionalIgnorePatterns: string[] = []): Promise<string[]> {
         try {
             let fileBasedPatterns: string[] = [];
 
@@ -1016,16 +1026,32 @@ export class Context {
             const globalIgnorePatterns = await this.loadGlobalIgnoreFile();
             fileBasedPatterns.push(...globalIgnorePatterns);
 
-            // Merge file-based patterns with existing patterns (which may include custom MCP patterns)
-            if (fileBasedPatterns.length > 0) {
-                this.addCustomIgnorePatterns(fileBasedPatterns);
-                console.log(`[Context] 🚫 Loaded total ${fileBasedPatterns.length} ignore patterns from all ignore files`);
+            const effectiveIgnorePatterns = this.dedupePatterns([
+                ...this.baseIgnorePatterns,
+                ...additionalIgnorePatterns,
+                ...fileBasedPatterns
+            ]);
+            // Preserve the previous observable getIgnorePatterns() behavior for
+            // sequential callers, while all indexing paths use the local return
+            // value to avoid shared-state leakage between background tasks.
+            this.ignorePatterns = effectiveIgnorePatterns;
+
+            if (fileBasedPatterns.length > 0 || additionalIgnorePatterns.length > 0) {
+                console.log(`[Context] 🚫 Loaded total ${fileBasedPatterns.length} ignore patterns from all ignore files and ${additionalIgnorePatterns.length} request ignore patterns`);
             } else {
-                console.log('📄 No ignore files found, keeping existing patterns');
+                console.log('📄 No ignore files found, using base ignore patterns');
             }
+            return effectiveIgnorePatterns;
         } catch (error) {
             console.warn(`[Context] ⚠️ Failed to load ignore patterns: ${error}`);
-            // Continue with existing patterns on error - don't reset them
+            // Continue with base/request patterns on error - don't reuse
+            // previously loaded codebase-specific patterns.
+            const fallbackPatterns = this.dedupePatterns([
+                ...this.baseIgnorePatterns,
+                ...additionalIgnorePatterns
+            ]);
+            this.ignorePatterns = fallbackPatterns;
+            return fallbackPatterns;
         }
     }
 
@@ -1107,7 +1133,7 @@ export class Context {
      * @param basePath Base path for relative pattern matching
      * @returns True if path should be ignored
      */
-    private matchesIgnorePattern(filePath: string, basePath: string): boolean {
+    private matchesIgnorePattern(filePath: string, basePath: string, ignorePatterns: string[] = this.ignorePatterns): boolean {
         const relativePath = path.relative(basePath, filePath);
 
         // Always ignore dotfiles/dotdirs to stay aligned with
@@ -1118,13 +1144,13 @@ export class Context {
             return true;
         }
 
-        if (this.ignorePatterns.length === 0) {
+        if (ignorePatterns.length === 0) {
             return false;
         }
 
         const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
 
-        for (const pattern of this.ignorePatterns) {
+        for (const pattern of ignorePatterns) {
             if (this.isPatternMatch(normalizedPath, pattern)) {
                 return true;
             }
@@ -1172,6 +1198,10 @@ export class Context {
 
         const regex = new RegExp(`^${regexPattern}$`);
         return regex.test(text);
+    }
+
+    private dedupePatterns(patterns: string[]): string[] {
+        return [...new Set(patterns)];
     }
 
     /**
