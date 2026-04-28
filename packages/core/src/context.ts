@@ -191,6 +191,15 @@ export class Context {
     }
 
     /**
+     * Get supported extensions for the current operation without mutating
+     * the Context's persistent extension list.
+     */
+    getEffectiveSupportedExtensions(additionalExtensions: string[] = []): string[] {
+        const normalizedExtensions = this.normalizeExtensions(additionalExtensions);
+        return [...new Set([...this.supportedExtensions, ...normalizedExtensions])];
+    }
+
+    /**
      * Get ignore patterns
      */
     getIgnorePatterns(): string[] {
@@ -308,13 +317,16 @@ export class Context {
      * @param codebasePath Codebase root path
      * @param progressCallback Optional progress callback function
      * @param forceReindex Whether to recreate the collection even if it exists
+     * @param additionalIgnorePatterns Request-scoped ignore patterns
+     * @param additionalSupportedExtensions Request-scoped file extensions
      * @returns Indexing statistics
      */
     async indexCodebase(
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
         forceReindex: boolean = false,
-        additionalIgnorePatterns: string[] = []
+        additionalIgnorePatterns: string[] = [],
+        additionalSupportedExtensions: string[] = []
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
@@ -331,7 +343,8 @@ export class Context {
 
         // 3. Recursively traverse codebase to get all supported files
         progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
-        const codeFiles = await this.getCodeFiles(codebasePath, ignorePatterns);
+        const supportedExtensions = this.getEffectiveSupportedExtensions(additionalSupportedExtensions);
+        const codeFiles = await this.getCodeFiles(codebasePath, ignorePatterns, supportedExtensions);
         console.log(`[Context] 📁 Found ${codeFiles.length} code files`);
 
         if (codeFiles.length === 0) {
@@ -722,7 +735,11 @@ export class Context {
     /**
      * Recursively get all code files in the codebase
      */
-    private async getCodeFiles(codebasePath: string, ignorePatterns: string[] = this.ignorePatterns): Promise<string[]> {
+    private async getCodeFiles(
+        codebasePath: string,
+        ignorePatterns: string[] = this.ignorePatterns,
+        supportedExtensions: string[] = this.supportedExtensions
+    ): Promise<string[]> {
         const files: string[] = [];
 
         const traverseDirectory = async (currentPath: string) => {
@@ -740,7 +757,7 @@ export class Context {
                     await traverseDirectory(fullPath);
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
-                    if (this.supportedExtensions.includes(ext)) {
+                    if (supportedExtensions.includes(ext)) {
                         files.push(fullPath);
                     }
                 }
@@ -1253,6 +1270,13 @@ export class Context {
         }
     }
 
+    private normalizeExtensions(extensions: string[]): string[] {
+        return extensions
+            .map(ext => ext.trim())
+            .filter(ext => ext.length > 0)
+            .map(ext => ext.startsWith('.') ? ext : `.${ext}`);
+    }
+
     /**
      * Add custom extensions (from MCP or other sources) without replacing existing ones
      * @param customExtensions Array of custom extensions to add
@@ -1260,10 +1284,7 @@ export class Context {
     addCustomExtensions(customExtensions: string[]): void {
         if (customExtensions.length === 0) return;
 
-        // Ensure extensions start with dot
-        const normalizedExtensions = customExtensions.map(ext =>
-            ext.startsWith('.') ? ext : `.${ext}`
-        );
+        const normalizedExtensions = this.normalizeExtensions(customExtensions);
 
         // Merge current extensions with new custom extensions, avoiding duplicates
         const mergedExtensions = [...this.supportedExtensions, ...normalizedExtensions];
