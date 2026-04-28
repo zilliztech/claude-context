@@ -199,6 +199,41 @@ export class SnapshotManager {
         }
     }
 
+    private isSameOrDescendantPath(candidatePath: string, codebasePath: string): boolean {
+        const relativePath = path.relative(path.resolve(codebasePath), path.resolve(candidatePath));
+        return relativePath === ''
+            || (!!relativePath && !relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+    }
+
+    private findBestMatchingCodebasePath(codebasePath: string, candidates: string[]): string | undefined {
+        let bestMatch: string | undefined;
+        let bestMatchLength = -1;
+
+        for (const candidate of candidates) {
+            const resolvedCandidate = path.resolve(candidate);
+            if (!this.isSameOrDescendantPath(codebasePath, resolvedCandidate)) continue;
+
+            if (resolvedCandidate.length > bestMatchLength) {
+                bestMatch = candidate;
+                bestMatchLength = resolvedCandidate.length;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    public findIndexedCodebasePath(codebasePath: string): string | undefined {
+        return this.findBestMatchingCodebasePath(codebasePath, this.getIndexedCodebases());
+    }
+
+    public findIndexingCodebasePath(codebasePath: string): string | undefined {
+        return this.findBestMatchingCodebasePath(codebasePath, this.getIndexingCodebases());
+    }
+
+    public findTrackedCodebasePath(codebasePath: string): string | undefined {
+        return this.findBestMatchingCodebasePath(codebasePath, Array.from(this.codebaseInfoMap.keys()));
+    }
+
     /**
      * @deprecated Use getCodebaseInfo() for individual codebases or iterate through codebases for v2 format support
      */
@@ -598,4 +633,4 @@ export class SnapshotManager {
             }
         }
     }
-} 
+}
