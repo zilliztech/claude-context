@@ -197,6 +197,22 @@ CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project
 
 The per-codebase `<pathHash>` suffix is preserved even when the override is set, so the same MCP server can still index multiple repos without collapsing them onto one collection. The override value is sanitized to letters, numbers, and underscores, and truncated to keep the full name within Milvus's 255-char limit. If you unset the variable later, Claude Context switches back to the plain `code_chunks_<pathHash>` naming.
 
+#### Background Sync Configuration (Optional)
+
+By default, the MCP server does **not** run background sync. This avoids duplicated rescans when multiple local MCP sessions are open at the same time.
+
+If you want automatic reindexing, enable it explicitly:
+
+```bash
+# Opt in to startup + periodic background sync
+CLAUDE_CONTEXT_BACKGROUND_SYNC=true
+
+# Optional: control how often sync runs (default: 300000 = 5 minutes)
+CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000
+```
+
+This is most useful when you run Claude Context as a single long-lived MCP server. For per-session local stdio setups, leaving background sync disabled usually avoids unnecessary CPU churn.
+
 ## Usage with MCP Clients
 
 <details>
