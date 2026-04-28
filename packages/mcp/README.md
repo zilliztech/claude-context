@@ -197,6 +197,33 @@ CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project
 
 The per-codebase `<pathHash>` suffix is preserved even when the override is set, so the same MCP server can still index multiple repos without collapsing them onto one collection. The override value is sanitized to letters, numbers, and underscores, and truncated to keep the full name within Milvus's 255-char limit. If you unset the variable later, Claude Context switches back to the plain `code_chunks_<pathHash>` naming.
 
+#### Trigger File Watcher (Optional)
+
+In addition to the periodic background sync, the MCP server watches a sentinel file at `~/.context/.sync-trigger` and starts an immediate re-index whenever the file is modified. This lets external tools (Claude Code `PostToolUse` hooks, editor save hooks, CI scripts, etc.) request a sync on demand instead of waiting for the next polling tick.
+
+```bash
+# Default: watcher enabled. Set to false to disable filesystem watching entirely
+# (useful on read-only filesystems or sandboxed environments).
+CLAUDE_CONTEXT_TRIGGER_WATCHER=true
+```
+
+Example — Claude Code hook that re-indexes after every Edit/Write:
+
+```json
+"hooks": {
+  "PostToolUse": [
+    { "matcher": "Edit|Write", "hooks": [
+      { "type": "command", "command": "touch ~/.context/.sync-trigger" }
+    ]}
+  ]
+}
+```
+
+Notes:
+- The trigger fires a debounced re-index (2 s window) so rapid touches collapse to a single sync.
+- Triggered syncs go through the same global cross-process lock as background sync, so when multiple MCP processes share `$HOME` only one process performs the work per trigger.
+- The trigger file's *contents* are ignored — only the modification event matters.
+
 ## Usage with MCP Clients
 
 <details>

@@ -226,6 +226,16 @@ Environment Variables:
                           The per-codebase pathHash is preserved so multiple
                           codebases stay distinct under the same override.
 
+  Sync Trigger Watcher:
+  CLAUDE_CONTEXT_TRIGGER_WATCHER
+                          Enable/disable the ~/.context/.sync-trigger filesystem
+                          watcher (default: true). When enabled, touching the
+                          trigger file kicks off an immediate, debounced re-index.
+                          Triggered syncs share the same global cross-process
+                          lock as background sync, so multi-instance setups stay
+                          coordinated. Set to false to disable filesystem
+                          watching entirely (read-only / sandboxed environments).
+
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
   OPENAI_API_KEY=sk-xxx MILVUS_ADDRESS=localhost:19530 npx @zilliz/claude-context-mcp@latest
