@@ -3,8 +3,8 @@ import * as os from 'os';
 import * as path from 'path';
 import { Context } from './context';
 import { Embedding, EmbeddingVector } from './embedding';
-import { FileSynchronizer } from './sync/synchronizer';
 import { Splitter, CodeChunk } from './splitter';
+import { FileSynchronizer } from './sync/synchronizer';
 import { VectorDatabase } from './vectordb';
 
 class TestEmbedding extends Embedding {
@@ -181,4 +181,49 @@ describe('Context ignore pattern isolation', () => {
         }
     });
 
+    it('treats leading-slash directory ignore patterns as root-anchored and recursive during indexing', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(path.join(project, 'Library'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src', 'Library'), { recursive: true });
+        await fs.writeFile(path.join(project, '.gitignore'), '/Library/\n');
+        await fs.writeFile(path.join(project, 'Library', 'generated.md'), 'root library should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'Library', 'nested.md'), 'nested library should stay');
+        await fs.writeFile(path.join(project, 'src', 'keep.md'), 'regular file should stay');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual([
+            'src/Library/nested.md',
+            'src/keep.md',
+        ]);
+    });
+
+    it('treats leading-slash directory ignore patterns as root-anchored and recursive during sync', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(path.join(project, 'Library'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src', 'Library'), { recursive: true });
+        await fs.writeFile(path.join(project, 'Library', 'generated.md'), 'root library should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'Library', 'nested.md'), 'nested library should stay');
+        await fs.writeFile(path.join(project, 'src', 'keep.md'), 'regular file should stay');
+
+        const synchronizer = new FileSynchronizer(project, ['/Library/'], ['.md']);
+        const fileHashes = await (synchronizer as any).generateFileHashes(project) as Map<string, string>;
+
+        expect(fileHashes.has(path.join('Library', 'generated.md'))).toBe(false);
+        expect(fileHashes.has(path.join('src', 'Library', 'nested.md'))).toBe(true);
+        expect(fileHashes.has(path.join('src', 'keep.md'))).toBe(true);
+    });
 });
