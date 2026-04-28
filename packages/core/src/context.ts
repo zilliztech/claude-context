@@ -191,6 +191,23 @@ export class Context {
     }
 
     /**
+     * Get the effective supported extensions for a single indexing request,
+     * combining persistent extensions on this Context with request-level
+     * additions. Does not mutate shared state, so per-request additions cannot
+     * leak between codebases when the same Context is reused (e.g. an MCP
+     * server indexing multiple projects over its lifetime).
+     */
+    getEffectiveSupportedExtensions(additionalExtensions: string[] = []): string[] {
+        if (additionalExtensions.length === 0) {
+            return [...this.supportedExtensions];
+        }
+        const normalized = additionalExtensions.map(ext =>
+            ext.startsWith('.') ? ext : `.${ext}`
+        );
+        return [...new Set([...this.supportedExtensions, ...normalized])];
+    }
+
+    /**
      * Get ignore patterns
      */
     getIgnorePatterns(): string[] {
@@ -314,15 +331,18 @@ export class Context {
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
         forceReindex: boolean = false,
-        additionalIgnorePatterns: string[] = []
+        additionalIgnorePatterns: string[] = [],
+        additionalSupportedExtensions: string[] = []
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
 
-        // 1. Compute ignore patterns for this codebase/request without
-        // retaining file-based patterns from previous codebases.
+        // 1. Compute ignore patterns and supported extensions for this
+        // codebase/request without retaining file-based patterns or
+        // request-level extensions from previous codebases.
         const ignorePatterns = await this.loadIgnorePatterns(codebasePath, additionalIgnorePatterns);
+        const supportedExtensions = this.getEffectiveSupportedExtensions(additionalSupportedExtensions);
 
         // 2. Check and prepare vector collection
         progressCallback?.({ phase: 'Preparing collection...', current: 0, total: 100, percentage: 0 });
@@ -331,7 +351,7 @@ export class Context {
 
         // 3. Recursively traverse codebase to get all supported files
         progressCallback?.({ phase: 'Scanning files...', current: 5, total: 100, percentage: 5 });
-        const codeFiles = await this.getCodeFiles(codebasePath, ignorePatterns);
+        const codeFiles = await this.getCodeFiles(codebasePath, ignorePatterns, supportedExtensions);
         console.log(`[Context] 📁 Found ${codeFiles.length} code files`);
 
         if (codeFiles.length === 0) {
@@ -722,7 +742,11 @@ export class Context {
     /**
      * Recursively get all code files in the codebase
      */
-    private async getCodeFiles(codebasePath: string, ignorePatterns: string[] = this.ignorePatterns): Promise<string[]> {
+    private async getCodeFiles(
+        codebasePath: string,
+        ignorePatterns: string[] = this.ignorePatterns,
+        supportedExtensions: string[] = this.supportedExtensions
+    ): Promise<string[]> {
         const files: string[] = [];
 
         const traverseDirectory = async (currentPath: string) => {
@@ -740,7 +764,7 @@ export class Context {
                     await traverseDirectory(fullPath);
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
-                    if (this.supportedExtensions.includes(ext)) {
+                    if (supportedExtensions.includes(ext)) {
                         files.push(fullPath);
                     }
                 }
