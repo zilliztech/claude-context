@@ -393,17 +393,21 @@ export class Context {
 
     async reindexByChange(
         codebasePath: string,
-        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
+        progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
+        additionalIgnorePatterns: string[] = [],
+        additionalSupportedExtensions: string[] = []
     ): Promise<{ added: number, removed: number, modified: number }> {
         const collectionName = this.getCollectionName(codebasePath);
         const synchronizer = this.synchronizers.get(collectionName);
 
         if (!synchronizer) {
-            // Load project-specific ignore patterns before creating FileSynchronizer.
-            const ignorePatterns = await this.loadIgnorePatterns(codebasePath);
+            // Recreate the synchronizer with the same request-scoped options that
+            // were used for the original indexing task.
+            const ignorePatterns = await this.loadIgnorePatterns(codebasePath, additionalIgnorePatterns);
+            const supportedExtensions = this.getEffectiveSupportedExtensions(additionalSupportedExtensions);
 
             // To be safe, let's initialize if it's not there.
-            const newSynchronizer = new FileSynchronizer(codebasePath, ignorePatterns, this.supportedExtensions);
+            const newSynchronizer = new FileSynchronizer(codebasePath, ignorePatterns, supportedExtensions);
             await newSynchronizer.initialize();
             this.synchronizers.set(collectionName, newSynchronizer);
         }
