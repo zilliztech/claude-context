@@ -443,10 +443,8 @@ export class ToolHandlers {
                 };
             }
 
-            // Add custom extensions if provided
             if (customFileExtensions.length > 0) {
-                console.log(`[CUSTOM-EXTENSIONS] Adding ${customFileExtensions.length} custom extensions: ${customFileExtensions.join(', ')}`);
-                this.context.addCustomExtensions(customFileExtensions);
+                console.log(`[CUSTOM-EXTENSIONS] Using ${customFileExtensions.length} request-scoped custom extensions: ${customFileExtensions.join(', ')}`);
             }
 
             // Check current status and log if retrying after failure
@@ -464,7 +462,7 @@ export class ToolHandlers {
             trackCodebasePath(absolutePath);
 
             // Start background indexing - now safe to proceed
-            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, customIgnorePatterns);
+            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, customIgnorePatterns, customFileExtensions);
 
             const pathInfo = codebasePath !== absolutePath
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
@@ -500,7 +498,13 @@ export class ToolHandlers {
         }
     }
 
-    private async startBackgroundIndexing(codebasePath: string, forceReindex: boolean, splitterType: string, customIgnorePatterns: string[] = []) {
+    private async startBackgroundIndexing(
+        codebasePath: string,
+        forceReindex: boolean,
+        splitterType: string,
+        customIgnorePatterns: string[] = [],
+        customFileExtensions: string[] = []
+    ) {
         const absolutePath = codebasePath;
         let lastSaveTime = 0; // Track last save timestamp
 
@@ -521,12 +525,16 @@ export class ToolHandlers {
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
             // and merge them with this request's custom ignore patterns without
             // relying on shared Context state for this background indexing task.
-            const ignorePatterns = await this.context.getEffectiveIgnorePatterns(absolutePath, customIgnorePatterns);
+            const ignorePatterns = await contextForThisTask.getEffectiveIgnorePatterns(absolutePath, customIgnorePatterns);
+            const supportedExtensions = contextForThisTask.getEffectiveSupportedExtensions(customFileExtensions);
 
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             const { FileSynchronizer } = await import("@zilliz/claude-context-core");
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
-            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, this.context.getSupportedExtensions());
+            if (customFileExtensions.length > 0) {
+                console.log(`[BACKGROUND-INDEX] Using ${customFileExtensions.length} request-scoped custom extensions: ${customFileExtensions.join(', ')}`);
+            }
+            const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, supportedExtensions);
             await synchronizer.initialize();
 
             // Store synchronizer in the context (let context manage collection names)
@@ -558,7 +566,7 @@ export class ToolHandlers {
                 }
 
                 console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
-            }, false, customIgnorePatterns);
+            }, false, customIgnorePatterns, customFileExtensions);
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics
