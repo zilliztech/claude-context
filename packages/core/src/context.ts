@@ -6,7 +6,8 @@ import {
 import {
     Embedding,
     EmbeddingVector,
-    OpenAIEmbedding
+    OpenAIEmbedding,
+    EmbeddingCache
 } from './embedding';
 import {
     VectorDatabase,
@@ -110,6 +111,7 @@ export class Context {
     private collectionNameOverride?: string;
     private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
+    private embeddingCache: EmbeddingCache | null = null;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -159,6 +161,25 @@ export class Context {
         }
         if (envCustomIgnorePatterns.length > 0) {
             console.log(`[Context] 🚫 Loaded ${envCustomIgnorePatterns.length} custom ignore patterns from environment: ${envCustomIgnorePatterns.join(', ')}`);
+        }
+
+        // Initialize embedding cache
+        this.initEmbeddingCache();
+    }
+
+    /**
+     * (Re)create the embedding cache keyed by current provider + dimension.
+     * Called on construction and again whenever the embedding instance changes
+     * via updateEmbedding(), so cached vectors from a previous model never bleed
+     * into the new one.
+     */
+    private initEmbeddingCache(): void {
+        const dimension = this.embedding.getDimension();
+        const cacheModel = `${this.embedding.getProvider()}_${dimension}`;
+        this.embeddingCache = new EmbeddingCache(cacheModel, undefined, dimension);
+        if (this.embeddingCache.isEnabled()) {
+            console.log(`[Context] 💾 Embedding cache enabled for model: ${cacheModel}`);
+            this.embeddingCache.cleanup().catch(() => {});
         }
     }
 
@@ -595,6 +616,61 @@ export class Context {
     }
 
     /**
+     * Embed batch with disk cache. Only calls API for uncached chunks.
+     * Also dedupes duplicate strings within the same batch — without this, two
+     * identical chunks in one batch would each hit the API since neither is
+     * cached at the start of the call. Common in monorepos with re-exports or
+     * generated boilerplate.
+     */
+    private async cachedEmbedBatch(contents: string[]): Promise<EmbeddingVector[]> {
+        if (!this.embeddingCache || !this.embeddingCache.isEnabled()) {
+            return this.embedding.embedBatch(contents);
+        }
+
+        const { results, uncachedIndices } = this.embeddingCache.getBatch(contents);
+
+        if (uncachedIndices.length === 0) {
+            console.log(`[Cache] ✅ All ${contents.length} embeddings from cache`);
+            return results as EmbeddingVector[];
+        }
+
+        // Dedupe uncached texts: send each unique string once and fan results
+        // back out to every original index pointing at that string.
+        const uniqueTexts: string[] = [];
+        const textToUniqueIndex = new Map<string, number>();
+        const indicesByUnique: number[][] = [];
+        for (const i of uncachedIndices) {
+            const text = contents[i];
+            let uniq = textToUniqueIndex.get(text);
+            if (uniq === undefined) {
+                uniq = uniqueTexts.length;
+                textToUniqueIndex.set(text, uniq);
+                uniqueTexts.push(text);
+                indicesByUnique.push([]);
+            }
+            indicesByUnique[uniq].push(i);
+        }
+
+        const newEmbeddings = await this.embedding.embedBatch(uniqueTexts);
+
+        for (let u = 0; u < uniqueTexts.length; u++) {
+            const embedding = newEmbeddings[u];
+            this.embeddingCache.set(uniqueTexts[u], embedding);
+            for (const i of indicesByUnique[u]) {
+                results[i] = embedding;
+            }
+        }
+
+        const hitRate = ((contents.length - uncachedIndices.length) / contents.length * 100).toFixed(0);
+        const dedupNote = uniqueTexts.length < uncachedIndices.length
+            ? ` (deduped ${uncachedIndices.length} → ${uniqueTexts.length} API calls)`
+            : '';
+        console.log(`[Cache] ${hitRate}% hit (${contents.length - uncachedIndices.length}/${contents.length} cached, ${uniqueTexts.length} embedded)${dedupNote}`);
+
+        return results as EmbeddingVector[];
+    }
+
+    /**
      * Check if index exists for codebase
      * @param codebasePath Codebase path to check
      * @returns Whether index exists
@@ -675,6 +751,9 @@ export class Context {
     updateEmbedding(embedding: Embedding): void {
         this.embedding = embedding;
         console.log(`[Context] 🔄 Updated embedding provider: ${embedding.getProvider()}`);
+        // Cache key is `${provider}_${dimension}`; re-key so we don't return
+        // vectors from the previous model on the next embed call.
+        this.initEmbeddingCache();
     }
 
     /**
@@ -891,9 +970,9 @@ export class Context {
     private async processChunkBatch(chunks: CodeChunk[], codebasePath: string): Promise<void> {
         const isHybrid = this.getIsHybrid();
 
-        // Generate embedding vectors
+        // Generate embedding vectors (with cache)
         const chunkContents = chunks.map(chunk => chunk.content);
-        const embeddings = await this.embedding.embedBatch(chunkContents);
+        const embeddings = await this.cachedEmbedBatch(chunkContents);
 
         if (isHybrid === true) {
             // Create hybrid vector documents
