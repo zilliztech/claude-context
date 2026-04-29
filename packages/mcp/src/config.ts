@@ -17,6 +17,7 @@ export interface ContextMcpConfig {
     // Ollama configuration
     ollamaModel?: string;
     ollamaHost?: string;
+    ollamaDimension?: number;
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
@@ -108,11 +109,27 @@ export function getEmbeddingModelForProvider(provider: string): string {
     }
 }
 
+function getPositiveIntegerFromEnv(name: string): number | undefined {
+    const rawValue = envManager.get(name);
+    if (!rawValue) {
+        return undefined;
+    }
+
+    const parsedValue = Number(rawValue);
+    if (Number.isInteger(parsedValue) && parsedValue > 0) {
+        return parsedValue;
+    }
+
+    console.warn(`[DEBUG] ⚠️  Ignoring invalid ${name}: ${rawValue}. Expected a positive integer.`);
+    return undefined;
+}
+
 export function createMcpConfig(): ContextMcpConfig {
     // Debug: Print all environment variables related to Context
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
     console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${envManager.get('EMBEDDING_PROVIDER') || 'NOT SET'}`);
     console.log(`[DEBUG]   EMBEDDING_MODEL: ${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}`);
+    console.log(`[DEBUG]   EMBEDDING_DIMENSION: ${envManager.get('EMBEDDING_DIMENSION') || 'NOT SET'}`);
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
@@ -137,6 +154,7 @@ export function createMcpConfig(): ContextMcpConfig {
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
+        ollamaDimension: getPositiveIntegerFromEnv('EMBEDDING_DIMENSION'),
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
@@ -181,6 +199,9 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
         case 'Ollama':
             console.log(`[MCP]   Ollama Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}`);
             console.log(`[MCP]   Ollama Model: ${config.embeddingModel}`);
+            if (config.ollamaDimension) {
+                console.log(`[MCP]   Ollama Embedding Dimension: ${config.ollamaDimension}`);
+            }
             break;
     }
 
@@ -203,6 +224,7 @@ Environment Variables:
   Embedding Provider Configuration:
   EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama, OpenRouter (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
+  EMBEDDING_DIMENSION     Optional embedding dimension override for Ollama
   
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)

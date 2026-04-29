@@ -130,6 +130,9 @@ EMBEDDING_MODEL=nomic-embed-text
 
 # Optional: Specify Ollama host (default: http://127.0.0.1:11434)
 OLLAMA_HOST=http://127.0.0.1:11434
+
+# Optional: Override embedding dimension to skip runtime dimension detection
+EMBEDDING_DIMENSION=768
 ```
 
 **Setup Instructions:**
@@ -388,6 +391,7 @@ Pasting the following configuration into your Cursor `~/.cursor/mcp.json` file i
         "EMBEDDING_PROVIDER": "Ollama",
         "EMBEDDING_MODEL": "nomic-embed-text",
         "OLLAMA_HOST": "http://127.0.0.1:11434",
+        "EMBEDDING_DIMENSION": "768",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
