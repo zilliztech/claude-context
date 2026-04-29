@@ -12,6 +12,19 @@ const Rust = require('tree-sitter-rust');
 const CSharp = require('tree-sitter-c-sharp');
 const Scala = require('tree-sitter-scala');
 
+// Dart parser is loaded lazily to avoid crashing at module load time if the
+// native binding is unavailable (e.g. tree-sitter-dart has no prebuilt binary
+// for the current platform).  If loading fails we fall through to the
+// LangChain character-based splitter for .dart files.
+let _dartParser: any = null;
+let _dartLoadError: string | null = null;
+try {
+    _dartParser = require('tree-sitter-dart');
+} catch (err: any) {
+    _dartLoadError = err?.message ?? String(err);
+    console.warn(`[ast-splitter] ⚠️  Failed to load tree-sitter-dart: ${_dartLoadError}. Dart will use LangChain splitter.`);
+}
+
 // Node types that represent logical code units
 const SPLITTABLE_NODE_TYPES = {
     javascript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement'],
@@ -22,7 +35,8 @@ const SPLITTABLE_NODE_TYPES = {
     go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
     rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
     csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration'],
-    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
+    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration'],
+    dart: ['local_function_declaration', 'method_signature', 'class_definition', 'constructor_signature', 'mixin_declaration', 'extension_declaration']
 };
 
 export class AstCodeSplitter implements Splitter {
@@ -100,7 +114,9 @@ export class AstCodeSplitter implements Splitter {
             'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
             'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
             'csharp': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala }
+            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala },
+            // Only register Dart AST splitter if the native binding loaded successfully
+            ...(_dartParser ? { 'dart': { parser: _dartParser, nodeTypes: SPLITTABLE_NODE_TYPES.dart } } : {})
         };
 
         return langMap[language.toLowerCase()] || null;
@@ -261,10 +277,14 @@ export class AstCodeSplitter implements Splitter {
      * Check if AST splitting is supported for the given language
      */
     static isLanguageSupported(language: string): boolean {
-        const supportedLanguages = [
+        const astLanguages = [
             'javascript', 'js', 'typescript', 'ts', 'python', 'py',
             'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala'
         ];
-        return supportedLanguages.includes(language.toLowerCase());
+        // Dart is only supported at the AST level if the native binding loaded
+        if (language.toLowerCase() === 'dart') {
+            return _dartParser !== null;
+        }
+        return astLanguages.includes(language.toLowerCase());
     }
 }
