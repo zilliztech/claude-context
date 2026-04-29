@@ -33,8 +33,14 @@ export interface CodebaseSnapshotV1 {
 
 // New format (v2) - structured with codebase information
 
+// Request-level indexing options stored with a codebase's snapshot entry.
+export interface CodebaseIndexOptions {
+    requestCustomExtensions?: string[];
+    requestIgnorePatterns?: string[];
+}
+
 // Base interface for common fields
-interface CodebaseInfoBase {
+interface CodebaseInfoBase extends CodebaseIndexOptions {
     lastUpdated: string;
 }
 

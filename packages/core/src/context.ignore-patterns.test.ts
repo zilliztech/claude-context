@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { Context } from './context';
 import { Embedding, EmbeddingVector } from './embedding';
+import { FileSynchronizer } from './sync/synchronizer';
 import { Splitter, CodeChunk } from './splitter';
 import { VectorDatabase } from './vectordb';
 
@@ -156,4 +157,28 @@ describe('Context ignore pattern isolation', () => {
         await context.indexCodebase(projectB);
         expect(vectorDatabase.insert).not.toHaveBeenCalled();
     });
+
+    it('uses request options when recreating a synchronizer for change indexing', async () => {
+        const project = path.join(tempRoot, 'project-with-options');
+        await fs.mkdir(project);
+        await fs.writeFile(path.join(project, 'custom.foo'), 'custom extension file');
+        await fs.writeFile(path.join(project, 'ignored.ts'), 'ignored by request pattern');
+
+        const context = new Context({ vectorDatabase: createVectorDatabase() });
+
+        try {
+            await context.reindexByChange(project, undefined, ['*.ts'], ['foo']);
+
+            const collectionName = context.getCollectionName(project);
+            const synchronizer = context.getSynchronizers().get(collectionName);
+
+            expect(synchronizer).toBeDefined();
+            expect(synchronizer?.getFileHash('custom.foo')).toBeDefined();
+            expect(synchronizer?.getFileHash('ignored.ts')).toBeUndefined();
+            expect(context.getSupportedExtensions()).not.toContain('.foo');
+        } finally {
+            await FileSynchronizer.deleteSnapshot(project);
+        }
+    });
+
 });

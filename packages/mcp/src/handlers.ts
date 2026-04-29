@@ -3,6 +3,7 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
+import type { CodebaseIndexOptions } from "./config.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
 export class ToolHandlers {
@@ -317,6 +318,10 @@ export class ToolHandlers {
         const splitterType = splitter || 'ast'; // Default to AST
         const customFileExtensions = customExtensions || [];
         const customIgnorePatterns = ignorePatterns || [];
+        const indexOptions: CodebaseIndexOptions = {
+            requestCustomExtensions: customFileExtensions,
+            requestIgnorePatterns: customIgnorePatterns
+        };
 
         try {
             // Sync indexed codebases from cloud first
@@ -462,14 +467,14 @@ export class ToolHandlers {
             }
 
             // Set to indexing status and save snapshot immediately
-            this.snapshotManager.setCodebaseIndexing(absolutePath, 0);
+            this.snapshotManager.setCodebaseIndexing(absolutePath, 0, indexOptions);
             this.snapshotManager.saveCodebaseSnapshot();
 
             // Track the codebase path for syncing
             trackCodebasePath(absolutePath);
 
             // Start background indexing - now safe to proceed
-            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, customIgnorePatterns, customFileExtensions);
+            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, customIgnorePatterns, customFileExtensions, indexOptions);
 
             const pathInfo = codebasePath !== absolutePath
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
@@ -510,7 +515,8 @@ export class ToolHandlers {
         forceReindex: boolean,
         splitterType: string,
         customIgnorePatterns: string[] = [],
-        customFileExtensions: string[] = []
+        customFileExtensions: string[] = [],
+        indexOptions?: CodebaseIndexOptions
     ) {
         const absolutePath = codebasePath;
         let lastSaveTime = 0; // Track last save timestamp
@@ -576,7 +582,7 @@ export class ToolHandlers {
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics
-            this.snapshotManager.setCodebaseIndexed(absolutePath, stats);
+            this.snapshotManager.setCodebaseIndexed(absolutePath, stats, indexOptions);
             this.indexingStats = { indexedFiles: stats.indexedFiles, totalChunks: stats.totalChunks };
 
             // Save snapshot after updating codebase lists
@@ -597,7 +603,7 @@ export class ToolHandlers {
 
             // Set codebase to failed status with error information
             const errorMessage = error.message || String(error);
-            this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress);
+            this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress, indexOptions);
             this.snapshotManager.saveCodebaseSnapshot();
 
             // Log error but don't crash MCP service - indexing errors are handled gracefully

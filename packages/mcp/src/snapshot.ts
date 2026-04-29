@@ -6,6 +6,7 @@ import {
     CodebaseSnapshotV1,
     CodebaseSnapshotV2,
     CodebaseInfo,
+    CodebaseIndexOptions,
     CodebaseInfoIndexing,
     CodebaseInfoIndexed,
     CodebaseInfoIndexFailed
@@ -124,6 +125,7 @@ export class SnapshotManager {
                     status: 'indexfailed',
                     errorMessage: 'Indexing was interrupted (MCP server restarted)',
                     lastAttemptedPercentage: info.indexingPercentage,
+                    ...this.getIndexOptions(info),
                     lastUpdated: new Date().toISOString()
                 };
                 validCodebaseInfoMap.set(codebasePath, failedInfo);
@@ -220,6 +222,21 @@ export class SnapshotManager {
         }
 
         return bestMatch;
+    }
+
+    private getIndexOptions(options?: CodebaseIndexOptions): CodebaseIndexOptions {
+        const indexOptions: CodebaseIndexOptions = {};
+        if (options?.requestCustomExtensions?.length) {
+            indexOptions.requestCustomExtensions = options.requestCustomExtensions;
+        }
+        if (options?.requestIgnorePatterns?.length) {
+            indexOptions.requestIgnorePatterns = options.requestIgnorePatterns;
+        }
+        return indexOptions;
+    }
+
+    private resolveIndexOptions(codebasePath: string, options?: CodebaseIndexOptions): CodebaseIndexOptions {
+        return this.getIndexOptions(options ?? this.codebaseInfoMap.get(codebasePath));
     }
 
     public findIndexedCodebasePath(codebasePath: string): string | undefined {
@@ -374,17 +391,20 @@ export class SnapshotManager {
     /**
      * Set codebase to indexing status
      */
-    public setCodebaseIndexing(codebasePath: string, progress: number = 0): void {
+    public setCodebaseIndexing(codebasePath: string, progress: number = 0, indexOptions?: CodebaseIndexOptions): void {
         this.indexingCodebases.set(codebasePath, progress);
 
         // Remove from other states
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
         this.codebaseFileCount.delete(codebasePath);
 
+        const resolvedIndexOptions = this.resolveIndexOptions(codebasePath, indexOptions);
+
         // Update info map
         const info: CodebaseInfoIndexing = {
             status: 'indexing',
             indexingPercentage: progress,
+            ...resolvedIndexOptions,
             lastUpdated: new Date().toISOString()
         };
         this.codebaseInfoMap.set(codebasePath, info);
@@ -395,7 +415,8 @@ export class SnapshotManager {
      */
     public setCodebaseIndexed(
         codebasePath: string,
-        stats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }
+        stats: { indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' },
+        indexOptions?: CodebaseIndexOptions
     ): void {
         // Defensive guard: 0/0 + completed is a known-bad state that causes an
         // infinite force-reindex loop — the client reads it as "not indexed",
@@ -418,11 +439,14 @@ export class SnapshotManager {
         // Update file count and info
         this.codebaseFileCount.set(codebasePath, stats.indexedFiles);
 
+        const resolvedIndexOptions = this.resolveIndexOptions(codebasePath, indexOptions);
+
         const info: CodebaseInfoIndexed = {
             status: 'indexed',
             indexedFiles: stats.indexedFiles,
             totalChunks: stats.totalChunks,
             indexStatus: stats.status,
+            ...resolvedIndexOptions,
             lastUpdated: new Date().toISOString()
         };
         this.codebaseInfoMap.set(codebasePath, info);
@@ -434,18 +458,22 @@ export class SnapshotManager {
     public setCodebaseIndexFailed(
         codebasePath: string,
         errorMessage: string,
-        lastAttemptedPercentage?: number
+        lastAttemptedPercentage?: number,
+        indexOptions?: CodebaseIndexOptions
     ): void {
         // Remove from other states
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
         this.indexingCodebases.delete(codebasePath);
         this.codebaseFileCount.delete(codebasePath);
 
+        const resolvedIndexOptions = this.resolveIndexOptions(codebasePath, indexOptions);
+
         // Update info map
         const info: CodebaseInfoIndexFailed = {
             status: 'indexfailed',
             errorMessage: errorMessage,
             lastAttemptedPercentage: lastAttemptedPercentage,
+            ...resolvedIndexOptions,
             lastUpdated: new Date().toISOString()
         };
         this.codebaseInfoMap.set(codebasePath, info);

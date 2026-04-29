@@ -157,7 +157,15 @@ export class SyncManager {
 
                 try {
                     console.log(`[SYNC-DEBUG] Calling context.reindexByChange() for '${codebasePath}'`);
-                    const stats = await this.context.reindexByChange(codebasePath);
+                    const codebaseInfo = this.snapshotManager.getCodebaseInfo(codebasePath);
+                    const requestIgnorePatterns = codebaseInfo?.requestIgnorePatterns || [];
+                    const requestCustomExtensions = codebaseInfo?.requestCustomExtensions || [];
+                    const stats = await this.context.reindexByChange(
+                        codebasePath,
+                        undefined,
+                        requestIgnorePatterns,
+                        requestCustomExtensions
+                    );
                     const codebaseElapsed = Date.now() - codebaseStartTime;
 
                     console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
