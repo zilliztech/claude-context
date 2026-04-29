@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { Context, FileSynchronizer } from "@zilliz/claude-context-core";
+import { Context, FileSynchronizer, envManager } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 
 const DEFAULT_SYNC_LOCK_STALE_MS = 10 * 60 * 1000;
@@ -12,6 +12,8 @@ export class SyncManager {
     private snapshotManager: SnapshotManager;
     private isSyncing: boolean = false;
     private syncLockToken: string | null = null;
+    private triggerWatcher: fs.FSWatcher | null = null;
+    private triggerDebounceTimer: NodeJS.Timeout | null = null;
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
@@ -212,6 +214,13 @@ export class SyncManager {
     public startBackgroundSync(): void {
         console.log('[SYNC-DEBUG] startBackgroundSync() called');
 
+        // Set up the trigger file watcher FIRST, independent of polling. Polling may
+        // be gated off by other configuration (e.g. opt-in CLAUDE_CONTEXT_BACKGROUND_SYNC
+        // discussed in #285 / #314); the watcher is the on-demand counterpart and should
+        // remain available so external tools (Claude Code PostToolUse hooks, CI scripts)
+        // can still request a sync by touching ~/.context/.sync-trigger.
+        this.setupTriggerWatcher();
+
         // Execute initial sync immediately after a short delay to let server initialize
         console.log('[SYNC-DEBUG] Scheduling initial sync in 5 seconds...');
         setTimeout(async () => {
@@ -237,5 +246,102 @@ export class SyncManager {
         }, 5 * 60 * 1000); // every 5 minutes
 
         console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
+    }
+
+    /**
+     * Read CLAUDE_CONTEXT_TRIGGER_WATCHER. Default ON — the watcher is cheap and only
+     * fires when an external process explicitly touches the trigger file. Users who want
+     * zero filesystem watching (e.g. read-only filesystems, sandboxed envs) can disable it.
+     */
+    private isTriggerWatcherEnabled(): boolean {
+        const v = (envManager.get('CLAUDE_CONTEXT_TRIGGER_WATCHER') ?? '').trim().toLowerCase();
+        if (!v) return true;
+        if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+        if (['0', 'false', 'no', 'off'].includes(v)) return false;
+        console.warn(
+            `[SYNC-DEBUG] Invalid CLAUDE_CONTEXT_TRIGGER_WATCHER value '${v}'. ` +
+            'Expected true/false. Trigger watcher will remain enabled.'
+        );
+        return true;
+    }
+
+    /**
+     * Watch for trigger file changes to enable instant re-index.
+     * Claude Code PostToolUse hooks can touch ~/.context/.sync-trigger
+     * after Write/Edit operations to trigger immediate re-indexing.
+     */
+    private setupTriggerWatcher(): void {
+        if (!this.isTriggerWatcherEnabled()) {
+            console.log('[SYNC-DEBUG] Trigger watcher disabled via CLAUDE_CONTEXT_TRIGGER_WATCHER');
+            return;
+        }
+
+        // Guard against double-initialization (hot reload, repeated test setup).
+        if (this.triggerWatcher) {
+            console.log('[SYNC-DEBUG] Trigger watcher already active, skipping re-init');
+            return;
+        }
+
+        const contextDir = path.join(os.homedir(), '.context');
+        const triggerFile = '.sync-trigger';
+        const triggerPath = path.join(contextDir, triggerFile);
+
+        try {
+            // Ensure context dir exists before watching (snapshot manager
+            // also creates it, but be defensive in case watcher starts first).
+            fs.mkdirSync(contextDir, { recursive: true });
+
+            // Pass encoding so `filename` is consistently a string across platforms
+            // (default can be Buffer on some Node builds).
+            const watcher = fs.watch(contextDir, { encoding: 'utf8' }, (_event, filename) => {
+                // With encoding: 'utf8', filename is `string | null`. null happens on
+                // some platforms when the underlying event lacks a name; treat as no-op.
+                if (typeof filename !== 'string' || filename !== triggerFile) return;
+
+                if (this.triggerDebounceTimer) clearTimeout(this.triggerDebounceTimer);
+                this.triggerDebounceTimer = setTimeout(() => {
+                    console.log('[SYNC] 🔔 Trigger file detected, starting instant re-index...');
+                    // Fire-and-forget with explicit catch so an unhandled rejection
+                    // can't crash the process from inside the setTimeout callback.
+                    void this.handleSyncIndex().catch((error) => {
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        if (errorMessage.includes('Failed to query collection')) {
+                            console.log('[SYNC-DEBUG] Collection not yet established during trigger sync; will retry on next cycle.');
+                        } else {
+                            console.error('[SYNC-DEBUG] Triggered sync failed with unexpected error:', error);
+                        }
+                    });
+                }, 2000);
+            });
+
+            // fs.watch can emit `error` asynchronously (e.g. dir deleted, fs unmounted).
+            // Without a listener this would crash the process.
+            watcher.on('error', (err) => {
+                console.warn('[SYNC-DEBUG] Trigger watcher error:', err instanceof Error ? err.message : String(err));
+                this.stopTriggerWatcher();
+            });
+
+            this.triggerWatcher = watcher;
+            console.log(`[SYNC-DEBUG] Trigger watcher active on ${triggerPath}`);
+        } catch (error) {
+            if (error instanceof Error) {
+                console.warn('[SYNC-DEBUG] Could not set up trigger watcher:', error.message);
+                if (error.stack) console.warn(error.stack);
+            } else {
+                console.warn('[SYNC-DEBUG] Could not set up trigger watcher:', String(error));
+            }
+        }
+    }
+
+    /** Stop the watcher (idempotent). Useful for tests or graceful shutdown. */
+    public stopTriggerWatcher(): void {
+        if (this.triggerDebounceTimer) {
+            clearTimeout(this.triggerDebounceTimer);
+            this.triggerDebounceTimer = null;
+        }
+        if (this.triggerWatcher) {
+            try { this.triggerWatcher.close(); } catch { /* already closed */ }
+            this.triggerWatcher = null;
+        }
     }
 }
