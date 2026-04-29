@@ -1187,22 +1187,53 @@ export class Context {
      * @returns True if pattern matches
      */
     private isPatternMatch(filePath: string, pattern: string): boolean {
+        const cleanPath = filePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        const normalizedPattern = pattern.replace(/\\/g, '/');
+        const cleanPattern = normalizedPattern.replace(/^\/+|\/+$/g, '');
+        const isRootAnchored = normalizedPattern.startsWith('/');
+        const isDirectoryPattern = normalizedPattern.endsWith('/');
+
+        if (!cleanPath || !cleanPattern) {
+            return false;
+        }
+
         // Handle directory patterns (ending with /)
-        if (pattern.endsWith('/')) {
-            const dirPattern = pattern.slice(0, -1);
-            const pathParts = filePath.split('/');
-            return pathParts.some(part => this.simpleGlobMatch(part, dirPattern));
+        if (isDirectoryPattern) {
+            if (isRootAnchored) {
+                return this.simpleGlobMatch(cleanPath, cleanPattern) ||
+                    cleanPath.startsWith(`${cleanPattern}/`);
+            }
+
+            return this.matchesDirectoryPattern(cleanPath, cleanPattern);
+        }
+
+        if (isRootAnchored) {
+            return this.simpleGlobMatch(cleanPath, cleanPattern);
         }
 
         // Handle file patterns
-        if (pattern.includes('/')) {
+        if (cleanPattern.includes('/')) {
             // Pattern with path separator - match exact path
-            return this.simpleGlobMatch(filePath, pattern);
+            return this.simpleGlobMatch(cleanPath, cleanPattern);
         } else {
             // Pattern without path separator - match filename in any directory
-            const fileName = path.basename(filePath);
-            return this.simpleGlobMatch(fileName, pattern);
+            const fileName = path.basename(cleanPath);
+            return this.simpleGlobMatch(fileName, cleanPattern);
         }
+    }
+
+    private matchesDirectoryPattern(filePath: string, dirPattern: string): boolean {
+        const pathParts = filePath.split('/');
+        const dirPartCount = dirPattern.split('/').length;
+
+        for (let i = 0; i <= pathParts.length - dirPartCount; i++) {
+            const candidate = pathParts.slice(i, i + dirPartCount).join('/');
+            if (this.simpleGlobMatch(candidate, dirPattern)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
