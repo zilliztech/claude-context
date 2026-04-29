@@ -3,7 +3,8 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
-import type { CodebaseIndexOptions } from "./config.js";
+import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
+import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
 export class ToolHandlers {
@@ -315,28 +316,30 @@ export class ToolHandlers {
     public async handleIndexCodebase(args: any) {
         const { path: codebasePath, force, splitter, customExtensions, ignorePatterns } = args;
         const forceReindex = force || false;
-        const splitterType = splitter || 'ast'; // Default to AST
+        const requestedSplitter = splitter || 'ast'; // Default to AST
         const customFileExtensions = customExtensions || [];
         const customIgnorePatterns = ignorePatterns || [];
-        const indexOptions: CodebaseIndexOptions = {
-            requestCustomExtensions: customFileExtensions,
-            requestIgnorePatterns: customIgnorePatterns
-        };
 
         try {
             // Sync indexed codebases from cloud first
             await this.syncIndexedCodebasesFromCloud();
 
             // Validate splitter parameter
-            if (splitterType !== 'ast' && splitterType !== 'langchain') {
+            if (!isRequestSplitterType(requestedSplitter)) {
                 return {
                     content: [{
                         type: "text",
-                        text: `Error: Invalid splitter type '${splitterType}'. Must be 'ast' or 'langchain'.`
+                        text: `Error: Invalid splitter type '${requestedSplitter}'. Must be 'ast' or 'langchain'.`
                     }],
                     isError: true
                 };
             }
+            const splitterType: RequestSplitterType = requestedSplitter;
+            const indexOptions: CodebaseIndexOptions = {
+                requestSplitter: splitterType,
+                requestCustomExtensions: customFileExtensions,
+                requestIgnorePatterns: customIgnorePatterns
+            };
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = ensureAbsolutePath(codebasePath);
 
@@ -513,7 +516,7 @@ export class ToolHandlers {
     private async startBackgroundIndexing(
         codebasePath: string,
         forceReindex: boolean,
-        splitterType: string,
+        splitterType: RequestSplitterType,
         customIgnorePatterns: string[] = [],
         customFileExtensions: string[] = [],
         indexOptions?: CodebaseIndexOptions
@@ -529,17 +532,13 @@ export class ToolHandlers {
                 console.log(`[BACKGROUND-INDEX] ℹ️  Force reindex mode - collection was already cleared during validation`);
             }
 
-            // Use the existing Context instance for indexing.
-            let contextForThisTask = this.context;
-            if (splitterType !== 'ast') {
-                console.warn(`[BACKGROUND-INDEX] Non-AST splitter '${splitterType}' requested; falling back to AST splitter`);
-            }
+            const requestSplitter = createRequestSplitter(splitterType);
 
             // Load ignore patterns from files first (including .ignore, .gitignore, etc.)
             // and merge them with this request's custom ignore patterns without
             // relying on shared Context state for this background indexing task.
-            const ignorePatterns = await contextForThisTask.getEffectiveIgnorePatterns(absolutePath, customIgnorePatterns);
-            const supportedExtensions = contextForThisTask.getEffectiveSupportedExtensions(customFileExtensions);
+            const ignorePatterns = await this.context.getEffectiveIgnorePatterns(absolutePath, customIgnorePatterns);
+            const supportedExtensions = this.context.getEffectiveSupportedExtensions(customFileExtensions);
 
             // Initialize file synchronizer with proper ignore patterns (including project-specific patterns)
             console.log(`[BACKGROUND-INDEX] Using ignore patterns: ${ignorePatterns.join(', ')}`);
@@ -553,9 +552,6 @@ export class ToolHandlers {
             await this.context.getPreparedCollection(absolutePath);
             const collectionName = this.context.getCollectionName(absolutePath);
             this.context.setSynchronizer(collectionName, synchronizer);
-            if (contextForThisTask !== this.context) {
-                contextForThisTask.setSynchronizer(collectionName, synchronizer);
-            }
 
             console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
@@ -565,7 +561,7 @@ export class ToolHandlers {
 
             // Start indexing with the appropriate context and progress tracking
             console.log(`[BACKGROUND-INDEX] 🚀 Beginning codebase indexing process...`);
-            const stats = await contextForThisTask.indexCodebase(absolutePath, (progress) => {
+            const stats = await this.context.indexCodebase(absolutePath, (progress) => {
                 // Update progress in snapshot manager using new method
                 this.snapshotManager.setCodebaseIndexing(absolutePath, progress.percentage);
 
@@ -578,7 +574,7 @@ export class ToolHandlers {
                 }
 
                 console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
-            }, false, customIgnorePatterns, customFileExtensions);
+            }, false, customIgnorePatterns, customFileExtensions, requestSplitter);
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics

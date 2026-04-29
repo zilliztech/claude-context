@@ -319,6 +319,7 @@ export class Context {
      * @param forceReindex Whether to recreate the collection even if it exists
      * @param additionalIgnorePatterns Request-scoped ignore patterns
      * @param additionalSupportedExtensions Request-scoped file extensions
+     * @param requestSplitter Request-scoped splitter for this indexing run
      * @returns Indexing statistics
      */
     async indexCodebase(
@@ -326,11 +327,13 @@ export class Context {
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
         forceReindex: boolean = false,
         additionalIgnorePatterns: string[] = [],
-        additionalSupportedExtensions: string[] = []
+        additionalSupportedExtensions: string[] = [],
+        requestSplitter?: Splitter
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
+        const splitter = requestSplitter || this.codeSplitter;
 
         // 1. Compute ignore patterns for this codebase/request without
         // retaining file-based patterns from previous codebases.
@@ -372,7 +375,8 @@ export class Context {
                     total: totalFiles,
                     percentage: Math.round(progressPercentage)
                 });
-            }
+            },
+            splitter
         );
 
         console.log(`[Context] ✅ Codebase indexing completed! Processed ${result.processedFiles} files in total, generated ${result.totalChunks} code chunks`);
@@ -395,10 +399,12 @@ export class Context {
         codebasePath: string,
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void,
         additionalIgnorePatterns: string[] = [],
-        additionalSupportedExtensions: string[] = []
+        additionalSupportedExtensions: string[] = [],
+        requestSplitter?: Splitter
     ): Promise<{ added: number, removed: number, modified: number }> {
         const collectionName = this.getCollectionName(codebasePath);
         const synchronizer = this.synchronizers.get(collectionName);
+        const splitter = requestSplitter || this.codeSplitter;
 
         if (!synchronizer) {
             // Recreate the synchronizer with the same request-scoped options that
@@ -454,7 +460,8 @@ export class Context {
                 codebasePath,
                 (filePath, fileIndex, totalFiles) => {
                     updateProgress(`Indexed ${filePath} (${fileIndex}/${totalFiles})`);
-                }
+                },
+                splitter
             );
         }
 
@@ -810,7 +817,8 @@ export class Context {
     private async processFileList(
         filePaths: string[],
         codebasePath: string,
-        onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void
+        onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void,
+        splitter: Splitter = this.codeSplitter
     ): Promise<{ processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(envManager.get('EMBEDDING_BATCH_SIZE') || '100', 10));
@@ -828,7 +836,7 @@ export class Context {
             try {
                 const content = await fs.promises.readFile(filePath, 'utf-8');
                 const language = this.getLanguageFromExtension(path.extname(filePath));
-                const chunks = await this.codeSplitter.split(content, language, filePath);
+                const chunks = await splitter.split(content, language, filePath);
 
                 // Log files with many chunks or large content
                 if (chunks.length > 50) {

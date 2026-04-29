@@ -33,8 +33,11 @@ export interface CodebaseSnapshotV1 {
 
 // New format (v2) - structured with codebase information
 
+export type RequestSplitterType = 'ast' | 'langchain';
+
 // Request-level indexing options stored with a codebase's snapshot entry.
 export interface CodebaseIndexOptions {
+    requestSplitter?: RequestSplitterType;
     requestCustomExtensions?: string[];
     requestIgnorePatterns?: string[];
 }

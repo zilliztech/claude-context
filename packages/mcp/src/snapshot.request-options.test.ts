@@ -39,6 +39,7 @@ test("preserves request-level index options across snapshot state transitions", 
 
         const snapshotManager = new SnapshotManager();
         const indexOptions = {
+            requestSplitter: "langchain" as const,
             requestCustomExtensions: ["foo", ".vue"],
             requestIgnorePatterns: ["drafts/**", "*.tmp"]
         };
@@ -48,6 +49,7 @@ test("preserves request-level index options across snapshot state transitions", 
 
         const indexingInfo = snapshotManager.getCodebaseInfo(codebasePath);
         assert.equal(indexingInfo?.status, "indexing");
+        assert.equal(indexingInfo?.requestSplitter, "langchain");
         assert.deepEqual(indexingInfo?.requestCustomExtensions, ["foo", ".vue"]);
         assert.deepEqual(indexingInfo?.requestIgnorePatterns, ["drafts/**", "*.tmp"]);
 
@@ -59,6 +61,7 @@ test("preserves request-level index options across snapshot state transitions", 
 
         const indexedInfo = snapshotManager.getCodebaseInfo(codebasePath);
         assert.equal(indexedInfo?.status, "indexed");
+        assert.equal(indexedInfo?.requestSplitter, "langchain");
         assert.deepEqual(indexedInfo?.requestCustomExtensions, ["foo", ".vue"]);
         assert.deepEqual(indexedInfo?.requestIgnorePatterns, ["drafts/**", "*.tmp"]);
 
@@ -66,6 +69,7 @@ test("preserves request-level index options across snapshot state transitions", 
 
         const failedInfo = snapshotManager.getCodebaseInfo(codebasePath);
         assert.equal(failedInfo?.status, "indexfailed");
+        assert.equal(failedInfo?.requestSplitter, "langchain");
         assert.deepEqual(failedInfo?.requestCustomExtensions, ["foo", ".vue"]);
         assert.deepEqual(failedInfo?.requestIgnorePatterns, ["drafts/**", "*.tmp"]);
     });
@@ -79,6 +83,7 @@ test("explicit empty request options clear previous request-level index options"
         const snapshotManager = new SnapshotManager();
 
         snapshotManager.setCodebaseIndexing(codebasePath, 0, {
+            requestSplitter: "langchain",
             requestCustomExtensions: ["foo"],
             requestIgnorePatterns: ["drafts/**"]
         });
@@ -86,6 +91,7 @@ test("explicit empty request options clear previous request-level index options"
 
         const info = snapshotManager.getCodebaseInfo(codebasePath);
         assert.equal(info?.status, "indexing");
+        assert.equal(info?.requestSplitter, undefined);
         assert.equal(info?.requestCustomExtensions, undefined);
         assert.equal(info?.requestIgnorePatterns, undefined);
     });
@@ -98,6 +104,7 @@ test("preserves request-level index options when interrupted indexing is loaded 
 
         const firstSnapshotManager = new SnapshotManager();
         firstSnapshotManager.setCodebaseIndexing(codebasePath, 25, {
+            requestSplitter: "langchain",
             requestCustomExtensions: ["astro"],
             requestIgnorePatterns: ["drafts/**"]
         });
@@ -112,6 +119,7 @@ test("preserves request-level index options when interrupted indexing is loaded 
             throw new Error("Expected interrupted indexing to load as indexfailed");
         }
         assert.equal(info.lastAttemptedPercentage, 25);
+        assert.equal(info?.requestSplitter, "langchain");
         assert.deepEqual(info?.requestCustomExtensions, ["astro"]);
         assert.deepEqual(info?.requestIgnorePatterns, ["drafts/**"]);
     });

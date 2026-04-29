@@ -3,6 +3,8 @@ import * as os from "os";
 import * as path from "path";
 import { Context, FileSynchronizer, envManager } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
+import type { RequestSplitterType } from "./config.js";
+import { createRequestSplitter, resolveRequestSplitterType } from "./splitter.js";
 
 const DEFAULT_SYNC_LOCK_STALE_MS = 10 * 60 * 1000;
 const SYNC_LOCK_STALE_ENV = "CLAUDE_CONTEXT_SYNC_LOCK_STALE_MS";
@@ -158,13 +160,15 @@ export class SyncManager {
                 try {
                     console.log(`[SYNC-DEBUG] Calling context.reindexByChange() for '${codebasePath}'`);
                     const codebaseInfo = this.snapshotManager.getCodebaseInfo(codebasePath);
+                    const requestSplitterType: RequestSplitterType = resolveRequestSplitterType(codebaseInfo?.requestSplitter);
                     const requestIgnorePatterns = codebaseInfo?.requestIgnorePatterns || [];
                     const requestCustomExtensions = codebaseInfo?.requestCustomExtensions || [];
                     const stats = await this.context.reindexByChange(
                         codebasePath,
                         undefined,
                         requestIgnorePatterns,
-                        requestCustomExtensions
+                        requestCustomExtensions,
+                        createRequestSplitter(requestSplitterType)
                     );
                     const codebaseElapsed = Date.now() - codebaseStartTime;
 

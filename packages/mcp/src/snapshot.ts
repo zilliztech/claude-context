@@ -226,6 +226,9 @@ export class SnapshotManager {
 
     private getIndexOptions(options?: CodebaseIndexOptions): CodebaseIndexOptions {
         const indexOptions: CodebaseIndexOptions = {};
+        if (options?.requestSplitter === 'ast' || options?.requestSplitter === 'langchain') {
+            indexOptions.requestSplitter = options.requestSplitter;
+        }
         if (options?.requestCustomExtensions?.length) {
             indexOptions.requestCustomExtensions = options.requestCustomExtensions;
         }
