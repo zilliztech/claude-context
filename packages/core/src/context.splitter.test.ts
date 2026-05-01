@@ -165,4 +165,31 @@ describe('Context request-scoped splitters', () => {
             await FileSynchronizer.deleteSnapshot(project);
         }
     });
+
+    it('indexes Solidity files by default and maps them to the solidity language', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(project);
+        await fs.writeFile(path.join(project, 'Token.sol'), 'contract Token {}');
+
+        const vectorDatabase = createVectorDatabase();
+        const splitter = new RecordingSplitter('context');
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: splitter,
+        });
+
+        await context.indexCodebase(project);
+
+        expect(splitter.calls).toHaveLength(1);
+        expect(splitter.calls[0]).toMatchObject({
+            language: 'solidity',
+            filePath: path.join(project, 'Token.sol'),
+        });
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        expect(insertedDocuments).toHaveLength(1);
+        expect(insertedDocuments[0].relativePath).toBe('Token.sol');
+    });
 });

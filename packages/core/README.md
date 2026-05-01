@@ -141,6 +141,7 @@ interface ContextConfig {
   // Programming languages
   '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
   '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
+  '.dart', '.sol',
   // Text and markup files  
   '.md', '.markdown', '.ipynb'
 ]
