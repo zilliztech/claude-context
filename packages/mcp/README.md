@@ -100,7 +100,7 @@ Google's Gemini provides competitive embeddings with good multilingual support.
 # Required: Your Gemini API key
 GEMINI_API_KEY=your-gemini-api-key
 
-# Optional: Specify embedding model (default: gemini-embedding-001)
+# Optional: Specify embedding model (default: gemini-embedding-001; supports gemini-embedding-2)
 EMBEDDING_MODEL=gemini-embedding-001
 
 # Optional: Custom API base URL (for custom endpoints)

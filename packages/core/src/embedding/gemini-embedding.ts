@@ -1,6 +1,13 @@
 import { GoogleGenAI } from '@google/genai';
 import { Embedding, EmbeddingVector } from './base-embedding';
 
+type GeminiModelInfo = {
+    dimension: number;
+    contextLength: number;
+    description: string;
+    supportedDimensions?: number[];
+};
+
 export interface GeminiEmbeddingConfig {
     model: string;
     apiKey: string;
@@ -11,7 +18,7 @@ export interface GeminiEmbeddingConfig {
 export class GeminiEmbedding extends Embedding {
     private client: GoogleGenAI;
     private config: GeminiEmbeddingConfig;
-    private dimension: number = 3072; // Default dimension for gemini-embedding-001
+    private dimension: number = 3072; // Default dimension for Gemini embedding models
     protected maxTokens: number = 2048; // Maximum tokens for Gemini embedding models
 
     constructor(config: GeminiEmbeddingConfig) {
@@ -59,28 +66,17 @@ export class GeminiEmbedding extends Embedding {
         const model = this.config.model || 'gemini-embedding-001';
 
         try {
-            const response = await this.client.models.embedContent({
-                model: model,
-                contents: processedText,
-                config: {
-                    outputDimensionality: this.config.outputDimensionality || this.dimension,
-                },
-            });
-
-            if (!response.embeddings || !response.embeddings[0] || !response.embeddings[0].values) {
-                throw new Error('Gemini API returned invalid response');
-            }
-
-            return {
-                vector: response.embeddings[0].values,
-                dimension: response.embeddings[0].values.length
-            };
+            return await this.embedProcessedText(processedText, model);
         } catch (error) {
             throw new Error(`Gemini embedding failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
     async embedBatch(texts: string[]): Promise<EmbeddingVector[]> {
+        if (texts.length === 0) {
+            return [];
+        }
+
         const processedTexts = this.preprocessTexts(texts);
         const model = this.config.model || 'gemini-embedding-001';
 
@@ -97,6 +93,10 @@ export class GeminiEmbedding extends Embedding {
                 throw new Error('Gemini API returned invalid response');
             }
 
+            if (response.embeddings.length !== processedTexts.length) {
+                throw new Error(`Gemini API returned ${response.embeddings.length} embeddings for ${processedTexts.length} inputs`);
+            }
+
             return response.embeddings.map((embedding: any) => {
                 if (!embedding.values) {
                     throw new Error('Gemini API returned invalid embedding data');
@@ -109,6 +109,25 @@ export class GeminiEmbedding extends Embedding {
         } catch (error) {
             throw new Error(`Gemini batch embedding failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+    }
+
+    private async embedProcessedText(processedText: string, model: string): Promise<EmbeddingVector> {
+        const response = await this.client.models.embedContent({
+            model: model,
+            contents: processedText,
+            config: {
+                outputDimensionality: this.config.outputDimensionality || this.dimension,
+            },
+        });
+
+        if (!response.embeddings || !response.embeddings[0] || !response.embeddings[0].values) {
+            throw new Error('Gemini API returned invalid response');
+        }
+
+        return {
+            vector: response.embeddings[0].values,
+            dimension: response.embeddings[0].values.length
+        };
     }
 
     getDimension(): number {
@@ -147,13 +166,19 @@ export class GeminiEmbedding extends Embedding {
     /**
      * Get list of supported models
      */
-    static getSupportedModels(): Record<string, { dimension: number; contextLength: number; description: string; supportedDimensions?: number[] }> {
+    static getSupportedModels(): Record<string, GeminiModelInfo> {
         return {
             'gemini-embedding-001': {
                 dimension: 3072,
                 contextLength: 2048,
-                description: 'Latest Gemini embedding model with state-of-the-art performance (recommended)',
+                description: 'Gemini embedding model with state-of-the-art performance',
                 supportedDimensions: [3072, 1536, 768, 256] // Matryoshka Representation Learning support
+            },
+            'gemini-embedding-2': {
+                dimension: 3072,
+                contextLength: 8192,
+                description: 'Gemini Embedding 2 model with improved embedding quality and longer context',
+                supportedDimensions: [3072, 1536, 768, 256]
             }
         };
     }
