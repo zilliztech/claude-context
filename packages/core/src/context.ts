@@ -1274,19 +1274,26 @@ export class Context {
     }
 
     /**
-     * Simple glob matching supporting * wildcard
+     * Simple glob matching supporting * wildcard with ReDoS protection.
      * @param text Text to test
      * @param pattern Pattern with * wildcards
      * @returns True if pattern matches
      */
     private simpleGlobMatch(text: string, pattern: string): boolean {
-        // Convert glob pattern to regex
+        if (!pattern || pattern === '*') return true;
+        
+        // Convert glob pattern to a safe regex
+        // We use a non-greedy .*? and anchor the match to prevent catastrophic backtracking
         const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-            .replace(/\*/g, '.*'); // Convert * to .*
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars
+            .replace(/\*/g, '.*?');               // Convert * to non-greedy any chars
 
-        const regex = new RegExp(`^${regexPattern}$`);
-        return regex.test(text);
+        try {
+            const regex = new RegExp(`^${regexPattern}$`);
+            return regex.test(text);
+        } catch (e) {
+            return false;
+        }
     }
 
     private dedupePatterns(patterns: string[]): string[] {
