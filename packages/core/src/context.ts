@@ -14,7 +14,8 @@ import {
     VectorSearchResult,
     HybridSearchRequest,
     HybridSearchOptions,
-    HybridSearchResult
+    HybridSearchResult,
+    MilvusUnsupportedSparseVectorError
 } from './vectordb';
 import { SemanticSearchResult } from './types';
 import { envManager } from './utils/env-manager';
@@ -110,6 +111,8 @@ export class Context {
     private collectionNameOverride?: string;
     private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
+    private hybridModeOverride?: boolean;
+    private hybridFallbackWarned = false;
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -243,14 +246,27 @@ export class Context {
     }
 
     /**
-     * Get isHybrid setting from environment variable with default true
+     * Get isHybrid setting. An instance-level override (set when the server
+     * lacks SparseFloatVector support) takes precedence over the env var.
      */
     private getIsHybrid(): boolean {
+        if (this.hybridModeOverride !== undefined) {
+            return this.hybridModeOverride;
+        }
         const isHybridEnv = envManager.get('HYBRID_MODE');
         if (isHybridEnv === undefined || isHybridEnv === null) {
             return true; // Default to true
         }
         return isHybridEnv.toLowerCase() === 'true';
+    }
+
+    /**
+     * Whether the user explicitly opted into hybrid mode via HYBRID_MODE=true.
+     * Used to decide whether falling back to non-hybrid is safe.
+     */
+    private isHybridModeExplicitlyEnabled(): boolean {
+        const isHybridEnv = envManager.get('HYBRID_MODE');
+        return typeof isHybridEnv === 'string' && isHybridEnv.toLowerCase() === 'true';
     }
 
     /**
@@ -763,12 +779,64 @@ export class Context {
         const dirName = path.basename(codebasePath);
 
         if (isHybrid === true) {
-            await this.vectorDatabase.createHybridCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
+            try {
+                await this.vectorDatabase.createHybridCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
+            } catch (error) {
+                if (error instanceof MilvusUnsupportedSparseVectorError) {
+                    if (this.isHybridModeExplicitlyEnabled()) {
+                        // User explicitly opted in — don't silently downgrade.
+                        throw new Error(
+                            `HYBRID_MODE=true is set but the Milvus server does not support SparseFloatVector. ` +
+                            `Upgrade Milvus to a version with SparseFloatVector support, or set HYBRID_MODE=false ` +
+                            `to use dense-only collections. Underlying error: ${error.milvusReason}`
+                        );
+                    }
+                    await this.fallbackToDenseCollection(codebasePath, dimension, forceReindex, error);
+                    return;
+                }
+                throw error;
+            }
         } else {
             await this.vectorDatabase.createCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
         }
 
         console.log(`[Context] ✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
+    }
+
+    /**
+     * Recover from a server that lacks SparseFloatVector support by switching
+     * this Context to dense-only mode and creating (or reusing) a dense
+     * collection. Only invoked when hybrid mode was the implicit default.
+     */
+    private async fallbackToDenseCollection(
+        codebasePath: string,
+        dimension: number,
+        forceReindex: boolean,
+        cause: MilvusUnsupportedSparseVectorError
+    ): Promise<void> {
+        if (!this.hybridFallbackWarned) {
+            console.warn(
+                `[Context] ⚠️  Milvus server does not support SparseFloatVector; ` +
+                `falling back to dense-only collections for this session. ` +
+                `Set HYBRID_MODE=false to silence this warning, or upgrade Milvus to enable hybrid search. ` +
+                `Reason: ${cause.milvusReason}`
+            );
+            this.hybridFallbackWarned = true;
+        }
+        this.hybridModeOverride = false;
+        const denseName = this.getCollectionName(codebasePath);
+
+        const denseExists = await this.vectorDatabase.hasCollection(denseName);
+        if (denseExists && !forceReindex) {
+            console.log(`📋 Dense collection ${denseName} already exists, skipping creation`);
+            return;
+        }
+        if (denseExists && forceReindex) {
+            console.log(`[Context] 🗑️  Dropping existing dense collection ${denseName} for force reindex...`);
+            await this.vectorDatabase.dropCollection(denseName);
+        }
+        await this.vectorDatabase.createCollection(denseName, dimension, `codebasePath:${codebasePath}`);
+        console.log(`[Context] ✅ Dense collection ${denseName} created successfully (dimension: ${dimension})`);
     }
 
     /**
