@@ -175,6 +175,9 @@ importers:
       tree-sitter-cpp:
         specifier: ^0.22.0
         version: 0.22.3(tree-sitter@0.21.1)
+      tree-sitter-dart:
+        specifier: ^1.0.0
+        version: 1.0.0
       tree-sitter-go:
         specifier: ^0.21.0
         version: 0.21.2(tree-sitter@0.21.1)
@@ -3156,6 +3159,9 @@ packages:
   mute-stream@0.0.8:
     resolution: {integrity: sha512-nnbWWOkoWyUsTjKrhgD0dcz22mdkSnpYqbEjIm2nhwhuxlSkpywJmBo8h0ZqJdkp73mb90SssHkN4rsRaBAfAA==}
 
+  nan@2.26.2:
+    resolution: {integrity: sha512-0tTvBTYkt3tdGw22nrAy50x7gpbGCCFH3AFcyS5WiUu7Eu4vWlri1woE6qHBSfy11vksDqkiwjOnlR7WV8G1Hw==}
+
   napi-build-utils@2.0.0:
     resolution: {integrity: sha512-GEbrYkbfF7MoNaoh2iGG84Mnf/WZfB0GdGEsM8wz7Expx/LlWf5U8t9nvJKXSp3qr5IsEbK04cBGhol/KwOsWA==}
 
@@ -3969,6 +3975,9 @@ packages:
     peerDependenciesMeta:
       tree_sitter:
         optional: true
+
+  tree-sitter-dart@1.0.0:
+    resolution: {integrity: sha512-Ve5YMPJjjGW9LEsO+MngAOibQsw5obFp+bUT41pvwdcXWRwJImOWs3eaPi6AubEiBmc09qvhdvxeIXvxlhMnug==}
 
   tree-sitter-go@0.21.2:
     resolution: {integrity: sha512-aMFwjsB948nWhURiIxExK8QX29JYKs96P/IfXVvluVMRJZpL04SREHsdOZHYqJr1whkb7zr3/gWHqqvlkczmvw==}
@@ -7778,6 +7787,8 @@ snapshots:
 
   mute-stream@0.0.8: {}
 
+  nan@2.26.2: {}
+
   napi-build-utils@2.0.0: {}
 
   napi-postinstall@0.2.4: {}
@@ -8624,6 +8635,10 @@ snapshots:
       node-addon-api: 8.4.0
       node-gyp-build: 4.8.4
       tree-sitter: 0.21.1
+
+  tree-sitter-dart@1.0.0:
+    dependencies:
+      nan: 2.26.2
 
   tree-sitter-go@0.21.2(tree-sitter@0.21.1):
     dependencies:

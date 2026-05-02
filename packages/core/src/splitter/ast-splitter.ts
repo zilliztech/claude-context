@@ -12,8 +12,13 @@ const Rust = require('tree-sitter-rust');
 const CSharp = require('tree-sitter-c-sharp');
 const Scala = require('tree-sitter-scala');
 
+// Dart parser is NOT listed above — it is loaded lazily inside splitDart() only
+// when a Dart file is actually being processed. This ensures:
+// 1. Non-Dart users never trigger a require() or warning for tree-sitter-dart
+// 2. The warning is only emitted when Dart splitting is attempted and fails
+
 // Node types that represent logical code units
-const SPLITTABLE_NODE_TYPES = {
+export const SPLITTABLE_NODE_TYPES = {
     javascript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement'],
     typescript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement', 'interface_declaration', 'type_alias_declaration'],
     python: ['function_definition', 'class_definition', 'decorated_definition', 'async_function_definition'],
@@ -22,7 +27,8 @@ const SPLITTABLE_NODE_TYPES = {
     go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
     rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
     csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration'],
-    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
+    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration'],
+    dart: ['local_function_declaration', 'method_signature', 'class_definition', 'constructor_signature', 'mixin_declaration', 'extension_declaration']
 };
 
 export class AstCodeSplitter implements Splitter {
@@ -42,7 +48,12 @@ export class AstCodeSplitter implements Splitter {
     }
 
     async split(code: string, language: string, filePath?: string): Promise<CodeChunk[]> {
-        // Check if language is supported by AST splitter
+        // Dart: load parser lazily on first Dart split — only warn if Dart is requested
+        if (language.toLowerCase() === 'dart') {
+            return this.splitDart(code, filePath);
+        }
+
+        // All other languages: use the standard AST path
         const langConfig = this.getLanguageConfig(language);
         if (!langConfig) {
             console.log(`📝 Language ${language} not supported by AST, using LangChain splitter for: ${filePath || 'unknown'}`);
@@ -73,6 +84,40 @@ export class AstCodeSplitter implements Splitter {
         }
     }
 
+    /**
+     * Split Dart code. The tree-sitter-dart parser is loaded lazily on first call.
+     * If the native binding is unavailable, a warning is emitted and LangChain
+     * character-based splitter is used instead.
+     */
+    private async splitDart(code: string, filePath?: string): Promise<CodeChunk[]> {
+        let dartParser: any;
+        try {
+            dartParser = require('tree-sitter-dart');
+        } catch (err: any) {
+            console.warn(`[ast-splitter] ⚠️  Failed to load tree-sitter-dart native binding: ${err?.message ?? String(err)}. Dart will use LangChain splitter.`);
+            return await this.langchainFallback.split(code, 'dart', filePath);
+        }
+
+        try {
+            console.log(`🌳 Using AST splitter for dart file: ${filePath || 'unknown'}`);
+
+            this.parser.setLanguage(dartParser);
+            const tree = this.parser.parse(code);
+
+            if (!tree.rootNode) {
+                console.warn(`[ast-splitter] ⚠️  Failed to parse AST for dart, falling back to LangChain: ${filePath || 'unknown'}`);
+                return await this.langchainFallback.split(code, 'dart', filePath);
+            }
+
+            const chunks = this.extractChunks(tree.rootNode, code, SPLITTABLE_NODE_TYPES.dart, 'dart', filePath);
+            const refinedChunks = await this.refineChunks(chunks, code);
+            return refinedChunks;
+        } catch (error) {
+            console.warn(`[ast-splitter] ⚠️  AST splitter failed for dart, falling back to LangChain: ${error}`);
+            return await this.langchainFallback.split(code, 'dart', filePath);
+        }
+    }
+
     setChunkSize(chunkSize: number): void {
         this.chunkSize = chunkSize;
         this.langchainFallback.setChunkSize(chunkSize);
@@ -100,7 +145,7 @@ export class AstCodeSplitter implements Splitter {
             'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
             'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
             'csharp': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala }
+            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala },
         };
 
         return langMap[language.toLowerCase()] || null;
@@ -261,10 +306,15 @@ export class AstCodeSplitter implements Splitter {
      * Check if AST splitting is supported for the given language
      */
     static isLanguageSupported(language: string): boolean {
-        const supportedLanguages = [
+        const astLanguages = [
             'javascript', 'js', 'typescript', 'ts', 'python', 'py',
             'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala'
         ];
-        return supportedLanguages.includes(language.toLowerCase());
+        if (language.toLowerCase() === 'dart') {
+            // Probe at call time — safe to call from non-Dart users without side effects
+            try { require('tree-sitter-dart'); return true; }
+            catch { return false; }
+        }
+        return astLanguages.includes(language.toLowerCase());
     }
 }
