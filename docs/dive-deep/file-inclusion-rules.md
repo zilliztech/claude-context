@@ -28,7 +28,7 @@ All extension sources are combined together:
 
 ### 1. Default Extensions
 Built-in supported file extensions including:
-- Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`
+- Programming languages: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.hpp`, `.cs`, `.go`, `.rs`, `.php`, `.rb`, `.swift`, `.kt`, `.scala`, `.m`, `.mm`, `.dart`, `.sol`
 - Documentation: `.md`, `.markdown`, `.ipynb`
 
 For more details, see [DEFAULT_SUPPORTED_EXTENSIONS](../../packages/core/src/context.ts) in the context.ts file.
