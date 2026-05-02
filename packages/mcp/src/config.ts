@@ -250,6 +250,10 @@ Environment Variables:
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  MAX_DEPTH              Max directory traversal depth (optional)
+
+  Directory Traversal:
+  MAX_DEPTH              Maximum directory traversal depth (optional, limits how deep to recurse)
   CODE_CHUNKS_COLLECTION_NAME_OVERRIDE
                           Optional readable prefix for collection names.
                           Uses code_chunks_<override>_<pathHash> (or hybrid_...)

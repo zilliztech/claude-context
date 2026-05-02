@@ -96,6 +96,7 @@ export interface ContextConfig {
     customExtensions?: string[]; // New: custom extensions from MCP
     customIgnorePatterns?: string[]; // New: custom ignore patterns from MCP
     collectionNameOverride?: string; // Optional: custom collection name suffix
+    maxDepth?: number; // Optional: max directory traversal depth
 }
 
 export class Context {
@@ -108,6 +109,7 @@ export class Context {
     private baseIgnorePatterns: string[];
     private ignorePatterns: string[];
     private collectionNameOverride?: string;
+    private maxDepth?: number;
     private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
 
@@ -152,6 +154,7 @@ export class Context {
         this.baseIgnorePatterns = this.dedupePatterns(allIgnorePatterns);
         this.ignorePatterns = [...this.baseIgnorePatterns];
         this.collectionNameOverride = config.collectionNameOverride;
+        this.maxDepth = config?.maxDepth || (parseInt(envManager.get("MAX_DEPTH") || "") || undefined);
 
         console.log(`[Context] 🔧 Initialized with ${this.supportedExtensions.length} supported extensions and ${this.ignorePatterns.length} ignore patterns`);
         if (envCustomExtensions.length > 0) {
@@ -781,7 +784,7 @@ export class Context {
     ): Promise<string[]> {
         const files: string[] = [];
 
-        const traverseDirectory = async (currentPath: string) => {
+        const traverseDirectory = async (currentPath: string, depth: number = 0) => {
             const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
 
             for (const entry of entries) {
@@ -793,7 +796,8 @@ export class Context {
                 }
 
                 if (entry.isDirectory()) {
-                    await traverseDirectory(fullPath);
+                    if (this.maxDepth !== undefined && depth >= this.maxDepth) continue;
+                    await traverseDirectory(fullPath, depth + 1);
                 } else if (entry.isFile()) {
                     const ext = path.extname(entry.name);
                     if (supportedExtensions.includes(ext)) {
@@ -803,7 +807,7 @@ export class Context {
             }
         };
 
-        await traverseDirectory(codebasePath);
+        await traverseDirectory(codebasePath, 0);
         return files;
     }
 
