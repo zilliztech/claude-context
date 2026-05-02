@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer } from "@zilliz/claude-context-core";
+import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer, IndexAbortError } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
@@ -12,6 +12,14 @@ export class ToolHandlers {
     private snapshotManager: SnapshotManager;
     private indexingStats: { indexedFiles: number; totalChunks: number } | null = null;
     private currentWorkspace: string;
+    /**
+     * Tracks active background indexing tasks per absolute codebase path so
+     * clear_index can cancel and await them before dropping the collection.
+     * Without this, a clear_index call returns "successfully cleared" while
+     * the background task keeps embedding chunks and writing them into the
+     * just-cleared collection (issue #199).
+     */
+    private indexingTasks: Map<string, { controller: AbortController; promise: Promise<void> }> = new Map();
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
@@ -476,8 +484,27 @@ export class ToolHandlers {
             // Track the codebase path for syncing
             trackCodebasePath(absolutePath);
 
-            // Start background indexing - now safe to proceed
-            this.startBackgroundIndexing(absolutePath, forceReindex, splitterType, customIgnorePatterns, customFileExtensions, indexOptions);
+            // Start background indexing - now safe to proceed.
+            // Track the controller + promise so clear_index can cancel and
+            // await us before dropping the underlying collection.
+            const controller = new AbortController();
+            const promise = this.startBackgroundIndexing(
+                absolutePath,
+                forceReindex,
+                splitterType,
+                customIgnorePatterns,
+                customFileExtensions,
+                indexOptions,
+                controller.signal
+            ).finally(() => {
+                // Only clear the entry if it still points at this run — a
+                // concurrent re-index may have replaced us.
+                const current = this.indexingTasks.get(absolutePath);
+                if (current && current.controller === controller) {
+                    this.indexingTasks.delete(absolutePath);
+                }
+            });
+            this.indexingTasks.set(absolutePath, { controller, promise });
 
             const pathInfo = codebasePath !== absolutePath
                 ? `\nNote: Input path '${codebasePath}' was resolved to absolute path '${absolutePath}'`
@@ -519,8 +546,9 @@ export class ToolHandlers {
         splitterType: RequestSplitterType,
         customIgnorePatterns: string[] = [],
         customFileExtensions: string[] = [],
-        indexOptions?: CodebaseIndexOptions
-    ) {
+        indexOptions?: CodebaseIndexOptions,
+        signal?: AbortSignal
+    ): Promise<void> {
         const absolutePath = codebasePath;
         let lastSaveTime = 0; // Track last save timestamp
 
@@ -574,7 +602,7 @@ export class ToolHandlers {
                 }
 
                 console.log(`[BACKGROUND-INDEX] Progress: ${progress.phase} - ${progress.percentage}% (${progress.current}/${progress.total})`);
-            }, false, customIgnorePatterns, customFileExtensions, requestSplitter);
+            }, false, customIgnorePatterns, customFileExtensions, requestSplitter, signal);
             console.log(`[BACKGROUND-INDEX] ✅ Indexing completed successfully! Files: ${stats.indexedFiles}, Chunks: ${stats.totalChunks}`);
 
             // Set codebase to indexed status with complete statistics
@@ -592,6 +620,15 @@ export class ToolHandlers {
             console.log(`[BACKGROUND-INDEX] ${message}`);
 
         } catch (error: any) {
+            // Cooperative cancel from clear_index — clear_index is responsible
+            // for tearing down the snapshot/collection right after, so do not
+            // overwrite the snapshot with an "indexfailed" entry that would
+            // race the clear and leave a tombstone behind.
+            if (error instanceof IndexAbortError) {
+                console.log(`[BACKGROUND-INDEX] Indexing for ${absolutePath} was cancelled: ${error.message}`);
+                return;
+            }
+
             console.error(`[BACKGROUND-INDEX] Error during indexing for ${absolutePath}:`, error);
 
             // Get the last attempted progress
@@ -868,6 +905,24 @@ export class ToolHandlers {
             }
 
             console.log(`[CLEAR] Clearing codebase: ${absolutePath}`);
+
+            // Cancel any in-flight background indexing for this codebase and
+            // wait for it to wind down before we drop the collection.
+            // Otherwise the background task keeps embedding chunks and writes
+            // them into the just-cleared collection (issue #199).
+            const activeTask = this.indexingTasks.get(absolutePath);
+            if (activeTask) {
+                console.log(`[CLEAR] Cancelling in-flight background indexing for: ${absolutePath}`);
+                activeTask.controller.abort();
+                try {
+                    await activeTask.promise;
+                } catch (waitError: any) {
+                    // startBackgroundIndexing already logs and never re-throws,
+                    // so this catch only guards against future refactors.
+                    console.warn(`[CLEAR] Background indexing wind-down reported: ${waitError?.message || waitError}`);
+                }
+                this.indexingTasks.delete(absolutePath);
+            }
 
             try {
                 await this.context.clearIndex(absolutePath);

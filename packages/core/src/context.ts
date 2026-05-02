@@ -23,6 +23,18 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { FileSynchronizer } from './sync/synchronizer';
 
+/**
+ * Thrown by indexCodebase / processFileList when an AbortSignal fires
+ * mid-indexing. Callers (e.g. the MCP server's clear_index handler) use
+ * this to detect a cooperative cancel vs. a real failure.
+ */
+export class IndexAbortError extends Error {
+    constructor(message: string = 'Indexing aborted') {
+        super(message);
+        this.name = 'IndexAbortError';
+    }
+}
+
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
     '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
@@ -328,7 +340,8 @@ export class Context {
         forceReindex: boolean = false,
         additionalIgnorePatterns: string[] = [],
         additionalSupportedExtensions: string[] = [],
-        requestSplitter?: Splitter
+        requestSplitter?: Splitter,
+        signal?: AbortSignal
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
@@ -376,7 +389,8 @@ export class Context {
                     percentage: Math.round(progressPercentage)
                 });
             },
-            splitter
+            splitter,
+            signal
         );
 
         console.log(`[Context] ✅ Codebase indexing completed! Processed ${result.processedFiles} files in total, generated ${result.totalChunks} code chunks`);
@@ -818,7 +832,8 @@ export class Context {
         filePaths: string[],
         codebasePath: string,
         onFileProcessed?: (filePath: string, fileIndex: number, totalFiles: number) => void,
-        splitter: Splitter = this.codeSplitter
+        splitter: Splitter = this.codeSplitter,
+        signal?: AbortSignal
     ): Promise<{ processedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
         const isHybrid = this.getIsHybrid();
         const EMBEDDING_BATCH_SIZE = Math.max(1, parseInt(envManager.get('EMBEDDING_BATCH_SIZE') || '100', 10));
@@ -831,6 +846,13 @@ export class Context {
         let limitReached = false;
 
         for (let i = 0; i < filePaths.length; i++) {
+            // Cooperative cancellation: bail out at the next file boundary so the
+            // caller (e.g. clear_index) can rely on no further inserts/snapshot
+            // writes happening once it has signalled abort. See issue #199.
+            if (signal?.aborted) {
+                throw new IndexAbortError(`Indexing aborted after processing ${processedFiles}/${filePaths.length} files`);
+            }
+
             const filePath = filePaths[i];
 
             try {
@@ -885,8 +907,8 @@ export class Context {
             }
         }
 
-        // Process any remaining chunks in the buffer
-        if (chunkBuffer.length > 0) {
+        // Process any remaining chunks in the buffer (skip if cancelled).
+        if (chunkBuffer.length > 0 && !signal?.aborted) {
             const searchType = isHybrid === true ? 'hybrid' : 'regular';
             console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks for ${searchType}`);
             try {
@@ -897,6 +919,10 @@ export class Context {
                     console.error('[Context] Stack trace:', error.stack);
                 }
             }
+        }
+
+        if (signal?.aborted) {
+            throw new IndexAbortError(`Indexing aborted after processing ${processedFiles}/${filePaths.length} files`);
         }
 
         return {
