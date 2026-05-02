@@ -106,7 +106,7 @@ results.forEach(result => {
 
 - **OpenAI Embeddings** (`text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002`)
 - **VoyageAI Embeddings** - High-quality embeddings optimized for code (`voyage-code-3`, `voyage-3.5`, etc.)
-- **Gemini Embeddings** - Google's embedding models (`gemini-embedding-001`)
+- **Gemini Embeddings** - Google's embedding models (`gemini-embedding-001`, `gemini-embedding-2`)
 - **Ollama Embeddings** - Local embedding models via Ollama
 
 ## Vector Database Support
