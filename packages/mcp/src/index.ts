@@ -74,6 +74,9 @@ class ContextMcpServer {
 
         // Initialize managers
         this.snapshotManager = new SnapshotManager();
+        // Wire canonical-key resolver so snapshot keys are git remote URLs
+        // (shared across team members) rather than local absolute paths.
+        this.snapshotManager.setCanonicalKeyFn((localPath) => this.context.getCanonicalKey(localPath));
         this.syncManager = new SyncManager(this.context, this.snapshotManager);
         this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager);
 
@@ -89,10 +92,11 @@ Index a codebase directory to enable semantic search using a configurable code s
 
 ⚠️ **IMPORTANT**:
 - You MUST provide an absolute path to the target codebase.
+- For git repositories, the index is keyed by the git remote origin URL, so it is **shared across the entire team**. A teammate may have already indexed the same repository — in that case calling this tool with force=true overwrites the team's shared index, not just your local copy.
 
 ✨ **Usage Guidance**:
 - This tool is typically used when search fails due to an unindexed codebase.
-- If indexing is attempted on an already indexed path, and a conflict is detected, you MUST prompt the user to confirm whether to proceed with a force index (i.e., re-indexing and overwriting the previous index).
+- If indexing is attempted on an already indexed path, and a conflict is detected, you MUST prompt the user to confirm whether to proceed with a force index (i.e., re-indexing and overwriting the previous index — including the team's shared one for git repos).
 `;
 
 
@@ -113,8 +117,8 @@ This tool is versatile and can be used before completing various tasks to retrie
 - **Duplicate detection**: Identify redundant or duplicated code patterns across the codebase
 
 ✨ **Usage Guidance**:
-- If the codebase is not indexed, this tool will return a clear error message indicating that indexing is required first.
-- You can then use the index_codebase tool to index the codebase before searching again.
+- If the codebase is not indexed, this tool will return a clear error message indicating that indexing is required first. You can then use the index_codebase tool to index the codebase before searching again.
+- For git repositories, indexes are shared across the team — a search may succeed even if you have not indexed personally, because a teammate already did.
 `;
 
         // Define available tools
@@ -196,7 +200,12 @@ This tool is versatile and can be used before completing various tasks to retrie
                     },
                     {
                         name: "clear_index",
-                        description: `Clear the search index. IMPORTANT: You MUST provide an absolute path.`,
+                        description: `Clear the search index for a codebase.
+
+⚠️ **CRITICAL**:
+- You MUST provide an absolute path.
+- For git repositories the index is **shared across the entire team** (keyed by git remote origin URL). Calling this tool deletes the shared cloud collection, which means **every teammate** will lose their search index for this repository until someone re-indexes.
+- Before calling this tool on a git repository you MUST explicitly confirm with the user that they intend to clear the team-wide index, not just their local snapshot.`,
                         inputSchema: {
                             type: "object",
                             properties: {
@@ -210,7 +219,7 @@ This tool is versatile and can be used before completing various tasks to retrie
                     },
                     {
                         name: "get_indexing_status",
-                        description: `Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases.`,
+                        description: `Get the current indexing status of a codebase. Shows progress percentage for actively indexing codebases and completion status for indexed codebases. For git repositories the status reflects the team-wide shared index — a codebase may report "indexed" even if you never indexed it personally, because a teammate did.`,
                         inputSchema: {
                             type: "object",
                             properties: {

@@ -394,6 +394,27 @@ export class Context {
         return normalized;
     }
 
+    /**
+     * Return the canonical identifier for a codebase directory.
+     *
+     * For git repos with a remote origin this is the normalised remote URL
+     * (e.g. "github.com/org/repo"), which is identical for every developer
+     * who clones the same repository regardless of their local checkout path.
+     *
+     * For non-git directories (or when git-remote collection is disabled) the
+     * canonical key falls back to the resolved absolute path.
+     */
+    public getCanonicalKey(codebasePath: string): string {
+        const normalizedPath = path.resolve(codebasePath);
+        if (this.isGitRemoteCollectionEnabled()) {
+            const remoteUrl = this.getGitRemoteUrl(normalizedPath);
+            if (remoteUrl) {
+                return this.normalizeGitRemoteUrl(remoteUrl);
+            }
+        }
+        return normalizedPath;
+    }
+
     private getValidOverrideValue(value?: string): string | undefined {
         if (!value) {
             return undefined;
@@ -879,10 +900,19 @@ export class Context {
         console.log(`[Context] 📏 Detected dimension: ${dimension} for ${this.embedding.getProvider()}`);
         const dirName = path.basename(codebasePath);
 
+        // Store both canonical key (machine-independent identifier — git remote
+        // URL or absolute path) and the local codebasePath. The canonical key is
+        // what sync actually compares against; the local path is preserved for
+        // diagnostics. Format: "canonicalKey:<key>|codebasePath:<path>".
+        // Old collections written before this format are still parseable: the
+        // sync code falls back to deriving the canonical key from the path.
+        const canonicalKey = this.getCanonicalKey(codebasePath);
+        const description = `canonicalKey:${canonicalKey}|codebasePath:${codebasePath}`;
+
         if (isHybrid === true) {
-            await this.vectorDatabase.createHybridCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
+            await this.vectorDatabase.createHybridCollection(collectionName, dimension, description);
         } else {
-            await this.vectorDatabase.createCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
+            await this.vectorDatabase.createCollection(collectionName, dimension, description);
         }
 
         console.log(`[Context] ✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);

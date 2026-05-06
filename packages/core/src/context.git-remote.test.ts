@@ -177,3 +177,53 @@ describe('getCollectionName — git-remote shared index', () => {
         });
     });
 });
+
+describe('getCanonicalKey', () => {
+    const originalEnv: Record<string, string | undefined> = {};
+
+    beforeEach(() => {
+        execSync.mockReset();
+        for (const key of ['CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION', 'HYBRID_MODE']) {
+            originalEnv[key] = process.env[key];
+            delete process.env[key];
+        }
+        process.env.HYBRID_MODE = 'false';
+    });
+
+    afterEach(() => {
+        for (const [key, val] of Object.entries(originalEnv)) {
+            if (val === undefined) delete process.env[key];
+            else process.env[key] = val;
+        }
+    });
+
+    it('returns the normalised remote URL for a git repo', () => {
+        execSync.mockReturnValue(Buffer.from('git@github.com:org/repo.git'));
+        const ctx = makeContext();
+        expect(ctx.getCanonicalKey('/some/local/path')).toBe('github.com/org/repo');
+    });
+
+    it('returns the absolute path when no remote is found', () => {
+        execSync.mockImplementation(() => { throw new Error('not a git repo'); });
+        const ctx = makeContext();
+        expect(ctx.getCanonicalKey('/non/git/path')).toBe('/non/git/path');
+    });
+
+    it('returns the absolute path when git-remote collection is disabled', () => {
+        process.env.CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION = 'false';
+        execSync.mockReturnValue(Buffer.from('https://github.com/org/repo.git'));
+        const ctx = makeContext();
+        expect(ctx.getCanonicalKey('/some/local/path')).toBe('/some/local/path');
+    });
+
+    it('is consistent with the git-hash part of getCollectionName', () => {
+        execSync.mockReturnValue(Buffer.from('https://github.com/org/repo.git'));
+        const ctx = makeContext();
+        const canonKey = ctx.getCanonicalKey('/some/local/path');
+        const collectionName = ctx.getCollectionName('/some/local/path');
+        // collectionName = code_chunks_git_<md5(canonKey)>
+        expect(collectionName).toContain('_git_');
+        const hash = crypto.createHash('md5').update(canonKey).digest('hex').substring(0, 8);
+        expect(collectionName).toBe(`code_chunks_git_${hash}`);
+    });
+});

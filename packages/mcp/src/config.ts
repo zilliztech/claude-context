@@ -45,6 +45,10 @@ export interface CodebaseIndexOptions {
 // Base interface for common fields
 interface CodebaseInfoBase extends CodebaseIndexOptions {
     lastUpdated: string;
+    /** Absolute path on the current machine. Stored so the snapshot can be
+     *  keyed by the canonical identifier (git remote URL or absolute path)
+     *  while still knowing where the codebase lives locally. */
+    localPath?: string;
 }
 
 // Indexing state - when indexing is in progress
