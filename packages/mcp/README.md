@@ -163,8 +163,12 @@ Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configurati
 ```bash
 MILVUS_TOKEN=your-zilliz-cloud-api-key
 
+# Optional: Specify Zilliz Cloud project name (defaults to 'Default Project')
+# Use this if you want to use a different project when auto-resolving address from token
+# ZILLIZ_PROJECT_NAME=My Custom Project
+
 # Optional: increase timeout for Milvus collection-limit pre-check on slow clusters (default: 15000)
-MILVUS_COLLECTION_LIMIT_CHECK_TIMEOUT_MS=30000
+# MILVUS_COLLECTION_LIMIT_CHECK_TIMEOUT_MS=30000
 ```
 
 #### Embedding Batch Size
