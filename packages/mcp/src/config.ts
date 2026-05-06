@@ -184,6 +184,8 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     if (config.collectionNameOverride) {
         console.log(`[MCP]   Collection Name Override: ✅ Configured`);
     }
+    const gitRemoteEnabled = (envManager.get('CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION') ?? 'true').trim().toLowerCase() !== 'false';
+    console.log(`[MCP]   Git Remote Collection: ${gitRemoteEnabled ? '✅ Enabled (team sharing)' : '⏸ Disabled (path-hash mode)'}`);
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -250,12 +252,22 @@ Environment Variables:
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION
+                          Enable/disable git-remote-based collection naming for
+                          shared team indexes (default: true). When enabled, the
+                          server hashes the git remote origin URL instead of the
+                          local path, so all developers who clone the same repo
+                          share one collection regardless of their checkout path.
+                          SSH and HTTPS variants of the same URL are normalised
+                          to the same hash. Set to false to restore the original
+                          path-hash behaviour.
   CODE_CHUNKS_COLLECTION_NAME_OVERRIDE
                           Optional readable prefix for collection names.
                           Uses code_chunks_<override>_<pathHash> (or hybrid_...)
                           after sanitization (letters/digits/underscore, 255 chars max).
                           The per-codebase pathHash is preserved so multiple
                           codebases stay distinct under the same override.
+                          Takes precedence over git-remote-based naming.
 
   MCP Sync Configuration:
   CLAUDE_CONTEXT_BACKGROUND_SYNC
@@ -300,5 +312,12 @@ Examples:
 
   # Start MCP server with background sync enabled every minute
   OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CLAUDE_CONTEXT_BACKGROUND_SYNC=true CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000 npx @zilliz/claude-context-mcp@latest
+
+  # Share one index across the entire team (git-remote-based naming, enabled by default)
+  # All developers cloning the same repo will use the same Milvus collection.
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Disable git-remote-based naming (revert to local path hash)
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION=false npx @zilliz/claude-context-mcp@latest
         `);
 }
