@@ -867,29 +867,6 @@ export class ToolHandlers {
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = ensureAbsolutePath(codebasePath);
 
-            // Validate path exists
-            if (!fs.existsSync(absolutePath)) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: `Error: Path '${absolutePath}' does not exist. Original input: '${codebasePath}'`
-                    }],
-                    isError: true
-                };
-            }
-
-            // Check if it's a directory
-            const stat = fs.statSync(absolutePath);
-            if (!stat.isDirectory()) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: `Error: Path '${absolutePath}' is not a directory`
-                    }],
-                    isError: true
-                };
-            }
-
             // Check if this codebase is indexed or being indexed
             const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
             const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
