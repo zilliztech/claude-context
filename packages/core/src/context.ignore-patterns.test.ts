@@ -211,6 +211,64 @@ describe('Context ignore pattern isolation', () => {
         ]);
     });
 
+    it('skips dotfiles and dot directories during initial indexing', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(path.join(project, '.config'), { recursive: true });
+        await fs.mkdir(path.join(project, '.github', 'workflows'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src', '.cache'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src'), { recursive: true });
+
+        await fs.writeFile(path.join(project, '.hidden.md'), 'root hidden file should be ignored');
+        await fs.writeFile(path.join(project, '.config', 'settings.md'), 'hidden dir should be ignored');
+        await fs.writeFile(path.join(project, '.github', 'workflows', 'ci.md'), 'hidden nested dir should be ignored');
+        await fs.writeFile(path.join(project, 'src', '.cache', 'generated.md'), 'nested hidden dir should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'keep.md'), 'regular file should stay');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual(['src/keep.md']);
+    });
+
+    it('keeps dotfile skipping active when request ignore patterns are provided', async () => {
+        const project = path.join(tempRoot, 'project-with-request-ignores');
+        await fs.mkdir(path.join(project, '.config'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src'), { recursive: true });
+
+        await fs.writeFile(path.join(project, '.config', 'settings.ts'), 'hidden dir should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'ignored.ts'), 'request ignore should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'keep.ts'), 'regular file should stay');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project, undefined, false, ['src/ignored.ts']);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual(['src/keep.ts']);
+    });
+
     it('treats leading-slash directory ignore patterns as root-anchored and recursive during sync', async () => {
         const project = path.join(tempRoot, 'project');
         await fs.mkdir(path.join(project, 'Library'), { recursive: true });
