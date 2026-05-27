@@ -209,7 +209,7 @@ export class FileSynchronizer {
 
         // Create a root node for the entire directory
         let valuesString = "";
-        keys.forEach(key => {
+        sortedPaths.forEach(key => {
             valuesString += fileHashes.get(key);
         });
         const rootNodeData = "root:" + valuesString;
