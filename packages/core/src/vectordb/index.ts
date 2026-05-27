@@ -9,11 +9,13 @@ export {
     HybridSearchResult,
     RerankStrategy,
     COLLECTION_LIMIT_MESSAGE
-} from './types';
+} from './types.js';
 
 // Implementation class exports
-export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
-export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
+export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb.js';
+export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb.js';
+export { LocalVectorDatabase, LocalVectorDatabaseConfig } from './local-vectordb.js';
+export { LanceDBVectorDatabase, LanceDBConfig } from './lancedb-vectordb.js';
 export {
     ClusterManager,
     ZillizConfig,
@@ -23,4 +25,4 @@ export {
     CreateFreeClusterResponse,
     CreateFreeClusterWithDetailsResponse,
     DescribeClusterResponse
-} from './zilliz-utils'; 
+} from './zilliz-utils.js'; 

@@ -21,8 +21,7 @@ import {
     ListToolsRequestSchema,
     CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { Context } from "@zilliz/claude-context-core";
-import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
+import { Context, MilvusVectorDatabase, LocalVectorDatabase, LanceDBVectorDatabase } from "@zilliz/claude-context-core";
 
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
@@ -60,10 +59,21 @@ class ContextMcpServer {
         logEmbeddingProviderInfo(config, embedding);
 
         // Initialize vector database
-        const vectorDatabase = new MilvusVectorDatabase({
-            address: config.milvusAddress,
-            ...(config.milvusToken && { token: config.milvusToken })
-        });
+        let vectorDatabase;
+        if (config.vectorDbType === 'milvus') {
+            vectorDatabase = new MilvusVectorDatabase({
+                address: config.milvusAddress,
+                ...(config.milvusToken && { token: config.milvusToken })
+            });
+        } else if (config.vectorDbType === 'lancedb') {
+            vectorDatabase = new LanceDBVectorDatabase({
+                dataDir: config.localDbPath
+            });
+        } else {
+            vectorDatabase = new LocalVectorDatabase({
+                dataDir: config.localDbPath
+            });
+        }
 
         // Initialize Claude Context
         this.context = new Context({

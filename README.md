@@ -22,6 +22,8 @@
 
 💰 **Cost-Effective for Large Codebases**: Instead of loading entire directories into Claude for every request, which can be very expensive, Claude Context efficiently stores your codebase in a vector database and only uses related code in context to keep your costs manageable.
 
+🖥️ **Local or Cloud Deployment**: Choose between a fully local vector database (LanceDB - recommended) for privacy and simplicity, or Milvus/Zilliz Cloud for enterprise scale. The local option requires no external services!
+
 ---
 
 ## 🚀 Demo
@@ -35,13 +37,29 @@ Model Context Protocol (MCP) allows you to integrate Claude Context with your fa
 ### Prerequisites
 
 <details>
-<summary>Get a free vector database on Zilliz Cloud 👈</summary>
+<summary>Choose your vector database option (Local or Cloud) 👈</summary>
 
-Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
+Claude Context supports three vector database options:
+
+**Option 1: LanceDB (RECOMMENDED for Local Use)**
+- No external services required
+- Uses LanceDB for fast, reliable local vector search
+- Perfect for individual developers and large codebases (up to millions of files)
+- No additional setup needed beyond the OpenAI key
+
+**Option 2: Local Vector Database (FAISS + SQLite)**
+- No external services required
+- Uses FAISS + SQLite for lightweight local search
+- Perfect for individual developers and small codebases
+- No additional setup needed beyond the OpenAI key
+
+**Option 3: Cloud Vector Database (Zilliz Cloud)**
+- For enterprise-scale codebases
+- Sign up on [Zilliz Cloud](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) to get an API key
 
 ![](assets/signup_and_get_apikey.png)
 
-Copy your Personal Key to replace `your-zilliz-cloud-api-key` in the configuration examples.
+Copy your Personal Key to replace `your-zilliz-cloud-api-key` if you choose this option.
 </details>
 
 <details>
@@ -60,13 +78,37 @@ Copy your key and use it in the configuration examples below as `your-openai-api
 
 - Node.js >= 20.0.0
 
-#### Configuration
+#### Configuration (LanceDB - Recommended)
 
-Use the command line interface to add the Claude Context MCP server:
+Use the command line interface to add the Claude Context MCP server with LanceDB (no Milvus required):
 
 ```bash
 claude mcp add claude-context \
   -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -- npx @zilliz/claude-context-mcp@latest
+```
+
+The server will automatically use LanceDB by default when no Milvus configuration is not provided.
+
+#### Configuration (FAISS + SQLite)
+
+To use the FAISS + SQLite database instead:
+
+```bash
+claude mcp add claude-context \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e VECTOR_DB_TYPE=local \
+  -- npx @zilliz/claude-context-mcp@latest
+```
+
+#### Configuration (Cloud Database - Zilliz Cloud)
+
+If you want to use Zilliz Cloud instead:
+
+```bash
+claude mcp add claude-context \
+  -e OPENAI_API_KEY=sk-your-openai-api-key \
+  -e VECTOR_DB_TYPE=milvus \
   -e MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint \
   -e MILVUS_TOKEN=your-zilliz-cloud-api-key \
   -- npx @zilliz/claude-context-mcp@latest
@@ -83,14 +125,26 @@ Codex CLI uses TOML configuration files:
 
 1. Create or edit the `~/.codex/config.toml` file.
 
-2. Add the following configuration:
+2. Add the following configuration (Local Database):
 
 ```toml
 # IMPORTANT: the top-level key is `mcp_servers` rather than `mcpServers`.
 [mcp_servers.claude-context]
 command = "npx"
 args = ["@zilliz/claude-context-mcp@latest"]
-env = { "OPENAI_API_KEY" = "your-openai-api-key", "MILVUS_TOKEN" = "your-zilliz-cloud-api-key" }
+env = { "OPENAI_API_KEY" = "your-openai-api-key" }
+# Optional: override the default 10s startup timeout
+startup_timeout_ms = 20000
+```
+
+Or for Zilliz Cloud:
+
+```toml
+# IMPORTANT: the top-level key is `mcp_servers` rather than `mcpServers`.
+[mcp_servers.claude-context]
+command = "npx"
+args = ["@zilliz/claude-context-mcp@latest"]
+env = { "OPENAI_API_KEY" = "your-openai-api-key", "VECTOR_DB_TYPE" = "milvus", "MILVUS_TOKEN" = "your-zilliz-cloud-api-key" }
 # Optional: override the default 10s startup timeout
 startup_timeout_ms = 20000
 ```
@@ -544,7 +598,7 @@ Claude Context is a monorepo containing three main packages:
 ### Supported Technologies
 
 - **Embedding Providers**: [OpenAI](https://openai.com), [VoyageAI](https://voyageai.com), [Ollama](https://ollama.com), [Gemini](https://gemini.google.com)
-- **Vector Databases**: [Milvus](https://milvus.io) or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
+- **Vector Databases**: [LanceDB](https://lancedb.com) (local, recommended), [Milvus](https://milvus.io), or [Zilliz Cloud](https://zilliz.com/cloud)(fully managed vector database as a service)
 - **Code Splitters**: AST-based splitter (with automatic fallback), LangChain character-based splitter
 - **Languages**: TypeScript, JavaScript, Python, Java, C++, C#, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Markdown
 - **Development Tools**: VSCode, Model Context Protocol
@@ -560,7 +614,7 @@ While MCP is the recommended way to use Claude Context with AI assistants, you c
 The `@zilliz/claude-context-core` package provides the fundamental functionality for code indexing and semantic search.
 
 ```typescript
-import { Context, MilvusVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
+import { Context, LanceDBVectorDatabase, MilvusVectorDatabase, LocalVectorDatabase, OpenAIEmbedding } from '@zilliz/claude-context-core';
 
 // Initialize embedding provider
 const embedding = new OpenAIEmbedding({
@@ -568,11 +622,21 @@ const embedding = new OpenAIEmbedding({
     model: 'text-embedding-3-small'
 });
 
-// Initialize vector database
-const vectorDatabase = new MilvusVectorDatabase({
-    address: process.env.MILVUS_ADDRESS || 'your-zilliz-cloud-public-endpoint',
-    token: process.env.MILVUS_TOKEN || 'your-zilliz-cloud-api-key'
+// Option 1: Initialize LanceDB (RECOMMENDED for local use)
+const vectorDatabase = new LanceDBVectorDatabase({
+    dataDir: process.env.LOCAL_DB_PATH // optional, defaults to ~/.claude-context/lancedb
 });
+
+// Option 2: Initialize FAISS + SQLite
+// const vectorDatabase = new LocalVectorDatabase({
+//     dataDir: process.env.LOCAL_DB_PATH // optional, defaults to ~/.claude-context/local-db
+// });
+
+// Option 3: Initialize Milvus
+// const vectorDatabase = new MilvusVectorDatabase({
+//     address: process.env.MILVUS_ADDRESS || 'your-zilliz-cloud-public-endpoint',
+//     token: process.env.MILVUS_TOKEN || 'your-zilliz-cloud-api-key'
+// });
 
 // Create context instance
 const context = new Context({
