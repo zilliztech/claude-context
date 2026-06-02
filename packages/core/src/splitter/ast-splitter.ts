@@ -53,10 +53,24 @@ export class AstCodeSplitter implements Splitter {
             console.log(`🌳 Using AST splitter for ${language} file: ${filePath || 'unknown'}`);
 
             this.parser.setLanguage(langConfig.parser);
-            const tree = this.parser.parse(code);
+            // node-tree-sitter defaults to a 32KB internal buffer and silently
+            // truncates longer string inputs (tree-sitter/node-tree-sitter#250).
+            // Size the buffer to the source so large files (e.g. >32KB Go files)
+            // are parsed in full.
+            const codeByteLength = Buffer.byteLength(code, 'utf8');
+            const bufferSize = Math.max(32 * 1024, codeByteLength + 1024);
+            const tree = this.parser.parse(code, undefined, { bufferSize });
 
             if (!tree.rootNode) {
                 console.warn(`[ASTSplitter] ⚠️  Failed to parse AST for ${language}, falling back to LangChain: ${filePath || 'unknown'}`);
+                return await this.langchainFallback.split(code, language, filePath);
+            }
+
+            // Defensive check against silent truncation: a healthy parse must cover
+            // the entire source byte range. If it doesn't, fall back so we don't
+            // silently drop the tail of the file from the index.
+            if (tree.rootNode.endIndex < codeByteLength) {
+                console.warn(`[ASTSplitter] ⚠️  AST parse incomplete for ${language} (parsed ${tree.rootNode.endIndex}/${codeByteLength} bytes), falling back to LangChain: ${filePath || 'unknown'}`);
                 return await this.langchainFallback.split(code, language, filePath);
             }
 
