@@ -35,6 +35,23 @@ export class IndexAbortError extends Error {
     }
 }
 
+/**
+ * Thrown when the embedding API fails (quota exhausted, auth failure,
+ * network error, etc.). Propagates through processFileList so callers
+ * can distinguish a critical embedding failure from a per-file skip.
+ *
+ * Unlike a per-file read/parse error (which is logged and skipped),
+ * an EmbeddingError is always re-thrown so that the entire indexing
+ * pipeline stops. This prevents silent partial indexing: Milvus would
+ * otherwise receive zero vectors while the snapshot marks files as done.
+ */
+export class EmbeddingError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'EmbeddingError';
+    }
+}
+
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
     '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
@@ -877,6 +894,10 @@ export class Context {
                         try {
                             await this.processChunkBuffer(chunkBuffer);
                         } catch (error) {
+                            // Embedding errors (such as API having no quota) halt the entire indexing process and propagate upwards.
+                            if (error instanceof EmbeddingError) {
+                                throw error;
+                            }
                             const searchType = isHybrid === true ? 'hybrid' : 'regular';
                             console.error(`[Context] ❌ Failed to process chunk batch for ${searchType}:`, error);
                             if (error instanceof Error) {
@@ -903,6 +924,9 @@ export class Context {
                 }
 
             } catch (error) {
+                if (error instanceof EmbeddingError) {
+                    throw error;
+                }
                 console.warn(`[Context] ⚠️  Skipping file ${filePath}: ${error}`);
             }
         }
@@ -914,6 +938,9 @@ export class Context {
             try {
                 await this.processChunkBuffer(chunkBuffer);
             } catch (error) {
+                if (error instanceof EmbeddingError) {
+                    throw error;
+                }
                 console.error(`[Context] ❌ Failed to process final chunk batch for ${searchType}:`, error);
                 if (error instanceof Error) {
                     console.error('[Context] Stack trace:', error.stack);
@@ -959,7 +986,18 @@ export class Context {
 
         // Generate embedding vectors
         const chunkContents = chunks.map(chunk => chunk.content);
-        const embeddings = await this.embedding.embedBatch(chunkContents);
+
+        let embeddings: EmbeddingVector[];
+        try {
+            embeddings = await this.embedding.embedBatch(chunkContents);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            // Include batch size in the log/error message so operators can
+            // identify how many chunks were lost when the API call failed.
+            console.error(`[Context] ❌ Embedding API failed (batch size: ${chunkContents.length}): ${errorMessage}`);
+            throw new EmbeddingError(`Embedding API error (batch size: ${chunkContents.length}): ${errorMessage}`);
+        }
+        this.validateEmbeddings(embeddings, chunks.length);
 
         if (isHybrid === true) {
             // Create hybrid vector documents
@@ -1022,6 +1060,39 @@ export class Context {
             // Store to vector database
             await this.vectorDatabase.insert(this.getCollectionName(codebasePath), documents);
         }
+    }
+
+    /**
+     * Validate that the embedding batch response is well-formed before writing
+     * any vectors to Milvus. Throwing EmbeddingError here aborts the entire
+     * indexing run so that no partial / empty vectors are persisted.
+     *
+     * @param embeddings   - Array of embedding vectors returned by the API.
+     * @param expectedCount - Number of chunks submitted in the batch request.
+     * @throws EmbeddingError if the response is missing, mismatched, or contains
+     *         any empty vector.
+     * @returns void
+     */
+    private validateEmbeddings(embeddings: EmbeddingVector[], expectedCount: number): void {
+        // Guard against non-array return values (e.g. API returning null or an
+        // error object instead of throwing).
+        if (!Array.isArray(embeddings)) {
+            throw new EmbeddingError('Embedding API returned invalid embedding batch response');
+        }
+
+        // A partial response would silently mis-align embeddings[i] with chunks[i],
+        // producing wrong vectors in Milvus — treat it as a hard failure.
+        if (embeddings.length !== expectedCount) {
+            throw new EmbeddingError(`Embedding API returned ${embeddings.length} embeddings for ${expectedCount} chunks`);
+        }
+
+        // Check each vector; an empty vector inserted into Milvus
+        // would corrupt search results for that chunk's file.
+        embeddings.forEach((embedding, index) => {
+            if (!embedding || !Array.isArray(embedding.vector) || embedding.vector.length === 0) {
+                throw new EmbeddingError(`Embedding API returned empty embedding vector at index ${index}`);
+            }
+        });
     }
 
     /**
