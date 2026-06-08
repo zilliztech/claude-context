@@ -11,17 +11,24 @@ export function truncateContent(content: string, maxLength: number): string {
 }
 
 /**
- * Ensure path is absolute. If relative path is provided, resolve it properly.
+ * Ensure path is absolute and safe. If relative path is provided, resolve it properly.
+ * Includes basic checks to prevent accessing highly sensitive system directories.
  */
 export function ensureAbsolutePath(inputPath: string): string {
-    // If already absolute, return as is
-    if (path.isAbsolute(inputPath)) {
-        return inputPath;
+    const resolved = path.isAbsolute(inputPath) ? inputPath : path.resolve(inputPath);
+    const normalized = path.normalize(resolved);
+
+    // Basic safety check for sensitive system paths (Unix-like and Windows)
+    const sensitivePaths = [
+        "/etc", "/var/private", "/root",
+        "C:\\Windows", "C:\\Users\\Administrator"
+    ];
+
+    if (sensitivePaths.some(p => normalized.startsWith(p))) {
+        throw new Error(`Access to sensitive system path denied: ${normalized}`);
     }
 
-    // For relative paths, resolve to absolute path
-    const resolved = path.resolve(inputPath);
-    return resolved;
+    return normalized;
 }
 
 export function trackCodebasePath(codebasePath: string): void {

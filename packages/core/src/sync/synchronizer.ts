@@ -192,14 +192,19 @@ export class FileSynchronizer {
 
     private simpleGlobMatch(text: string, pattern: string): boolean {
         if (!text || !pattern) return false;
+        if (pattern === '*') return true;
 
-        // Convert glob pattern to regex
+        // Convert glob pattern to a safe regex with non-greedy matching
         const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
-            .replace(/\*/g, '.*'); // Convert * to .*
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars
+            .replace(/\*/g, '.*?');               // Convert * to non-greedy .*?
 
-        const regex = new RegExp(`^${regexPattern}$`);
-        return regex.test(text);
+        try {
+            const regex = new RegExp(`^${regexPattern}$`);
+            return regex.test(text);
+        } catch (e) {
+            return false;
+        }
     }
 
     private buildMerkleDAG(fileHashes: Map<string, string>): MerkleDAG {
