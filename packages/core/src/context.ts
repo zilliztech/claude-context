@@ -1211,19 +1211,28 @@ export class Context {
     }
 
     /**
-     * Find all .xxxignore files in the codebase directory
+     * Find supported ignore files in the codebase root.
+     *
+     * Only `.gitignore` and `.contextignore` are loaded. Other tool-specific
+     * ignore files (`.prettierignore`, `.dockerignore`, `.eslintignore`, …)
+     * are intentionally skipped because their semantics are tool-defined and
+     * not reliably interpretable as a flat list of exclude patterns. In
+     * particular, prettier-style allowlists that begin with a bare `*` and
+     * use `!`-negations would otherwise cause every file to be ignored, since
+     * this loader does not implement gitignore negation. Projects that need
+     * extra patterns for indexing should put them in `.contextignore`.
+     *
      * @param codebasePath Path to the codebase
      * @returns Array of ignore file paths
      */
     private async findIgnoreFiles(codebasePath: string): Promise<string[]> {
+        const SUPPORTED_IGNORE_FILES = ['.gitignore', '.contextignore'];
         try {
             const entries = await fs.promises.readdir(codebasePath, { withFileTypes: true });
             const ignoreFiles: string[] = [];
 
             for (const entry of entries) {
-                if (entry.isFile() &&
-                    entry.name.startsWith('.') &&
-                    entry.name.endsWith('ignore')) {
+                if (entry.isFile() && SUPPORTED_IGNORE_FILES.includes(entry.name)) {
                     ignoreFiles.push(path.join(codebasePath, entry.name));
                 }
             }
