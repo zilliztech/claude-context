@@ -2,6 +2,14 @@ import * as vscode from 'vscode';
 import { Context } from '@zilliz/claude-context-core';
 import * as fs from 'fs';
 
+/** Progress callback parameter type */
+interface ProgressInfo {
+    phase: string;
+    current: number;
+    total: number;
+    percentage: number;
+}
+
 export class SyncCommand {
     private context: Context;
     private isSyncing: boolean = false;
@@ -59,7 +67,7 @@ export class SyncCommand {
                 try {
                     syncStats = await this.context.reindexByChange(
                         codebasePath,
-                        (progressInfo) => {
+                        (progressInfo: ProgressInfo) => {
                             const increment = progressInfo.percentage;
                             progress.report({
                                 increment: increment,
