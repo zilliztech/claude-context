@@ -73,13 +73,15 @@ export class ToolHandlers {
             const indexedCodebases = this.snapshotManager.getIndexedCodebases();
             let healed = 0, removed = 0, skipped = 0, checked = 0;
 
-            for (const codebasePath of indexedCodebases) {
-                const info = this.snapshotManager.getCodebaseInfo(codebasePath);
+            for (const canonKey of indexedCodebases) {
+                const info = this.snapshotManager.getCodebaseInfo(canonKey);
                 if (!info || info.status !== 'indexed') continue;
                 // Only validate suspiciously-zero entries
                 if (info.indexedFiles !== 0 || info.totalChunks !== 0) continue;
 
                 checked++;
+                // Resolve to local path so getCollectionName produces the right hash
+                const codebasePath = this.snapshotManager.getLocalPath(canonKey) ?? canonKey;
                 const collectionName = this.context.getCollectionName(codebasePath);
                 const vdb = this.context.getVectorDatabase();
 
@@ -154,24 +156,31 @@ export class ToolHandlers {
     }
 
     /**
-     * Sync indexed codebases from Zilliz Cloud collections
-     * This method fetches all collections from the vector database,
-     * extracts codebasePath from collection description (preferred) or falls back
-     * to querying document metadata for old collections,
-     * and updates the snapshot with discovered codebases.
+     * Sync indexed codebases from Zilliz Cloud collections.
      *
-     * Logic: Compare mcp-codebase-snapshot.json with zilliz cloud collections
-     * - If local snapshot has extra directories (not in cloud), remove them
-     * - If local snapshot is missing directories (exist in cloud), ignore them
+     * Comparison is now done by **canonical key** (git remote URL or absolute
+     * path), not by raw local path strings.  This lets team members on
+     * different machines share the same index without the sync logic removing
+     * their local snapshot entries just because the stored path differs from
+     * their checkout path.
+     *
+     * Logic:
+     * - Cloud collection found  → extract its canonical key
+     * - Local snapshot entry   → use its canonical key (from map)
+     * - Remove local entries whose canonical key is not present in cloud
+     * - Recover cloud entries that are missing from local snapshot when a
+     *   local path hint is available (supplied by the calling handler)
+     *
+     * @param localPathHint  The local absolute path used in the current
+     *   request.  If the canonical key for this path is found in the cloud
+     *   but missing from the local snapshot, the entry is recovered using
+     *   this path so it is immediately useful on this machine.
      */
-    private async syncIndexedCodebasesFromCloud(): Promise<void> {
+    private async syncIndexedCodebasesFromCloud(localPathHint?: string): Promise<void> {
         try {
             console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
 
-            // Get all collections using the interface method
             const vectorDb = this.context.getVectorDatabase();
-
-            // Use the new listCollections method from the interface
             const collections = await vectorDb.listCollections();
 
             console.log(`[SYNC-CLOUD] 📋 Found ${collections.length} collections in Zilliz Cloud`);
@@ -181,14 +190,13 @@ export class ToolHandlers {
                 return;
             }
 
-            const cloudCodebases = new Set<string>();
+            // cloudCanonicalKeys: canonical key → collection name (for recovery stats query)
+            const cloudCanonicalKeys = new Map<string, string>();
             let codeCollectionsChecked = 0;
             let successfulExtractions = 0;
 
-            // Check each collection for codebase path
             for (const collectionName of collections) {
                 try {
-                    // Skip collections that don't match the code_chunks pattern (support both legacy and new collections)
                     if (!collectionName.startsWith('code_chunks_') && !collectionName.startsWith('hybrid_code_chunks_')) {
                         console.log(`[SYNC-CLOUD] ⏭️  Skipping non-code collection: ${collectionName}`);
                         continue;
@@ -197,113 +205,133 @@ export class ToolHandlers {
                     codeCollectionsChecked++;
                     console.log(`[SYNC-CLOUD] 🔍 Checking collection: ${collectionName}`);
 
-                    // Try to extract codebasePath from collection description first (new format)
-                    let extracted = false;
+                    let canonKey: string | undefined;
+
+                    // Try collection description first.
+                    //
+                    // Description format priority:
+                    //   1. "canonicalKey:<key>|codebasePath:<path>" (current) — use
+                    //      the stored canonical key directly, immune to the local
+                    //      folder being moved/renamed/deleted.
+                    //   2. "codebasePath:<path>" (legacy) — derive canonical key
+                    //      from the stored path. May fall back to absolute path if
+                    //      the folder no longer exists; that's a known limitation
+                    //      of legacy collections and only affects them.
                     try {
                         const description = await vectorDb.getCollectionDescription(collectionName);
-                        if (description && description.startsWith('codebasePath:')) {
-                            const codebasePath = description.substring('codebasePath:'.length);
-                            if (codebasePath.length > 0) {
-                                console.log(`[SYNC-CLOUD] 📍 Found codebase path from description: ${codebasePath} in collection: ${collectionName}`);
-                                cloudCodebases.add(codebasePath);
-                                successfulExtractions++;
-                                extracted = true;
+                        if (description) {
+                            const canonMatch = description.match(/^canonicalKey:([^|]+)/);
+                            if (canonMatch) {
+                                canonKey = canonMatch[1].trim();
+                                console.log(`[SYNC-CLOUD] 📍 Canonical key from description (direct): ${canonKey}`);
+                            } else if (description.startsWith('codebasePath:')) {
+                                const storedPath = description.substring('codebasePath:'.length).trim();
+                                if (storedPath.length > 0) {
+                                    canonKey = this.context.getCanonicalKey(storedPath);
+                                    console.log(`[SYNC-CLOUD] 📍 Canonical key from legacy description path: ${canonKey} (stored path: ${storedPath})`);
+                                }
                             }
                         }
                     } catch (descError: any) {
-                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to get description for collection ${collectionName}:`, descError.message || descError);
+                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to get description for ${collectionName}:`, descError.message || descError);
                     }
 
-                    // Fallback: query document metadata for old collections without new description format
-                    if (!extracted) {
-                        console.log(`[SYNC-CLOUD] 🔄 Falling back to query-based extraction for collection: ${collectionName}`);
+                    // Fallback: query document metadata
+                    if (!canonKey) {
+                        console.log(`[SYNC-CLOUD] 🔄 Falling back to query-based extraction for: ${collectionName}`);
                         try {
-                            const results = await vectorDb.query(
-                                collectionName,
-                                undefined as any, // Don't pass empty filter
-                                ['metadata'], // Only fetch metadata field
-                                1 // Only need one result to extract codebasePath
-                            );
-
+                            const results = await vectorDb.query(collectionName, undefined as any, ['metadata'], 1);
                             if (results && results.length > 0) {
-                                const firstResult = results[0];
-                                const metadataStr = firstResult.metadata;
-
+                                const metadataStr = results[0].metadata;
                                 if (metadataStr) {
                                     const metadata = JSON.parse(metadataStr);
-                                    const codebasePath = metadata.codebasePath;
-
-                                    if (codebasePath && typeof codebasePath === 'string') {
-                                        console.log(`[SYNC-CLOUD] 📍 Found codebase path from query: ${codebasePath} in collection: ${collectionName}`);
-                                        cloudCodebases.add(codebasePath);
-                                        successfulExtractions++;
-                                    } else {
-                                        console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
+                                    const storedPath: string | undefined = metadata.codebasePath;
+                                    if (storedPath) {
+                                        canonKey = this.context.getCanonicalKey(storedPath);
+                                        console.log(`[SYNC-CLOUD] 📍 Canonical key from metadata: ${canonKey} (stored path: ${storedPath})`);
                                     }
-                                } else {
-                                    console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
                                 }
                             } else {
                                 console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
                             }
                         } catch (queryError: any) {
-                            console.warn(`[SYNC-CLOUD] ⚠️  Fallback query failed for collection ${collectionName}:`, queryError.message || queryError);
+                            console.warn(`[SYNC-CLOUD] ⚠️  Fallback query failed for ${collectionName}:`, queryError.message || queryError);
                         }
+                    }
+
+                    if (canonKey) {
+                        cloudCanonicalKeys.set(canonKey, collectionName);
+                        successfulExtractions++;
+                    } else {
+                        console.warn(`[SYNC-CLOUD] ⚠️  Could not derive canonical key for ${collectionName}`);
                     }
                 } catch (collectionError: any) {
                     console.warn(`[SYNC-CLOUD] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
-                    // Continue with next collection
                 }
             }
 
-            console.log(`[SYNC-CLOUD] 📊 Found ${cloudCodebases.size} valid codebases in cloud (checked ${codeCollectionsChecked} code collections, ${successfulExtractions} successfully extracted)`);
+            console.log(`[SYNC-CLOUD] 📊 Found ${cloudCanonicalKeys.size} valid codebases in cloud (checked ${codeCollectionsChecked} code collections, ${successfulExtractions} successfully extracted)`);
 
-            // Safety guard: if we checked code collections but none returned results,
-            // treat this as an extraction failure rather than "cloud is empty".
-            // This prevents deleting all local codebases due to transient errors.
             if (codeCollectionsChecked > 0 && successfulExtractions === 0) {
-                console.warn(`[SYNC-CLOUD] ⚠️  All ${codeCollectionsChecked} code collection extractions failed. Skipping sync to avoid accidental deletion of local codebases.`);
+                console.warn(`[SYNC-CLOUD] ⚠️  All ${codeCollectionsChecked} code collection extractions failed. Skipping sync to avoid accidental deletion.`);
                 return;
             }
 
-            // Get current local codebases
-            const localCodebases = new Set(this.snapshotManager.getIndexedCodebases());
-            console.log(`[SYNC-CLOUD] 📊 Found ${localCodebases.size} local codebases in snapshot`);
+            // Local snapshot uses canonical keys as map keys
+            const localCanonicalKeys = new Set(this.snapshotManager.getIndexedCodebases());
+            console.log(`[SYNC-CLOUD] 📊 Found ${localCanonicalKeys.size} local codebases in snapshot`);
 
             let hasChanges = false;
 
-            // Remove local codebases that don't exist in cloud
-            for (const localCodebase of localCodebases) {
-                if (!cloudCodebases.has(localCodebase)) {
-                    this.snapshotManager.removeCodebaseCompletely(localCodebase);
+            // Remove local entries whose canonical key is no longer in cloud
+            for (const localKey of localCanonicalKeys) {
+                if (!cloudCanonicalKeys.has(localKey)) {
+                    this.snapshotManager.removeCodebaseCompletely(localKey);
                     hasChanges = true;
 
+                    // Best-effort: delete local merkle snapshot using stored local path
+                    const localPath = this.snapshotManager.getLocalPath(localKey) ?? localKey;
                     try {
-                        await FileSynchronizer.deleteSnapshot(localCodebase);
+                        await FileSynchronizer.deleteSnapshot(localPath);
                     } catch (error: any) {
-                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to delete local merkle snapshot for removed codebase '${localCodebase}':`, error?.message || error);
+                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to delete local merkle snapshot for '${localKey}':`, error?.message || error);
                     }
 
-                    console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
+                    console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localKey}`);
                 }
             }
 
-            // Add cloud codebases that are missing from local snapshot (recovery).
-            // Query Milvus for the real row count — if unknown/empty, skip the write
-            // so we don't persist a poisoning 0/0+completed entry (Issue #295).
-            for (const cloudCodebase of cloudCodebases) {
-                if (!localCodebases.has(cloudCodebase)) {
-                    const stats = await this.queryCollectionStats(cloudCodebase);
-                    if (stats) {
-                        this.snapshotManager.setCodebaseIndexed(cloudCodebase, {
-                            ...stats,
-                            status: 'completed' as const
-                        });
-                        hasChanges = true;
-                        console.log(`[SYNC-CLOUD] ➕ Recovered codebase from cloud: ${cloudCodebase} (rows=${stats.totalChunks})`);
-                    } else {
-                        console.log(`[SYNC-CLOUD] ⏭️  Skipped recovery for ${cloudCodebase} (row count unknown or zero)`);
+            // Recover cloud entries missing from local snapshot.
+            // For each canonical key found in cloud but not locally, we need a
+            // local path to store in the snapshot.  Use the hint when it matches;
+            // otherwise skip (we cannot invent a local path for another machine).
+            for (const cloudKey of cloudCanonicalKeys.keys()) {
+                if (localCanonicalKeys.has(cloudKey)) continue;
+
+                // Determine the local path for this machine
+                let recoveryLocalPath: string | undefined;
+                if (localPathHint) {
+                    const hintKey = this.context.getCanonicalKey(localPathHint);
+                    if (hintKey === cloudKey) {
+                        recoveryLocalPath = localPathHint;
                     }
+                }
+
+                if (!recoveryLocalPath) {
+                    console.log(`[SYNC-CLOUD] ⏭️  Skipped recovery for ${cloudKey} (no local path hint matches)`);
+                    continue;
+                }
+
+                const stats = await this.queryCollectionStats(recoveryLocalPath);
+                if (stats) {
+                    this.snapshotManager.setCodebaseIndexed(recoveryLocalPath, {
+                        ...stats,
+                        status: 'completed' as const
+                    });
+                    hasChanges = true;
+                    console.log(`[SYNC-CLOUD] ➕ Recovered codebase from cloud: ${cloudKey} → localPath=${recoveryLocalPath} (rows=${stats.totalChunks})`);
+                } else {
+                    console.log(`[SYNC-CLOUD] ⏭️  Skipped recovery for ${cloudKey} (row count unknown or zero)`);
                 }
             }
 
@@ -317,7 +345,6 @@ export class ToolHandlers {
             console.log(`[SYNC-CLOUD] ✅ Cloud sync completed successfully`);
         } catch (error: any) {
             console.error(`[SYNC-CLOUD] ❌ Error syncing codebases from cloud:`, error.message || error);
-            // Don't throw - this is not critical for the main functionality
         }
     }
 
@@ -329,8 +356,9 @@ export class ToolHandlers {
         const customIgnorePatterns = ignorePatterns || [];
 
         try {
-            // Sync indexed codebases from cloud first
-            await this.syncIndexedCodebasesFromCloud();
+            // Sync indexed codebases from cloud first (pass path as hint for recovery)
+            const earlyAbsPath = ensureAbsolutePath(codebasePath);
+            await this.syncIndexedCodebasesFromCloud(earlyAbsPath);
 
             // Validate splitter parameter
             if (!isRequestSplitterType(requestedSplitter)) {
@@ -374,11 +402,15 @@ export class ToolHandlers {
                 };
             }
 
+            // Snapshot keys are canonical (git remote URL or absolute path);
+            // resolve once and use for all map lookups in this handler.
+            const canonKey = this.snapshotManager.canonicalKey(absolutePath);
+
             // Check if already indexing
-            if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
+            if (this.snapshotManager.getIndexingCodebases().includes(canonKey)) {
                 if (forceReindex) {
                     console.log(`[FORCE-REINDEX] Clearing stale indexing state for '${absolutePath}'`);
-                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                    this.snapshotManager.removeCodebaseCompletely(canonKey);
                     this.snapshotManager.saveCodebaseSnapshot();
                 } else {
                     return {
@@ -392,7 +424,7 @@ export class ToolHandlers {
             }
 
             //Check if the snapshot and cloud index are in sync
-            const snapshotHasIndex = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
+            const snapshotHasIndex = this.snapshotManager.getIndexedCodebases().includes(canonKey);
             const vectorDbHasIndex = await this.context.hasIndex(absolutePath);
             if (snapshotHasIndex !== vectorDbHasIndex) {
                 if (vectorDbHasIndex && !snapshotHasIndex) {
@@ -409,13 +441,13 @@ export class ToolHandlers {
                     }
                 } else if (!vectorDbHasIndex && snapshotHasIndex) {
                     console.warn(`[INDEX-VALIDATION] Clearing stale snapshot for '${absolutePath}'`);
-                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                    this.snapshotManager.removeCodebaseCompletely(canonKey);
                     this.snapshotManager.saveCodebaseSnapshot();
                 }
             }
 
             // Check if already indexed (unless force is true)
-            if (!forceReindex && this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
+            if (!forceReindex && this.snapshotManager.getIndexedCodebases().includes(canonKey)) {
                 return {
                     content: [{
                         type: "text",
@@ -649,11 +681,12 @@ export class ToolHandlers {
         const resultLimit = limit || 10;
 
         try {
-            // Sync indexed codebases from cloud first
-            await this.syncIndexedCodebasesFromCloud();
-
-            // Force absolute path resolution - warn if relative path provided
+            // Force absolute path resolution first so we can pass it as the
+            // local path hint to the cloud sync for shared-index recovery.
             const absolutePath = ensureAbsolutePath(codebasePath);
+
+            // Sync indexed codebases from cloud first
+            await this.syncIndexedCodebasesFromCloud(absolutePath);
 
             // Validate path exists
             if (!fs.existsSync(absolutePath)) {
@@ -680,15 +713,22 @@ export class ToolHandlers {
 
             trackCodebasePath(absolutePath);
 
-            // Check if this codebase is indexed or being indexed
-            const indexedCodebasePath = this.snapshotManager.findIndexedCodebasePath(absolutePath);
-            const indexingCodebasePath = this.snapshotManager.findIndexingCodebasePath(absolutePath);
-            const matchedCodebase = [indexedCodebasePath, indexingCodebasePath]
-                .filter((codebase): codebase is string => codebase !== undefined)
+            // Check if this codebase is indexed or being indexed.
+            // The matched value is a *canonical key* (git remote URL or absolute
+            // path); resolve to the local path before passing downstream because
+            // semanticSearch / getCollectionName re-derive the canonical key
+            // from a real filesystem path.
+            const indexedCodebaseKey = this.snapshotManager.findIndexedCodebasePath(absolutePath);
+            const indexingCodebaseKey = this.snapshotManager.findIndexingCodebasePath(absolutePath);
+            const matchedKey = [indexedCodebaseKey, indexingCodebaseKey]
+                .filter((k): k is string => k !== undefined)
                 .sort((a, b) => b.length - a.length)[0];
-            let searchCodebasePath = matchedCodebase || absolutePath;
-            let isIndexed = indexedCodebasePath === searchCodebasePath;
-            const isIndexing = indexingCodebasePath === searchCodebasePath;
+            const matchedLocalPath = matchedKey
+                ? (this.snapshotManager.getLocalPath(matchedKey) ?? matchedKey)
+                : undefined;
+            let searchCodebasePath = matchedLocalPath || absolutePath;
+            let isIndexed = indexedCodebaseKey !== undefined && indexedCodebaseKey === matchedKey;
+            const isIndexing = indexingCodebaseKey !== undefined && indexingCodebaseKey === matchedKey;
 
             if (!isIndexed && !isIndexing) {
                 // Fallback: check VectorDB directly in case snapshot is out of sync.
@@ -891,8 +931,10 @@ export class ToolHandlers {
             }
 
             // Check if this codebase is indexed or being indexed
-            const isIndexed = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
-            const isIndexing = this.snapshotManager.getIndexingCodebases().includes(absolutePath);
+            // (snapshot uses canonical keys — git remote URL or absolute path)
+            const canonKey = this.snapshotManager.canonicalKey(absolutePath);
+            const isIndexed = this.snapshotManager.getIndexedCodebases().includes(canonKey);
+            const isIndexing = this.snapshotManager.getIndexingCodebases().includes(canonKey);
 
             if (!isIndexed && !isIndexing) {
                 return {
@@ -1019,7 +1061,7 @@ export class ToolHandlers {
                 };
             }
 
-            await this.syncIndexedCodebasesFromCloud();
+            await this.syncIndexedCodebasesFromCloud(absolutePath);
 
             // Check indexing status using new status system
             const statusCodebasePath = this.snapshotManager.findTrackedCodebasePath(absolutePath) || absolutePath;
