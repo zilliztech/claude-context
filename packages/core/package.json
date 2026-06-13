@@ -35,6 +35,9 @@
         "typescript": "^5.0.0",
         "voyageai": "^0.0.4"
     },
+    "optionalDependencies": {
+        "pg": "^8.13.0"
+    },
     "devDependencies": {
         "@types/fs-extra": "^11.0.0",
         "@types/jest": "^30.0.0",

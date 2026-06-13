@@ -146,6 +146,11 @@ export class OpenRouterEmbedding extends Embedding {
                 maxTokens: 8192,
                 description: 'OpenAI text-embedding-ada-002 via OpenRouter'
             },
+            'qwen/qwen3-embedding-4b': {
+                dimension: 2560,
+                maxTokens: 32768,
+                description: 'Qwen3-Embedding-4B (code-tuned, MTEB-Code top-tier) via OpenRouter'
+            },
         };
     }
 }

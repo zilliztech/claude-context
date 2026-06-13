@@ -242,6 +242,14 @@ export class Context {
      * Generate collection name based on codebase path and hybrid mode
      */
     public getCollectionName(codebasePath: string): string {
+        // Explicit override: lets CI (runner path) and local search (repo path) agree on one
+        // stable collection (e.g. `${repo}__${branch}`). Without this the path-hash below differs
+        // between machines, so a CI-built index is unreachable locally and branches collide.
+        const override = envManager.get('COLLECTION_NAME');
+        if (override && override.trim().length > 0) {
+            return override.trim();
+        }
+
         const isHybrid = this.getIsHybrid();
         const normalizedPath = path.resolve(codebasePath);
         const hash = crypto.createHash('md5').update(normalizedPath).digest('hex');
@@ -572,7 +580,7 @@ export class Context {
             return this.embedding.embedBatch(contents);
         }
 
-        const { results, uncachedIndices } = this.embeddingCache.getBatch(contents);
+        const { results, uncachedIndices } = await this.embeddingCache.getBatch(contents);
 
         if (uncachedIndices.length === 0) {
             console.log(`[Cache] ✅ All ${contents.length} embeddings from cache`);
@@ -582,10 +590,12 @@ export class Context {
         const uncachedTexts = uncachedIndices.map(i => contents[i]);
         const newEmbeddings = await this.embedding.embedBatch(uncachedTexts);
 
+        const toCache: { content: string; embedding: EmbeddingVector }[] = [];
         for (let j = 0; j < uncachedIndices.length; j++) {
             results[uncachedIndices[j]] = newEmbeddings[j];
-            this.embeddingCache.set(contents[uncachedIndices[j]], newEmbeddings[j]);
+            toCache.push({ content: contents[uncachedIndices[j]], embedding: newEmbeddings[j] });
         }
+        await this.embeddingCache.setBatch(toCache);
 
         const hitRate = ((contents.length - uncachedIndices.length) / contents.length * 100).toFixed(0);
         console.log(`[Cache] ${hitRate}% hit (${contents.length - uncachedIndices.length}/${contents.length} cached, ${uncachedIndices.length} embedded)`);
