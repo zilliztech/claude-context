@@ -253,6 +253,9 @@ importers:
         specifier: ^0.25.6
         version: 0.25.6
     devDependencies:
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
       '@types/node':
         specifier: 20.x
         version: 20.19.0
@@ -274,9 +277,15 @@ importers:
       eslint:
         specifier: ^9.25.1
         version: 9.28.0
+      jest:
+        specifier: ^30.0.0
+        version: 30.0.1(@types/node@20.19.0)
       source-map-loader:
         specifier: ^5.0.0
         version: 5.0.0(webpack@5.99.9)
+      ts-jest:
+        specifier: ^29.4.0
+        version: 29.4.0(@babel/core@7.27.4)(@jest/transform@30.0.1)(@jest/types@30.0.1)(babel-jest@30.0.1(@babel/core@7.27.4))(jest-util@30.0.1)(jest@30.0.1(@types/node@20.19.0))(typescript@5.8.3)
       ts-loader:
         specifier: ^9.5.2
         version: 9.5.2(typescript@5.8.3)(webpack@5.99.9)
