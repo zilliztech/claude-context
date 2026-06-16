@@ -23,6 +23,8 @@ class SemanticSearchController {
         // Search view elements
         this.searchInput = document.getElementById('searchInput');
         this.extFilterInput = document.getElementById('extFilterInput');
+        this.folderInput = document.getElementById('folderInput');
+        this.excludeInput = document.getElementById('excludeInput');
         this.searchButton = document.getElementById('searchButton');
         this.indexButton = document.getElementById('indexButton');
         this.settingsButton = document.getElementById('settingsButton');
@@ -82,7 +84,8 @@ class SemanticSearchController {
                     item.dataset.path,
                     Number(item.dataset.line),
                     Number(item.dataset.startLine),
-                    Number(item.dataset.endLine)
+                    Number(item.dataset.endLine),
+                    item.dataset.abspath
                 );
             }
         });
@@ -126,7 +129,9 @@ class SemanticSearchController {
         this.indexButton.textContent = 'Indexing...';
         this.indexButton.disabled = true;
         this.vscode.postMessage({
-            command: 'index'
+            command: 'index',
+            folderInput: (this.folderInput && this.folderInput.value) || '',
+            excludeInput: (this.excludeInput && this.excludeInput.value) || ''
         });
     }
 
@@ -245,6 +250,7 @@ class SemanticSearchController {
         return `
             <div class="result-item"
                  data-path="${this.escapeHtml(result.relativePath)}"
+                 data-abspath="${this.escapeHtml(result.absolutePath || '')}"
                  data-line="${Number(result.line) || 0}"
                  data-start-line="${Number(startLine) || 0}"
                  data-end-line="${Number(endLine) || 0}">
@@ -266,10 +272,11 @@ class SemanticSearchController {
      * @param {number} startLine - Start line
      * @param {number} endLine - End line
      */
-    openFile(relativePath, line, startLine, endLine) {
+    openFile(relativePath, line, startLine, endLine, absolutePath) {
         this.vscode.postMessage({
             command: 'openFile',
             relativePath: relativePath,
+            absolutePath: absolutePath || '',
             line: line,
             startLine: startLine,
             endLine: endLine
@@ -289,8 +296,13 @@ class SemanticSearchController {
                 break;
 
             case 'indexComplete':
-                this.indexButton.textContent = 'Index Current Codebase';
+                this.indexButton.textContent = 'Index Folder(s)';
                 this.indexButton.disabled = false;
+                break;
+
+            case 'indexConfigData':
+                if (this.folderInput) { this.folderInput.value = message.folderInput || ''; }
+                if (this.excludeInput) { this.excludeInput.value = message.excludeInput || ''; }
                 break;
 
             case 'updateIndexStatus':
