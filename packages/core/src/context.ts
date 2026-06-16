@@ -63,7 +63,7 @@ const DEFAULT_SUPPORTED_EXTENSIONS = [
     // '.css', '.scss', '.less', '.sql', '.sh', '.bash', '.env'
 ];
 
-const DEFAULT_IGNORE_PATTERNS = [
+export const DEFAULT_IGNORE_PATTERNS = [
     // Common build output and dependency directories
     'node_modules/**',
     'dist/**',
@@ -89,6 +89,10 @@ const DEFAULT_IGNORE_PATTERNS = [
     '__pycache__/**',
     '.pytest_cache/**',
 
+    // Python virtual environments
+    'venv/**',
+    '.venv/**',
+
     // Logs and temporary files
     'logs/**',
     'tmp/**',
@@ -113,7 +117,7 @@ const DEFAULT_IGNORE_PATTERNS = [
     '*.map', // source map files
     'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
     'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
-    'coverage', '.nyc_output', 'logs', 'tmp', 'temp'
+    'coverage', '.nyc_output', 'logs', 'tmp', 'temp', 'venv', '.venv'
 ];
 
 export interface ContextConfig {
