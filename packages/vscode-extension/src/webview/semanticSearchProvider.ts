@@ -6,10 +6,7 @@ import { SyncCommand } from '../commands/syncCommand';
 import { ConfigManager, EmbeddingProviderConfig } from '../config/configManager';
 import * as path from 'path';
 import { resolveIndexFolders, parseListInput } from '../utils/pathUtils';
-
-const STATE_INDEXED_PATHS = 'semanticCodeSearch.indexedPaths';
-const STATE_FOLDER_INPUT = 'semanticCodeSearch.folderInput';
-const STATE_EXCLUDE_INPUT = 'semanticCodeSearch.excludeInput';
+import { STATE_INDEXED_PATHS, STATE_FOLDER_INPUT, STATE_EXCLUDE_INPUT } from '../utils/stateKeys';
 
 export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
