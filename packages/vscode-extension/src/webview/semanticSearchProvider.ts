@@ -5,6 +5,11 @@ import { IndexCommand } from '../commands/indexCommand';
 import { SyncCommand } from '../commands/syncCommand';
 import { ConfigManager, EmbeddingProviderConfig } from '../config/configManager';
 import * as path from 'path';
+import { resolveIndexFolders, parseListInput } from '../utils/pathUtils';
+
+const STATE_INDEXED_PATHS = 'semanticCodeSearch.indexedPaths';
+const STATE_FOLDER_INPUT = 'semanticCodeSearch.folderInput';
+const STATE_EXCLUDE_INPUT = 'semanticCodeSearch.excludeInput';
 
 export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
@@ -13,7 +18,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     private syncCommand: SyncCommand;
     private configManager: ConfigManager;
 
-    constructor(private readonly _extensionUri: vscode.Uri, searchCommand: SearchCommand, indexCommand: IndexCommand, syncCommand: SyncCommand, configManager: ConfigManager) {
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        searchCommand: SearchCommand,
+        indexCommand: IndexCommand,
+        syncCommand: SyncCommand,
+        configManager: ConfigManager,
+        private readonly _extensionContext: vscode.ExtensionContext
+    ) {
         this.searchCommand = searchCommand;
         this.indexCommand = indexCommand;
         this.syncCommand = syncCommand;
@@ -53,6 +65,9 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
         // Send initial configuration data to webview
         this.sendCurrentConfig(webviewView.webview);
 
+        // Send saved folder/exclude inputs to prefill the panel
+        this.sendIndexConfig(webviewView.webview);
+
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(
             async message => {
@@ -76,11 +91,13 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
                     case 'search':
                         try {
-                            // Use search command
+                            // Use search command across all indexed folders
+                            const indexedPaths = this._extensionContext.workspaceState.get<string[]>(STATE_INDEXED_PATHS, []);
                             const searchResults = await this.searchCommand.executeForWebview(
                                 message.text,
                                 50,
-                                Array.isArray(message.fileExtensions) ? message.fileExtensions : []
+                                Array.isArray(message.fileExtensions) ? message.fileExtensions : [],
+                                indexedPaths
                             );
 
                             // Convert SemanticSearchResult[] to webview format
@@ -107,30 +124,54 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         return;
 
                     case 'index':
-                        // Handle index command
                         try {
-                            await this.indexCommand.execute();
-                            // Notify webview that indexing is complete and check index status
-                            webviewView.webview.postMessage({
-                                command: 'indexComplete'
-                            });
-                            // Update index status after completion
-                            await this.checkIndexStatusAndUpdateWebview(webviewView.webview);
+                            const workspaceFolders = vscode.workspace.workspaceFolders;
+                            if (!workspaceFolders || workspaceFolders.length === 0) {
+                                throw new Error('No workspace folder found. Please open a folder first.');
+                            }
+                            const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+                            const folderInput: string = message.folderInput || '';
+                            const excludeInput: string = message.excludeInput || '';
+
+                            // Persist raw inputs for prefill.
+                            await this._extensionContext.workspaceState.update(STATE_FOLDER_INPUT, folderInput);
+                            await this._extensionContext.workspaceState.update(STATE_EXCLUDE_INPUT, excludeInput);
+
+                            const { resolved, errors } = resolveIndexFolders(folderInput, workspaceRoot);
+                            if (errors.length > 0) {
+                                throw new Error(errors.join('\n'));
+                            }
+                            const excludes = parseListInput(excludeInput);
+
+                            const { indexedPaths, indexedFiles, totalChunks } =
+                                await this.indexCommand.executeForWebview(resolved, excludes);
+
+                            // Persist the authoritative indexed-path list for search.
+                            await this._extensionContext.workspaceState.update(STATE_INDEXED_PATHS, indexedPaths);
+
+                            vscode.window.showInformationMessage(
+                                `✅ Indexed ${indexedFiles} files (${totalChunks} chunks) across ${indexedPaths.length} folder(s).`
+                            );
                         } catch (error) {
                             console.error('Indexing error:', error);
-                            // Still notify webview to reset button state
-                            webviewView.webview.postMessage({
-                                command: 'indexComplete'
-                            });
+                            vscode.window.showErrorMessage(`❌ Indexing failed: ${error instanceof Error ? error.message : error}`);
+                        } finally {
+                            webviewView.webview.postMessage({ command: 'indexComplete' });
+                            await this.checkIndexStatusAndUpdateWebview(webviewView.webview);
                         }
                         return;
 
                     case 'openFile':
                         // Handle file opening
                         try {
-                            const workspaceFolders = vscode.workspace.workspaceFolders;
-                            const workspaceRoot = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
-                            const absPath = path.join(workspaceRoot, message.relativePath);
+                            // Prefer the absolute path carried from the search result.
+                            let absPath: string = message.absolutePath;
+                            if (!absPath) {
+                                const workspaceFolders = vscode.workspace.workspaceFolders;
+                                const workspaceRoot = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
+                                absPath = path.join(workspaceRoot, message.relativePath);
+                            }
                             const uri = vscode.Uri.file(absPath);
                             const document = await vscode.workspace.openTextDocument(uri);
                             const editor = await vscode.window.showTextDocument(document);
@@ -149,7 +190,7 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                                 editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
                             }
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to open file: ${message.relativePath}`);
+                            vscode.window.showErrorMessage(`Failed to open file: ${message.absolutePath || message.relativePath}`);
                         }
                         return;
                 }
@@ -160,32 +201,25 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Convert SemanticSearchResult[] from core to webview format
+     * Convert TaggedResult[] from the search command to webview display format.
      */
     private convertSearchResultsToWebviewFormat(searchResults: any[]): any[] {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        const baseWorkspacePath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '/tmp';
-
         return searchResults.map(result => {
-            let filePath = result.relativePath;
-            if (result.relativePath && !result.relativePath.startsWith('/') && !result.relativePath.includes(':')) {
-                filePath = `${baseWorkspacePath}/${result.relativePath}`;
-            }
+            const folderName = result.searchFolder ? path.basename(result.searchFolder) : '';
+            const displayPath = folderName ? `${folderName}/${result.relativePath}` : result.relativePath;
 
-            let displayPath = result.relativePath;
-
-            // Truncate content for display
             const truncatedContent = result.content && result.content.length <= 150
                 ? result.content
                 : (result.content || '').substring(0, 150) + '...';
 
             return {
                 file: displayPath,
-                filePath: filePath,
+                absolutePath: result.absolutePath,
                 relativePath: result.relativePath,
+                folder: folderName,
                 line: result.startLine,
                 preview: truncatedContent,
-                context: `1 match in ${displayPath}`,
+                context: folderName ? `match in ${folderName}` : `match in ${displayPath}`,
                 score: result.score,
                 startLine: result.startLine,
                 endLine: result.endLine
@@ -198,29 +232,34 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
      */
     private async checkIndexStatusAndUpdateWebview(webview: vscode.Webview): Promise<void> {
         try {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (!workspaceFolders || workspaceFolders.length === 0) {
-                webview.postMessage({
-                    command: 'updateIndexStatus',
-                    hasIndex: false
-                });
-                return;
+            const indexedPaths = this._extensionContext.workspaceState.get<string[]>(STATE_INDEXED_PATHS, []);
+            const candidates = indexedPaths.length > 0
+                ? indexedPaths
+                : (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath);
+
+            let hasIndex = false;
+            for (const p of candidates) {
+                if (await this.searchCommand.hasIndex(p)) {
+                    hasIndex = true;
+                    break;
+                }
             }
 
-            const codebasePath = workspaceFolders[0].uri.fsPath;
-            const hasIndex = await this.searchCommand.hasIndex(codebasePath);
-
-            webview.postMessage({
-                command: 'updateIndexStatus',
-                hasIndex: hasIndex
-            });
+            webview.postMessage({ command: 'updateIndexStatus', hasIndex });
         } catch (error) {
             console.error('Failed to check index status:', error);
-            webview.postMessage({
-                command: 'updateIndexStatus',
-                hasIndex: false
-            });
+            webview.postMessage({ command: 'updateIndexStatus', hasIndex: false });
         }
+    }
+
+    private sendIndexConfig(webview: vscode.Webview) {
+        const folderInput = this._extensionContext.workspaceState.get<string>(STATE_FOLDER_INPUT, '');
+        const excludeInput = this._extensionContext.workspaceState.get<string>(STATE_EXCLUDE_INPUT, '');
+        webview.postMessage({
+            command: 'indexConfigData',
+            folderInput,
+            excludeInput
+        });
     }
 
     private sendCurrentConfig(webview: vscode.Webview) {
