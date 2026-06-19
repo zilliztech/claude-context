@@ -1305,13 +1305,27 @@ export class Context {
 
         const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
 
-        for (const pattern of ignorePatterns) {
-            if (this.isPatternMatch(normalizedPath, pattern)) {
-                return true;
+        let ignored = false;
+
+        for (const rawPattern of ignorePatterns) {
+            const pattern = rawPattern.trim();
+            if (!pattern) {
+                continue;
+            }
+
+            const isNegation = pattern.startsWith('!');
+            const positivePattern = isNegation ? pattern.slice(1) : pattern;
+            if (!positivePattern) {
+                continue;
+            }
+
+            if (this.isPatternMatch(normalizedPath, positivePattern) ||
+                (isNegation && this.isDirectoryDescendantMatch(normalizedPath, positivePattern))) {
+                ignored = !isNegation;
             }
         }
 
-        return false;
+        return ignored;
     }
 
     /**
@@ -1368,6 +1382,17 @@ export class Context {
         }
 
         return false;
+    }
+
+    private isDirectoryDescendantMatch(filePath: string, pattern: string): boolean {
+        const cleanPath = filePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        const cleanPattern = pattern.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+
+        if (!cleanPath || !cleanPattern || cleanPattern.includes('*')) {
+            return false;
+        }
+
+        return cleanPath.startsWith(`${cleanPattern}/`);
     }
 
     /**

@@ -211,6 +211,43 @@ describe('Context ignore pattern isolation', () => {
         ]);
     });
 
+    it('respects .gitignore negation patterns during initial indexing', async () => {
+        const project = path.join(tempRoot, 'project-gitignore-negation');
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'app'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'backoffice'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'vendor-plugin'), { recursive: true });
+
+        await fs.writeFile(path.join(project, '.gitignore'), [
+            'wp-content/plugins/*',
+            '!wp-content/plugins/app',
+            '!wp-content/plugins/backoffice',
+            '',
+        ].join('\n'));
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'app', 'main.ts'), 'app should be indexed');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'backoffice', 'main.ts'), 'backoffice should be indexed');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'vendor-plugin', 'main.ts'), 'vendor should stay ignored');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual([
+            'wp-content/plugins/app/main.ts',
+            'wp-content/plugins/backoffice/main.ts',
+        ]);
+    });
+
     it('skips dotfiles and dot directories during initial indexing', async () => {
         const project = path.join(tempRoot, 'project');
         await fs.mkdir(path.join(project, '.config'), { recursive: true });
@@ -283,5 +320,26 @@ describe('Context ignore pattern isolation', () => {
         expect(fileHashes.has(path.join('Library', 'generated.md'))).toBe(false);
         expect(fileHashes.has(path.join('src', 'Library', 'nested.md'))).toBe(true);
         expect(fileHashes.has(path.join('src', 'keep.md'))).toBe(true);
+    });
+
+    it('respects .gitignore negation patterns during sync hashing', async () => {
+        const project = path.join(tempRoot, 'project-sync-gitignore-negation');
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'app'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'backoffice'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'vendor-plugin'), { recursive: true });
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'app', 'main.ts'), 'app should be hashed');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'backoffice', 'main.ts'), 'backoffice should be hashed');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'vendor-plugin', 'main.ts'), 'vendor should stay ignored');
+
+        const synchronizer = new FileSynchronizer(project, [
+            'wp-content/plugins/*',
+            '!wp-content/plugins/app',
+            '!wp-content/plugins/backoffice',
+        ], ['.ts']);
+        const fileHashes = await (synchronizer as any).generateFileHashes(project) as Map<string, string>;
+
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'app', 'main.ts'))).toBe(true);
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'backoffice', 'main.ts'))).toBe(true);
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'vendor-plugin', 'main.ts'))).toBe(false);
     });
 });
