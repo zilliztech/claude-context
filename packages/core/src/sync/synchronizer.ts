@@ -119,25 +119,37 @@ export class FileSynchronizer {
             return false; // Don't ignore root
         }
 
-        // Check direct pattern matches first
-        for (const pattern of this.ignorePatterns) {
-            if (this.matchPattern(normalizedPath, pattern)) {
-                return true;
-            }
-        }
+        let ignored = false;
 
-        // Check if any parent directory is ignored
+        const pathCandidates = [normalizedPath];
+
+        // Check if any parent directory is ignored. This preserves existing
+        // basename-only patterns such as `build`, while still allowing later
+        // negation patterns to re-include a directory subtree.
         const normalizedPathParts = normalizedPath.split('/');
         for (let i = 0; i < normalizedPathParts.length; i++) {
-            const partialPath = normalizedPathParts.slice(0, i + 1).join('/');
-            for (const pattern of this.ignorePatterns) {
-                if (this.matchPattern(partialPath, pattern)) {
-                    return true;
-                }
+            pathCandidates.push(normalizedPathParts.slice(0, i + 1).join('/'));
+        }
+
+        for (const rawPattern of this.ignorePatterns) {
+            const pattern = rawPattern.trim();
+            if (!pattern) {
+                continue;
+            }
+
+            const isNegation = pattern.startsWith('!');
+            const positivePattern = isNegation ? pattern.slice(1) : pattern;
+            if (!positivePattern) {
+                continue;
+            }
+
+            if (pathCandidates.some(candidate => this.matchPattern(candidate, positivePattern)) ||
+                (isNegation && this.isDirectoryDescendantMatch(normalizedPath, positivePattern))) {
+                ignored = !isNegation;
             }
         }
 
-        return false;
+        return ignored;
     }
 
     private matchPattern(filePath: string, pattern: string): boolean {
@@ -188,6 +200,17 @@ export class FileSynchronizer {
         }
 
         return false;
+    }
+
+    private isDirectoryDescendantMatch(filePath: string, pattern: string): boolean {
+        const cleanPath = filePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        const cleanPattern = pattern.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+
+        if (!cleanPath || !cleanPattern || cleanPattern.includes('*')) {
+            return false;
+        }
+
+        return cleanPath.startsWith(`${cleanPattern}/`);
     }
 
     private simpleGlobMatch(text: string, pattern: string): boolean {
