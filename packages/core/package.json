@@ -1,6 +1,6 @@
 {
     "name": "@zilliz/claude-context-core",
-    "version": "0.1.14",
+    "version": "0.1.15",
     "description": "Core indexing engine for Claude Context",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -19,6 +19,7 @@
         "faiss-node": "^0.5.1",
         "fs-extra": "^11.0.0",
         "glob": "^10.0.0",
+        "ignore": "^7.0.5",
         "langchain": "^0.3.27",
         "ollama": "^0.5.16",
         "openai": "^5.1.1",
