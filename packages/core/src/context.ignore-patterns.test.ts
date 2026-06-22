@@ -211,6 +211,35 @@ describe('Context ignore pattern isolation', () => {
         ]);
     });
 
+    it('honors negated ignore patterns during indexing', async () => {
+        const project = path.join(tempRoot, 'project-with-negated-ignore');
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'app'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'unused'), { recursive: true });
+        await fs.writeFile(
+            path.join(project, '.gitignore'),
+            'wp-content/plugins/*\n!wp-content/plugins/app\n'
+        );
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'app', 'main.ts'), 'should stay indexed');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'unused', 'main.ts'), 'should be ignored');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual(['wp-content/plugins/app/main.ts']);
+    });
+
     it('skips dotfiles and dot directories during initial indexing', async () => {
         const project = path.join(tempRoot, 'project');
         await fs.mkdir(path.join(project, '.config'), { recursive: true });
@@ -283,5 +312,22 @@ describe('Context ignore pattern isolation', () => {
         expect(fileHashes.has(path.join('Library', 'generated.md'))).toBe(false);
         expect(fileHashes.has(path.join('src', 'Library', 'nested.md'))).toBe(true);
         expect(fileHashes.has(path.join('src', 'keep.md'))).toBe(true);
+    });
+
+    it('honors negated ignore patterns during sync', async () => {
+        const project = path.join(tempRoot, 'project-with-negated-sync-ignore');
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'app'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'unused'), { recursive: true });
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'app', 'main.ts'), 'should stay tracked');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'unused', 'main.ts'), 'should be ignored');
+
+        const synchronizer = new FileSynchronizer(project, [
+            'wp-content/plugins/*',
+            '!wp-content/plugins/app',
+        ], ['.ts']);
+        const fileHashes = await (synchronizer as any).generateFileHashes(project) as Map<string, string>;
+
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'app', 'main.ts'))).toBe(true);
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'unused', 'main.ts'))).toBe(false);
     });
 });
