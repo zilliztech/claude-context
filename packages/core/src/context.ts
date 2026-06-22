@@ -1305,13 +1305,17 @@ export class Context {
 
         const normalizedPath = relativePath.replace(/\\/g, '/'); // Normalize path separators
 
-        for (const pattern of ignorePatterns) {
-            if (this.isPatternMatch(normalizedPath, pattern)) {
-                return true;
+        let ignored = false;
+        for (const rawPattern of ignorePatterns) {
+            const negated = rawPattern.startsWith('!');
+            const pattern = negated ? rawPattern.slice(1) : rawPattern;
+
+            if (this.matchesPathOrParent(normalizedPath, pattern)) {
+                ignored = !negated;
             }
         }
 
-        return false;
+        return ignored;
     }
 
     /**
@@ -1363,6 +1367,22 @@ export class Context {
         for (let i = 0; i <= pathParts.length - dirPartCount; i++) {
             const candidate = pathParts.slice(i, i + dirPartCount).join('/');
             if (this.simpleGlobMatch(candidate, dirPattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private matchesPathOrParent(filePath: string, pattern: string): boolean {
+        if (this.isPatternMatch(filePath, pattern)) {
+            return true;
+        }
+
+        const pathParts = filePath.split('/');
+        for (let i = 0; i < pathParts.length - 1; i++) {
+            const partialPath = pathParts.slice(0, i + 1).join('/');
+            if (this.isPatternMatch(partialPath, pattern)) {
                 return true;
             }
         }

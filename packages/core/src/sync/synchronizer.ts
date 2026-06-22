@@ -119,25 +119,17 @@ export class FileSynchronizer {
             return false; // Don't ignore root
         }
 
-        // Check direct pattern matches first
-        for (const pattern of this.ignorePatterns) {
-            if (this.matchPattern(normalizedPath, pattern)) {
-                return true;
+        let ignored = false;
+        for (const rawPattern of this.ignorePatterns) {
+            const negated = rawPattern.startsWith('!');
+            const pattern = negated ? rawPattern.slice(1) : rawPattern;
+
+            if (this.matchesPathOrParent(normalizedPath, pattern)) {
+                ignored = !negated;
             }
         }
 
-        // Check if any parent directory is ignored
-        const normalizedPathParts = normalizedPath.split('/');
-        for (let i = 0; i < normalizedPathParts.length; i++) {
-            const partialPath = normalizedPathParts.slice(0, i + 1).join('/');
-            for (const pattern of this.ignorePatterns) {
-                if (this.matchPattern(partialPath, pattern)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return ignored;
     }
 
     private matchPattern(filePath: string, pattern: string): boolean {
@@ -183,6 +175,22 @@ export class FileSynchronizer {
         for (let i = 0; i <= pathParts.length - dirPartCount; i++) {
             const candidate = pathParts.slice(i, i + dirPartCount).join('/');
             if (this.simpleGlobMatch(candidate, dirPattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private matchesPathOrParent(filePath: string, pattern: string): boolean {
+        if (this.matchPattern(filePath, pattern)) {
+            return true;
+        }
+
+        const pathParts = filePath.split('/');
+        for (let i = 0; i < pathParts.length - 1; i++) {
+            const partialPath = pathParts.slice(0, i + 1).join('/');
+            if (this.matchPattern(partialPath, pattern)) {
                 return true;
             }
         }
