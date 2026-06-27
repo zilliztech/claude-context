@@ -9,6 +9,7 @@ import {
     HybridSearchResult,
 } from './types';
 import { ClusterManager } from './zilliz-utils';
+import { validateMilvusSearchResultRow } from './search-result-validation';
 
 export interface MilvusConfig {
     address?: string;
@@ -394,7 +395,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
             return [];
         }
 
-        return searchResult.results.map((result: any) => {
+        return searchResult.results.map((rawResult: any, index: number) => {
+            const result = validateMilvusSearchResultRow(rawResult, collectionName, index);
             let metadata = {};
             try {
                 metadata = JSON.parse(result.metadata || '{}');
@@ -707,7 +709,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
             console.log(`[MilvusDB] ✅ Found ${searchResult.results.length} results from hybrid search`);
 
             // Transform results to HybridSearchResult format
-            return searchResult.results.map((result: any) => {
+            return searchResult.results.map((rawResult: any, index: number) => {
+                const result = validateMilvusSearchResultRow(rawResult, collectionName, index);
                 let metadata = {};
                 try {
                     metadata = JSON.parse(result.metadata || '{}');
