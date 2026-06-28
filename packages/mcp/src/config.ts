@@ -53,12 +53,25 @@ export interface CodebaseInfoIndexing extends CodebaseInfoBase {
     indexingPercentage: number;  // Current progress percentage
 }
 
+/** Change counts from a successful incremental sync (reindexByChange). */
+export interface CodebaseIncrementalSyncStats {
+    added: number;
+    removed: number;
+    modified: number;
+}
+
 // Indexed state - when indexing completed successfully
 export interface CodebaseInfoIndexed extends CodebaseInfoBase {
     status: 'indexed';
     indexedFiles: number;        // Number of files indexed
     totalChunks: number;         // Total number of chunks generated
     indexStatus: 'completed' | 'limit_reached';  // Status from indexing result
+    /** ISO timestamp of the last successful full index (index_codebase). */
+    lastFullIndexAt?: string;
+    /** ISO timestamp of the last successful incremental sync (background/trigger). */
+    lastIncrementalSyncAt?: string;
+    /** Stats from the most recent incremental sync, if any. */
+    lastSyncStats?: CodebaseIncrementalSyncStats;
 }
 
 // Index failed state - when indexing failed

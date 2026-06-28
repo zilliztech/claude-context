@@ -9,7 +9,8 @@ import {
     CodebaseIndexOptions,
     CodebaseInfoIndexing,
     CodebaseInfoIndexed,
-    CodebaseInfoIndexFailed
+    CodebaseInfoIndexFailed,
+    CodebaseIncrementalSyncStats
 } from "./config.js";
 
 export class SnapshotManager {
@@ -444,15 +445,62 @@ export class SnapshotManager {
 
         const resolvedIndexOptions = this.resolveIndexOptions(codebasePath, indexOptions);
 
+        const now = new Date().toISOString();
+        const existing = this.codebaseInfoMap.get(codebasePath);
+        const preservedIncremental =
+            existing && existing.status === 'indexed'
+                ? {
+                    lastIncrementalSyncAt: existing.lastIncrementalSyncAt,
+                    lastSyncStats: existing.lastSyncStats,
+                }
+                : {};
+
         const info: CodebaseInfoIndexed = {
             status: 'indexed',
             indexedFiles: stats.indexedFiles,
             totalChunks: stats.totalChunks,
             indexStatus: stats.status,
             ...resolvedIndexOptions,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: now,
+            lastFullIndexAt: now,
+            ...preservedIncremental,
         };
         this.codebaseInfoMap.set(codebasePath, info);
+    }
+
+    /**
+     * Record a successful incremental sync without rewriting full-index metadata.
+     * Updates freshness timestamps and optional file-count delta from sync stats.
+     */
+    public recordIncrementalSyncSuccess(
+        codebasePath: string,
+        syncStats: CodebaseIncrementalSyncStats
+    ): boolean {
+        const existing = this.codebaseInfoMap.get(codebasePath);
+        if (!existing || existing.status !== 'indexed') {
+            console.warn(
+                `[SNAPSHOT] Skipping incremental sync metadata for '${codebasePath}': not in indexed state`
+            );
+            return false;
+        }
+
+        const now = new Date().toISOString();
+        const indexedFiles = Math.max(
+            0,
+            existing.indexedFiles + syncStats.added - syncStats.removed
+        );
+
+        const info: CodebaseInfoIndexed = {
+            ...existing,
+            indexedFiles,
+            lastUpdated: now,
+            lastFullIndexAt: existing.lastFullIndexAt ?? existing.lastUpdated,
+            lastIncrementalSyncAt: now,
+            lastSyncStats: { ...syncStats },
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
+        this.codebaseFileCount.set(codebasePath, indexedFiles);
+        return true;
     }
 
     /**
