@@ -200,9 +200,19 @@ CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project
 
 The per-codebase `<pathHash>` suffix is preserved even when the override is set, so the same MCP server can still index multiple repos without collapsing them onto one collection. The override value is sanitized to letters, numbers, and underscores, and truncated to keep the full name within Milvus's 255-char limit. If you unset the variable later, Claude Context switches back to the plain `code_chunks_<pathHash>` naming.
 
+#### Keeping indexes up to date
+
+After a codebase is indexed with `index_codebase`, you can refresh the vector index when files change using any of these mechanisms (they share the same **global cross-process sync lock** at `~/.context/mcp-sync.lock`, so only one sync runs at a time across MCP processes that share `$HOME`):
+
+1. **`sync_index` MCP tool** (recommended for agents and IDE integrations) — incremental refresh on demand; see [Available Tools](#5-sync_index) below. Added in [issue #394](https://github.com/zilliztech/claude-context/issues/394).
+2. **Background sync** — startup + periodic polling via `CLAUDE_CONTEXT_BACKGROUND_SYNC` / `CLAUDE_CONTEXT_SYNC_INTERVAL_MS` (see below).
+3. **Trigger file** — `touch ~/.context/.sync-trigger` when `CLAUDE_CONTEXT_TRIGGER_WATCHER` is enabled (see below).
+
+> **Important:** `CLAUDE_CONTEXT_TRIGGER_WATCHER` watches **only** the sentinel file `~/.context/.sync-trigger`. It does **not** watch your project directories or individual repo paths. To sync after edits, call `sync_index`, rely on background sync, or touch the trigger file — do not expect filesystem events under a codebase root to be observed automatically. See also [issue #238](https://github.com/zilliztech/claude-context/issues/238).
+
 #### Trigger File Watcher (Optional)
 
-In addition to the periodic background sync, the MCP server watches a sentinel file at `~/.context/.sync-trigger` and starts an immediate re-index whenever the file is modified. This lets external tools (Claude Code `PostToolUse` hooks, editor save hooks, CI scripts, etc.) request a sync on demand instead of waiting for the next polling tick.
+When enabled, the MCP server watches **only** `~/.context/.sync-trigger` (not project folders). Modifying that file starts an immediate, debounced incremental re-index. This lets external tools (Claude Code `PostToolUse` hooks, CI scripts, etc.) request a sync on demand instead of waiting for the next polling tick or an explicit `sync_index` call.
 
 ```bash
 # Default: watcher enabled. Set to false to disable filesystem watching entirely
@@ -223,9 +233,11 @@ Example — Claude Code hook that re-indexes after every Edit/Write:
 ```
 
 Notes:
+- **Scope:** The watcher monitors `~/.context/.sync-trigger` only. It does not watch indexed codebase directories.
 - The trigger fires a debounced re-index (2 s window) so rapid touches collapse to a single sync.
-- Triggered syncs go through the same global cross-process lock as background sync, so when multiple MCP processes share `$HOME` only one process performs the work per trigger.
+- Triggered syncs use the same global cross-process lock as `sync_index` and background sync, so when multiple MCP processes share `$HOME` only one process performs the work per trigger.
 - The trigger file's *contents* are ignored — only the modification event matters.
+- Prefer `sync_index` from MCP clients when the assistant can call tools directly after `Edit`/`Write`.
 
 #### Background Sync Configuration (Optional)
 
@@ -241,7 +253,7 @@ CLAUDE_CONTEXT_BACKGROUND_SYNC=false
 CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000
 ```
 
-For multi-instance local stdio setups, set `CLAUDE_CONTEXT_BACKGROUND_SYNC=false` and keep the trigger watcher enabled. That avoids idle polling while still allowing external tools to request immediate re-indexing by touching `~/.context/.sync-trigger`.
+For multi-instance local stdio setups, set `CLAUDE_CONTEXT_BACKGROUND_SYNC=false` and use `sync_index` and/or the trigger watcher. That avoids idle polling while still allowing on-demand incremental refresh via the MCP tool or `touch ~/.context/.sync-trigger`.
 
 ## Usage with MCP Clients
 
@@ -738,6 +750,41 @@ Get the current indexing status of a codebase. Shows progress percentage for act
 - If a completed entry shows `0 files, 0 chunks`, that usually means the local snapshot metadata is stale rather than the vector database being queried live. Re-indexing, or clearing and re-indexing that exact absolute path, refreshes the stored stats.
 
 For a deeper explanation, see the [asynchronous indexing workflow guide](../../docs/dive-deep/asynchronous-indexing-workflow.md) and the [troubleshooting FAQ](../../docs/troubleshooting/faq.md).
+
+### 5. `sync_index`
+
+Incrementally refresh one or all indexed codebases using change detection (`reindexByChange`). This updates only added, removed, and modified files — it does **not** clear Milvus collections or force a full reindex. Per-codebase options stored at index time (splitter, `ignorePatterns`, `customExtensions`) are preserved from the MCP snapshot and passed into `reindexByChange`.
+
+**Parameters:**
+
+- `path` (optional): Absolute path to a single indexed codebase. If omitted, all indexed codebases are synced.
+- `wait` (optional): If `true` (default), block until sync finishes and return per-path stats. If `false`, start sync in the background and return immediately.
+
+**Behavior:**
+
+- Uses the same global sync lock as background sync and trigger-file sync (`~/.context/mcp-sync.lock`).
+- Response is JSON with fields such as `status`, optional `message`, optional `paths` (per-codebase `added` / `removed` / `modified`), and optional `totals`.
+
+**`status` values:**
+
+| `status` | Meaning |
+|----------|---------|
+| `completed` | Sync finished (`wait=true`); see `paths` and `totals` when present. |
+| `skipped` | Sync not run (e.g. already syncing, lock held elsewhere, or `wait=false` fire-and-forget). |
+| `no_codebases` | Nothing indexed yet — call `index_codebase` first. |
+| `path_not_indexed` | `path` was given but is not a tracked indexed codebase. |
+
+**Example (wait for results):**
+
+```json
+{ "path": "/absolute/path/to/repo", "wait": true }
+```
+
+**Example (background refresh of all indexed repos):**
+
+```json
+{ "wait": false }
+```
 
 ## Contributing
 

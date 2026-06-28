@@ -39,6 +39,7 @@ See [README.md](./README.md#prepare-environment-variables) for required environm
 3. Use the tools:
    - `index_codebase` - Index a sample codebase with optional custom ignore patterns
    - `search_code` - Search for code snippets
+   - `sync_index` - Incrementally refresh indexed codebases (`reindexByChange`)
    - `clear_index` - Clear the index
 
 ## Making Changes
@@ -73,6 +74,14 @@ See [README.md](./README.md#prepare-environment-variables) for required environm
 ### `clear_index`
 - `path` (required): Path to the codebase to clear
 
+### `sync_index`
+- `path` (optional): Absolute path to one indexed codebase; omit to sync all indexed codebases
+- `wait` (optional): Wait for completion and return stats (default: `true`). Set `false` to run in the background.
+
+Incremental sync via `reindexByChange`; preserves snapshot index options (splitter, ignore patterns, custom extensions). Returns JSON: `{ status, paths?, totals?, message? }` with `status` one of `completed`, `skipped`, `no_codebases`, or `path_not_indexed`. Uses the same global sync lock as background and trigger-file sync. See [README — Keeping indexes up to date](./README.md#keeping-indexes-up-to-date) and [issue #394](https://github.com/zilliztech/claude-context/issues/394).
+
+**Trigger watcher vs project paths:** `CLAUDE_CONTEXT_TRIGGER_WATCHER` watches **only** `~/.context/.sync-trigger`, not repository directories. For on-demand refresh during development, call `sync_index`, use background sync, or `touch ~/.context/.sync-trigger` (see [issue #238](https://github.com/zilliztech/claude-context/issues/238)).
+
 ## Guidelines
 
 - Keep tool interfaces simple and intuitive
@@ -106,10 +115,12 @@ claude mcp add claude-context -e OPENAI_API_KEY=sk-your-openai-api-key -e MILVUS
 And then you can start Claude Code with `claude --debug` to see the MCP server logs.
 
 ### Manual Usage
-Use all three MCP tools:
+Use the MCP tools:
 - `index_codebase` - Index sample repositories with optional custom ignore patterns  
   Example with ignore patterns: `{"path": "/repo/path", "ignorePatterns": ["static/**", "*.tmp"]}`
 - `search_code` - Search with various queries  
+- `sync_index` - Refresh after local edits without a full reindex  
+  Example: `{"path": "/repo/path", "wait": true}` or `{}` to sync all indexed codebases
 - `clear_index` - Clear and re-index
 
 ## Questions?
