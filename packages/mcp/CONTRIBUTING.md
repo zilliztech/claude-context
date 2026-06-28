@@ -78,7 +78,7 @@ See [README.md](./README.md#prepare-environment-variables) for required environm
 - `path` (optional): Absolute path to one indexed codebase; omit to sync all indexed codebases
 - `wait` (optional): Wait for completion and return stats (default: `true`). Set `false` to run in the background.
 
-Incremental sync via `reindexByChange`; preserves snapshot index options (splitter, ignore patterns, custom extensions). Returns JSON: `{ status, paths?, totals?, message? }` with `status` one of `completed`, `skipped`, `no_codebases`, or `path_not_indexed`. Uses the same global sync lock as background and trigger-file sync. See [README — Keeping indexes up to date](./README.md#keeping-indexes-up-to-date) and [issue #394](https://github.com/zilliztech/claude-context/issues/394).
+Incremental sync via `reindexByChange`; preserves snapshot index options (splitter, ignore patterns, custom extensions). Returns JSON: `{ status, paths?, totals?, message? }` with `status` one of `completed`, `skipped`, `no_codebases`, `path_not_indexed`, or `failed`. Uses the same global sync lock as background and trigger-file sync. See [README — Keeping indexes up to date](./README.md#keeping-indexes-up-to-date) and [issue #394](https://github.com/zilliztech/claude-context/issues/394).
 
 **Trigger watcher vs project paths:** `CLAUDE_CONTEXT_TRIGGER_WATCHER` watches **only** `~/.context/.sync-trigger`, not repository directories. For on-demand refresh during development, call `sync_index`, use background sync, or `touch ~/.context/.sync-trigger` (see [issue #238](https://github.com/zilliztech/claude-context/issues/238)).
 

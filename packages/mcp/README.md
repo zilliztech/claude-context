@@ -773,6 +773,7 @@ Incrementally refresh one or all indexed codebases using change detection (`rein
 | `skipped` | Sync not run (e.g. already syncing, lock held elsewhere, or `wait=false` fire-and-forget). |
 | `no_codebases` | Nothing indexed yet — call `index_codebase` first. |
 | `path_not_indexed` | `path` was given but is not a tracked indexed codebase. |
+| `failed` | Sync aborted due to an unexpected error (`wait=true`); see `message` and any partial `paths`. |
 
 **Example (wait for results):**
 

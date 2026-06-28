@@ -144,6 +144,18 @@ test("syncIndex returns skipped when isSyncing is already true", async () => {
     });
 });
 
+test("syncIndex returns no_codebases when snapshot is empty and path omitted", async () => {
+    await withTempHome(async () => {
+        const snapshotManager = new SnapshotManager();
+        const syncManager = new SyncManager(createMockContext(), snapshotManager);
+
+        const result = await syncManager.syncIndex({ wait: true });
+
+        assert.equal(result.status, "no_codebases");
+        assert.match(result.message ?? "", /index_codebase/i);
+    });
+});
+
 test("syncIndex returns skipped when global sync lock is held", async () => {
     await withTempHome(async (tempRoot, homeDir) => {
         const codebasePath = path.join(tempRoot, "repo");

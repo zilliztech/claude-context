@@ -3,6 +3,7 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer, IndexAbortError } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
+import type { SyncManager } from "./sync.js";
 import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
@@ -20,10 +21,12 @@ export class ToolHandlers {
      * just-cleared collection (issue #199).
      */
     private indexingTasks: Map<string, { controller: AbortController; promise: Promise<void> }> = new Map();
+    private syncManager: SyncManager | null;
 
-    constructor(context: Context, snapshotManager: SnapshotManager) {
+    constructor(context: Context, snapshotManager: SnapshotManager, syncManager?: SyncManager) {
         this.context = context;
         this.snapshotManager = snapshotManager;
+        this.syncManager = syncManager ?? null;
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
     }
@@ -1101,6 +1104,73 @@ export class ToolHandlers {
                     text: `Error getting indexing status: ${error.message || error}`
                 }],
                 isError: true
+            };
+        }
+    }
+
+    public async handleSyncIndex(args: any) {
+        try {
+            if (!this.syncManager) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: "Internal error: sync manager is not available.",
+                    }],
+                    isError: true,
+                };
+            }
+
+            const pathArg = typeof args?.path === "string" ? args.path : undefined;
+            const wait = args?.wait !== false;
+
+            let absolutePath: string | undefined;
+            if (pathArg !== undefined) {
+                absolutePath = ensureAbsolutePath(pathArg);
+                if (!fs.existsSync(absolutePath)) {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Path does not exist: ${absolutePath}`,
+                        }],
+                        isError: true,
+                    };
+                }
+                const stat = fs.statSync(absolutePath);
+                if (!stat.isDirectory()) {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Path is not a directory: ${absolutePath}`,
+                        }],
+                        isError: true,
+                    };
+                }
+            }
+
+            const result = await this.syncManager.syncIndex({
+                path: absolutePath,
+                wait,
+            });
+
+            const isError =
+                result.status === "path_not_indexed" ||
+                result.status === "no_codebases" ||
+                result.status === "failed";
+
+            return {
+                content: [{
+                    type: "text",
+                    text: JSON.stringify(result, null, 2),
+                }],
+                ...(isError ? { isError: true } : {}),
+            };
+        } catch (error: any) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error running sync_index: ${error.message || error}`,
+                }],
+                isError: true,
             };
         }
     }
