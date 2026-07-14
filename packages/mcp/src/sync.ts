@@ -12,6 +12,22 @@ const MIN_SYNC_INTERVAL_MS = 1_000;
 const DEFAULT_SYNC_LOCK_STALE_MS = 10 * 60 * 1000;
 const SYNC_LOCK_STALE_ENV = "CLAUDE_CONTEXT_SYNC_LOCK_STALE_MS";
 
+export type SyncPathStats = {
+    path: string;
+    added: number;
+    removed: number;
+    modified: number;
+    skipped?: boolean;
+    error?: string;
+};
+
+export type SyncIndexResult = {
+    status: "completed" | "skipped" | "no_codebases" | "path_not_indexed" | "failed";
+    message?: string;
+    paths?: SyncPathStats[];
+    totals?: { added: number; removed: number; modified: number };
+};
+
 function isBackgroundSyncEnabled(): boolean {
     const value = envManager.get("CLAUDE_CONTEXT_BACKGROUND_SYNC");
     if (!value) {
@@ -156,51 +172,122 @@ export class SyncManager {
         }
     }
 
-    public async handleSyncIndex(): Promise<void> {
-        const syncStartTime = Date.now();
-        console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
+    public async syncIndex(options?: { path?: string; wait?: boolean }): Promise<SyncIndexResult> {
+        const wait = options?.wait !== false;
+        const requestedPath = options?.path?.trim();
 
-        const indexedCodebases = this.snapshotManager.getIndexedCodebases();
-
-        if (indexedCodebases.length === 0) {
-            console.log('[SYNC-DEBUG] No codebases indexed. Skipping sync.');
-            return;
+        if (requestedPath) {
+            const resolved = path.resolve(requestedPath);
+            const indexedPath = this.snapshotManager.findIndexedCodebasePath(resolved);
+            if (!indexedPath) {
+                return {
+                    status: "path_not_indexed",
+                    message: `Codebase is not indexed: ${resolved}. Use index_codebase first.`,
+                };
+            }
         }
 
-        console.log(`[SYNC-DEBUG] Found ${indexedCodebases.length} indexed codebases:`, indexedCodebases);
+        const allIndexed = this.snapshotManager.getIndexedCodebases();
+        if (allIndexed.length === 0) {
+            return {
+                status: "no_codebases",
+                message: "No codebases are indexed. Use index_codebase first.",
+            };
+        }
+
+        if (!wait) {
+            if (this.isSyncing) {
+                return {
+                    status: "skipped",
+                    message: "Index sync already in progress in this process.",
+                };
+            }
+            if (!this.isGlobalSyncLockAvailable()) {
+                return {
+                    status: "skipped",
+                    message: "Another MCP process holds the global sync lock or sync is in progress.",
+                };
+            }
+            void this.handleSyncIndex(requestedPath ? path.resolve(requestedPath) : undefined);
+            return {
+                status: "skipped",
+                message: "Incremental sync started in the background (wait=false).",
+            };
+        }
 
         if (this.isSyncing) {
-            console.log('[SYNC-DEBUG] Index sync already in progress. Skipping.');
-            return;
+            return {
+                status: "skipped",
+                message: "Index sync already in progress in this process.",
+            };
         }
 
         if (!this.acquireGlobalSyncLock()) {
-            return;
+            return {
+                status: "skipped",
+                message: "Another MCP process holds the global sync lock or sync is in progress.",
+            };
+        }
+
+        return await this.runSyncLocked(requestedPath ? path.resolve(requestedPath) : undefined);
+    }
+
+    private async runSyncLocked(singlePath?: string): Promise<SyncIndexResult> {
+        const syncStartTime = Date.now();
+        const indexedCodebases = this.snapshotManager.getIndexedCodebases();
+        let targets: string[];
+
+        if (singlePath) {
+            const indexedPath = this.snapshotManager.findIndexedCodebasePath(singlePath);
+            if (!indexedPath) {
+                this.releaseGlobalSyncLock();
+                return {
+                    status: "path_not_indexed",
+                    message: `Codebase is not indexed: ${singlePath}. Use index_codebase first.`,
+                };
+            }
+            targets = [indexedPath];
+        } else {
+            targets = indexedCodebases;
         }
 
         this.isSyncing = true;
-        console.log(`[SYNC-DEBUG] Starting index sync for all ${indexedCodebases.length} codebases...`);
+        console.log(`[SYNC-DEBUG] Starting index sync for ${targets.length} codebase(s)...`);
+
+        const pathResults: SyncPathStats[] = [];
+        let totals = { added: 0, removed: 0, modified: 0 };
 
         try {
-            let totalStats = { added: 0, removed: 0, modified: 0 };
-
-            for (let i = 0; i < indexedCodebases.length; i++) {
-                const codebasePath = indexedCodebases[i];
+            for (let i = 0; i < targets.length; i++) {
+                const codebasePath = targets[i];
                 const codebaseStartTime = Date.now();
 
-                console.log(`[SYNC-DEBUG] [${i + 1}/${indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
+                console.log(`[SYNC-DEBUG] [${i + 1}/${targets.length}] Starting sync for codebase: '${codebasePath}'`);
 
-                // Check if codebase path still exists
                 try {
                     const pathExists = fs.existsSync(codebasePath);
-                    console.log(`[SYNC-DEBUG] Codebase path exists: ${pathExists}`);
-
                     if (!pathExists) {
                         console.warn(`[SYNC-DEBUG] Codebase path '${codebasePath}' no longer exists. Skipping sync.`);
+                        pathResults.push({
+                            path: codebasePath,
+                            added: 0,
+                            removed: 0,
+                            modified: 0,
+                            skipped: true,
+                            error: "Path no longer exists on disk",
+                        });
                         continue;
                     }
                 } catch (pathError: any) {
                     console.error(`[SYNC-DEBUG] Error checking codebase path '${codebasePath}':`, pathError);
+                    pathResults.push({
+                        path: codebasePath,
+                        added: 0,
+                        removed: 0,
+                        modified: 0,
+                        skipped: true,
+                        error: pathError?.message || String(pathError),
+                    });
                     continue;
                 }
 
@@ -219,13 +306,15 @@ export class SyncManager {
                     );
                     const codebaseElapsed = Date.now() - codebaseStartTime;
 
-                    console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
-                    console.log(`[SYNC-DEBUG] Codebase sync completed in ${codebaseElapsed}ms`);
-
-                    // Accumulate total stats
-                    totalStats.added += stats.added;
-                    totalStats.removed += stats.removed;
-                    totalStats.modified += stats.modified;
+                    pathResults.push({
+                        path: codebasePath,
+                        added: stats.added,
+                        removed: stats.removed,
+                        modified: stats.modified,
+                    });
+                    totals.added += stats.added;
+                    totals.removed += stats.removed;
+                    totals.modified += stats.modified;
 
                     if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
                         console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
@@ -235,39 +324,85 @@ export class SyncManager {
                 } catch (error: any) {
                     const codebaseElapsed = Date.now() - codebaseStartTime;
                     console.error(`[SYNC-DEBUG] Error syncing codebase '${codebasePath}' after ${codebaseElapsed}ms:`, error);
-                    console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
 
-                    if (error.message.includes('Failed to query Milvus')) {
-                        // Collection maybe deleted manually, delete the snapshot file
+                    if (error.message?.includes("Failed to query Milvus")) {
                         await FileSynchronizer.deleteSnapshot(codebasePath);
                     }
 
-                    // Log additional error details
-                    if (error.code) {
-                        console.error(`[SYNC-DEBUG] Error code: ${error.code}`);
-                    }
-                    if (error.errno) {
-                        console.error(`[SYNC-DEBUG] Error errno: ${error.errno}`);
-                    }
-
-                    // Continue with next codebase even if one fails
+                    pathResults.push({
+                        path: codebasePath,
+                        added: 0,
+                        removed: 0,
+                        modified: 0,
+                        error: error?.message || String(error),
+                    });
                 }
             }
 
             const totalElapsed = Date.now() - syncStartTime;
-            console.log(`[SYNC-DEBUG] Total sync stats across all codebases: Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
-            console.log(`[SYNC-DEBUG] Index sync completed for all codebases in ${totalElapsed}ms`);
-            console.log(`[SYNC] Index sync completed for all codebases. Total changes - Added: ${totalStats.added}, Removed: ${totalStats.removed}, Modified: ${totalStats.modified}`);
+            console.log(`[SYNC] Index sync completed in ${totalElapsed}ms. Totals - Added: ${totals.added}, Removed: ${totals.removed}, Modified: ${totals.modified}`);
+
+            return {
+                status: "completed",
+                paths: pathResults,
+                totals,
+            };
         } catch (error: any) {
-            const totalElapsed = Date.now() - syncStartTime;
-            console.error(`[SYNC-DEBUG] Error during index sync after ${totalElapsed}ms:`, error);
-            console.error(`[SYNC-DEBUG] Error stack:`, error.stack);
+            console.error(`[SYNC-DEBUG] Error during index sync:`, error);
+            return {
+                status: "failed",
+                message: error?.message || String(error),
+                paths: pathResults,
+                totals,
+            };
         } finally {
             this.isSyncing = false;
             this.releaseGlobalSyncLock();
-            const totalElapsed = Date.now() - syncStartTime;
-            console.log(`[SYNC-DEBUG] handleSyncIndex() finished at ${new Date().toISOString()}, total duration: ${totalElapsed}ms`);
+            console.log(`[SYNC-DEBUG] runSyncLocked() finished, duration: ${Date.now() - syncStartTime}ms`);
         }
+    }
+
+    private isGlobalSyncLockAvailable(): boolean {
+        const lockPath = this.getSyncLockPath();
+        const staleMs = this.getSyncLockStaleMs();
+        try {
+            if (!fs.existsSync(lockPath)) {
+                return true;
+            }
+            const stat = fs.statSync(lockPath);
+            if (Date.now() - stat.mtimeMs > staleMs) {
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
+    public async handleSyncIndex(optionalSinglePath?: string): Promise<void> {
+        const syncStartTime = Date.now();
+        console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
+
+        const indexedCodebases = this.snapshotManager.getIndexedCodebases();
+
+        if (indexedCodebases.length === 0) {
+            console.log("[SYNC-DEBUG] No codebases indexed. Skipping sync.");
+            return;
+        }
+
+        if (this.isSyncing) {
+            console.log("[SYNC-DEBUG] Index sync already in progress. Skipping.");
+            return;
+        }
+
+        if (!this.acquireGlobalSyncLock()) {
+            return;
+        }
+
+        await this.runSyncLocked(optionalSinglePath);
+        console.log(
+            `[SYNC-DEBUG] handleSyncIndex() finished at ${new Date().toISOString()}, total duration: ${Date.now() - syncStartTime}ms`
+        );
     }
 
     public startBackgroundSync(): void {
