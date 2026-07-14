@@ -7,6 +7,32 @@ import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
+interface SearchReceiptResult {
+    rank: number;
+    score_bucket: "high" | "medium" | "low";
+    source: {
+        path_hash: string;
+        extension: string;
+        range: string;
+    };
+    chunk: {
+        hash: string;
+    };
+    duplicate: {
+        dedupe_key: string;
+    };
+}
+
+interface SearchReceipt {
+    event: "context.search.returned";
+    receipt_id: string;
+    query_hash: string;
+    codebase_path_hash: string;
+    index_snapshot_id: string;
+    result_count: number;
+    results: SearchReceiptResult[];
+}
+
 export class ToolHandlers {
     private context: Context;
     private snapshotManager: SnapshotManager;
@@ -26,6 +52,70 @@ export class ToolHandlers {
         this.snapshotManager = snapshotManager;
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
+    }
+
+    private sha256(value: unknown): string {
+        const payload = typeof value === "string" ? value : JSON.stringify(value);
+        return `sha256:${crypto.createHash("sha256").update(payload).digest("hex")}`;
+    }
+
+    private scoreBucket(score: number): "high" | "medium" | "low" {
+        if (score >= 0.8) return "high";
+        if (score >= 0.5) return "medium";
+        return "low";
+    }
+
+    private buildSearchReceipt(
+        searchCodebasePath: string,
+        query: string,
+        searchResults: Array<{
+            content: string;
+            relativePath: string;
+            startLine: number;
+            endLine: number;
+            score: number;
+        }>
+    ): SearchReceipt {
+        const snapshotInfo = this.snapshotManager.getCodebaseInfo(searchCodebasePath) ?? { status: "unknown" };
+        const results = searchResults.map((result, index) => {
+            const range = `L${result.startLine}-L${result.endLine}`;
+            const pathHash = this.sha256(result.relativePath);
+            const chunkHash = this.sha256(result.content);
+
+            return {
+                rank: index + 1,
+                score_bucket: this.scoreBucket(result.score),
+                source: {
+                    path_hash: pathHash,
+                    extension: path.extname(result.relativePath),
+                    range
+                },
+                chunk: {
+                    hash: chunkHash
+                },
+                duplicate: {
+                    dedupe_key: this.sha256({ path_hash: pathHash, range, chunk_hash: chunkHash })
+                }
+            };
+        });
+
+        const receiptCore = {
+            query_hash: this.sha256(query),
+            codebase_path_hash: this.sha256(searchCodebasePath),
+            index_snapshot_id: this.sha256(snapshotInfo),
+            result_count: searchResults.length,
+            results
+        };
+
+        return {
+            event: "context.search.returned",
+            receipt_id: this.sha256(receiptCore),
+            ...receiptCore
+        };
+    }
+
+    private formatSearchReceipt(receipt: SearchReceipt): string {
+        return `\n\nSearch receipt:\n\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``;
     }
 
     /**
@@ -645,7 +735,7 @@ export class ToolHandlers {
     }
 
     public async handleSearchCode(args: any) {
-        const { path: codebasePath, query, limit = 10, extensionFilter } = args;
+        const { path: codebasePath, query, limit = 10, extensionFilter, includeReceipt = false } = args;
         const resultLimit = limit || 10;
 
         try {
@@ -789,6 +879,9 @@ export class ToolHandlers {
                 if (isIndexing) {
                     noResultsMessage += `\n\nNote: This codebase is still being indexed. Try searching again after indexing completes, or the query may not match any indexed content.`;
                 }
+                if (includeReceipt === true) {
+                    noResultsMessage += this.formatSearchReceipt(this.buildSearchReceipt(searchCodebasePath, query, []));
+                }
                 return {
                     content: [{
                         type: "text",
@@ -814,6 +907,9 @@ export class ToolHandlers {
                 resultMessage += `\nRequested path '${absolutePath}' is covered by indexed codebase '${searchCodebasePath}'.`;
             }
             resultMessage += `\n\n${formattedResults}`;
+            if (includeReceipt === true) {
+                resultMessage += this.formatSearchReceipt(this.buildSearchReceipt(searchCodebasePath, query, searchResults));
+            }
 
             if (isIndexing) {
                 resultMessage += `\n\n💡 **Tip**: This codebase is still being indexed. More results may become available as indexing progresses.`;

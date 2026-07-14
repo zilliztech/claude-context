@@ -189,6 +189,11 @@ This tool is versatile and can be used before completing various tasks to retrie
                                     },
                                     description: "Optional: List of file extensions to filter results. (e.g., ['.ts','.py']).",
                                     default: []
+                                },
+                                includeReceipt: {
+                                    type: "boolean",
+                                    description: "Optional: Include a privacy-preserving search result receipt with hashes, ranks, score buckets, and ranges.",
+                                    default: false
                                 }
                             },
                             required: ["path", "query"]
