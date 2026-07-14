@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer, IndexAbortError } from "@zilliz/claude-context-core";
+import type { SemanticSearchResult } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
@@ -26,6 +27,77 @@ export class ToolHandlers {
         this.snapshotManager = snapshotManager;
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
+    }
+
+    private hashValue(value: string): string {
+        return `sha256:${crypto.createHash("sha256").update(value).digest("hex")}`;
+    }
+
+    private buildSearchReceipt(params: {
+        requestedPath: string;
+        searchCodebasePath: string;
+        query: string;
+        limit: number;
+        filterExpr?: string;
+        results: SemanticSearchResult[];
+    }) {
+        const snapshotInfo = this.snapshotManager.getCodebaseInfo(params.searchCodebasePath);
+        const snapshotLastUpdated = snapshotInfo?.lastUpdated;
+        const snapshotAgeMs = snapshotLastUpdated
+            ? Math.max(0, Date.now() - Date.parse(snapshotLastUpdated))
+            : undefined;
+        const queryHash = this.hashValue(params.query);
+        const snapshotDigestInput = JSON.stringify({
+            codebase_path_hash: this.hashValue(params.searchCodebasePath),
+            status: snapshotInfo?.status ?? "unknown",
+            indexed_files: snapshotInfo && "indexedFiles" in snapshotInfo ? snapshotInfo.indexedFiles : undefined,
+            total_chunks: snapshotInfo && "totalChunks" in snapshotInfo ? snapshotInfo.totalChunks : undefined,
+            index_status: snapshotInfo && "indexStatus" in snapshotInfo ? snapshotInfo.indexStatus : undefined,
+            last_updated: snapshotLastUpdated
+        });
+
+        const results = params.results.map((result, index) => {
+            const location = `${result.relativePath}:${result.startLine}-${result.endLine}`;
+            return {
+                rank: index + 1,
+                location_hash: this.hashValue(location),
+                chunk_hash: this.hashValue(result.content),
+                score_bucket: Number(result.score.toFixed(2)),
+                dedupe_key: this.hashValue(`${params.searchCodebasePath}:${location}`)
+            };
+        });
+
+        const receiptSeed = JSON.stringify({
+            tool: "search_code",
+            queryHash,
+            requestedPathHash: this.hashValue(params.requestedPath),
+            searchCodebasePathHash: this.hashValue(params.searchCodebasePath),
+            limit: params.limit,
+            filterExprHash: params.filterExpr ? this.hashValue(params.filterExpr) : null,
+            snapshotHash: this.hashValue(snapshotDigestInput),
+            resultChunkHashes: results.map((result) => result.chunk_hash)
+        });
+
+        return {
+            receipt_id: this.hashValue(receiptSeed),
+            tool: "search_code",
+            index_snapshot: {
+                codebase_path_hash: this.hashValue(params.searchCodebasePath),
+                status: snapshotInfo?.status ?? "unknown",
+                indexed_files: snapshotInfo && "indexedFiles" in snapshotInfo ? snapshotInfo.indexedFiles : undefined,
+                total_chunks: snapshotInfo && "totalChunks" in snapshotInfo ? snapshotInfo.totalChunks : undefined,
+                index_status: snapshotInfo && "indexStatus" in snapshotInfo ? snapshotInfo.indexStatus : undefined,
+                last_updated: snapshotLastUpdated,
+                age_ms: snapshotAgeMs
+            },
+            query_hash: queryHash,
+            requested_path_hash: this.hashValue(params.requestedPath),
+            effective_codebase_path_hash: this.hashValue(params.searchCodebasePath),
+            result_count: params.results.length,
+            requested_limit: params.limit,
+            extension_filter_hash: params.filterExpr ? this.hashValue(params.filterExpr) : null,
+            results
+        };
     }
 
     /**
@@ -814,6 +886,16 @@ export class ToolHandlers {
                 resultMessage += `\nRequested path '${absolutePath}' is covered by indexed codebase '${searchCodebasePath}'.`;
             }
             resultMessage += `\n\n${formattedResults}`;
+
+            const receipt = this.buildSearchReceipt({
+                requestedPath: absolutePath,
+                searchCodebasePath,
+                query,
+                limit: Math.min(resultLimit, 50),
+                filterExpr,
+                results: searchResults
+            });
+            resultMessage += `\n\nSearch receipt (privacy-preserving):\n\`\`\`json\n${JSON.stringify(receipt, null, 2)}\n\`\`\``;
 
             if (isIndexing) {
                 resultMessage += `\n\n💡 **Tip**: This codebase is still being indexed. More results may become available as indexing progresses.`;
