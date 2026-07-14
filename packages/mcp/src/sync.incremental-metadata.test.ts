@@ -4,11 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ToolHandlers } from "./handlers.js";
+import { SyncManager } from "./sync.js";
 import { SnapshotManager } from "./snapshot.js";
 
 async function withTempHome(run: (tempRoot: string) => Promise<void>): Promise<void> {
-    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "claude-context-mcp-status-"));
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "claude-context-mcp-sync-meta-"));
     const homeDir = path.join(tempRoot, "home");
     await mkdir(homeDir, { recursive: true });
 
@@ -36,33 +36,36 @@ async function withTempHome(run: (tempRoot: string) => Promise<void>): Promise<v
     }
 }
 
-test("get_indexing_status syncs cloud state before reading the snapshot", async () => {
+test("handleSyncIndex persists incremental sync metadata after reindexByChange", async () => {
     await withTempHome(async (tempRoot) => {
         const codebasePath = path.join(tempRoot, "repo");
         await mkdir(codebasePath, { recursive: true });
 
         const snapshotManager = new SnapshotManager();
-        assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "not_found");
+        snapshotManager.setCodebaseIndexed(codebasePath, {
+            indexedFiles: 4,
+            totalChunks: 12,
+            status: "completed",
+        });
+        snapshotManager.saveCodebaseSnapshot();
 
-        const handlers = new ToolHandlers({} as any, snapshotManager);
-        let syncCalls = 0;
-        (handlers as any).syncIndexedCodebasesFromCloud = async () => {
-            syncCalls += 1;
-            snapshotManager.setCodebaseIndexed(codebasePath, {
-                indexedFiles: 3,
-                totalChunks: 5,
-                status: "completed",
-            });
+        const before = snapshotManager.getCodebaseInfo(codebasePath);
+        assert.ok(before && before.status === "indexed");
+        assert.equal(before.lastIncrementalSyncAt, undefined);
+
+        const mockContext = {
+            async reindexByChange() {
+                return { added: 0, removed: 0, modified: 1 };
+            },
         };
 
-        const result = await handlers.handleGetIndexingStatus({ path: codebasePath });
+        const syncManager = new SyncManager(mockContext as any, snapshotManager);
+        await syncManager.handleSyncIndex();
 
-        assert.equal(syncCalls, 1);
-        assert.equal(result.isError, undefined);
-        assert.match(result.content[0].text, /fully indexed and ready for search/);
-        assert.match(result.content[0].text, /3 files, 5 chunks/);
-        assert.match(result.content[0].text, /Last full index:/);
-        assert.match(result.content[0].text, /Index freshness:/);
-        assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "indexed");
+        const after = snapshotManager.getCodebaseInfo(codebasePath);
+        assert.ok(after && after.status === "indexed");
+        assert.ok(after.lastIncrementalSyncAt);
+        assert.deepEqual(after.lastSyncStats, { added: 0, removed: 0, modified: 1 });
+        assert.ok(after.lastUpdated >= before.lastUpdated);
     });
 });
