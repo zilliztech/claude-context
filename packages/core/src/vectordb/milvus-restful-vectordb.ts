@@ -20,6 +20,7 @@ import {
     COLLECTION_LIMIT_MESSAGE
 } from './types';
 import { ClusterManager } from './zilliz-utils';
+import { validateMilvusSearchResultRow } from './search-result-validation';
 
 export interface MilvusRestfulConfig {
     address?: string;
@@ -428,7 +429,8 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             const response = await this.makeRequest('/entities/search', 'POST', searchRequest);
 
             // Transform response to VectorSearchResult format
-            const results: VectorSearchResult[] = (response.data || []).map((item: any) => {
+            const results: VectorSearchResult[] = (response.data || []).map((rawItem: any, index: number) => {
+                const item = validateMilvusSearchResultRow(rawItem, collectionName, index, ['distance', 'score']);
                 // Parse metadata from JSON string
                 let metadata = {};
                 try {
@@ -449,7 +451,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                         fileExtension: item.fileExtension || '',
                         metadata: metadata
                     },
-                    score: item.distance || 0
+                    score: (item.distance ?? item.score) as number
                 };
             });
 
@@ -774,7 +776,8 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             console.log(`[MilvusRestfulDB] ✅ Found ${results.length} results from hybrid search`);
 
             // Transform response to HybridSearchResult format
-            return results.map((result: any) => {
+            return results.map((rawResult: any, index: number) => {
+                const result = validateMilvusSearchResultRow(rawResult, collectionName, index, ['score', 'distance']);
                 let metadata = {};
                 try {
                     metadata = JSON.parse(result.metadata || '{}');
@@ -794,7 +797,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                         fileExtension: result.fileExtension,
                         metadata,
                     },
-                    score: result.score || result.distance || 0,
+                    score: (result.score ?? result.distance) as number,
                 };
             });
 

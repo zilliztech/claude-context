@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer, IndexAbortError } from "@zilliz/claude-context-core";
+import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer, IndexAbortError, isVectorSearchResultValidationError } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
 import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
@@ -838,6 +838,16 @@ export class ToolHandlers {
                         type: "text",
                         text: COLLECTION_LIMIT_MESSAGE
                     }]
+                };
+            }
+
+            if (isVectorSearchResultValidationError(error)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Error searching code: ${errorMessage} The search_code result was malformed after indexing. Likely causes include embedding dimension mismatch, collection mismatch, stale collection data, or collection schema/configuration mismatch. Re-index with the same embedding provider and collection configuration if needed.`
+                    }],
+                    isError: true
                 };
             }
 
