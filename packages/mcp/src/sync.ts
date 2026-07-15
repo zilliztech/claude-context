@@ -185,10 +185,14 @@ export class SyncManager {
             let totalStats = { added: 0, removed: 0, modified: 0 };
 
             for (let i = 0; i < indexedCodebases.length; i++) {
-                const codebasePath = indexedCodebases[i];
+                const canonKey = indexedCodebases[i];
+                // Resolve canonical key → local path on this machine. For
+                // non-git codebases the canonical key is itself an absolute
+                // path, so fall back to it.
+                const codebasePath = this.snapshotManager.getLocalPath(canonKey) ?? canonKey;
                 const codebaseStartTime = Date.now();
 
-                console.log(`[SYNC-DEBUG] [${i + 1}/${indexedCodebases.length}] Starting sync for codebase: '${codebasePath}'`);
+                console.log(`[SYNC-DEBUG] [${i + 1}/${indexedCodebases.length}] Starting sync for codebase: '${codebasePath}' (key=${canonKey})`);
 
                 // Check if codebase path still exists
                 try {
@@ -206,7 +210,7 @@ export class SyncManager {
 
                 try {
                     console.log(`[SYNC-DEBUG] Calling context.reindexByChange() for '${codebasePath}'`);
-                    const codebaseInfo = this.snapshotManager.getCodebaseInfo(codebasePath);
+                    const codebaseInfo = this.snapshotManager.getCodebaseInfo(canonKey);
                     const requestSplitterType: RequestSplitterType = resolveRequestSplitterType(codebaseInfo?.requestSplitter);
                     const requestIgnorePatterns = codebaseInfo?.requestIgnorePatterns || [];
                     const requestCustomExtensions = codebaseInfo?.requestCustomExtensions || [];

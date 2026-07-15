@@ -21,6 +21,7 @@ import { envManager } from './utils/env-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { execSync } from 'child_process';
 import { FileSynchronizer } from './sync/synchronizer';
 import { IgnoreMatcher } from './utils/ignore-matcher';
 
@@ -140,6 +141,7 @@ export class Context {
     private collectionNameOverride?: string;
     private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
+    private gitRemoteCache = new Map<string, string | null>();
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -284,7 +286,19 @@ export class Context {
     }
 
     /**
-     * Generate collection name based on codebase path and hybrid mode
+     * Generate collection name based on codebase path and hybrid mode.
+     *
+     * Resolution order:
+     *   1. ContextConfig.collectionNameOverride constructor argument
+     *   2. CODE_CHUNKS_COLLECTION_NAME_OVERRIDE env var
+     *   3. Git remote origin URL hash (when CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION !== 'false')
+     *   4. Local absolute-path hash (original behaviour)
+     *
+     * Step 3 enables shared indexes across team members who clone the same
+     * repository to different local paths.  The remote URL is normalised before
+     * hashing so that SSH and HTTPS variants of the same repo produce the same
+     * collection name.  Set CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION=false to opt
+     * out and restore path-hash behaviour.
      */
     public getCollectionName(codebasePath: string): string {
         const isHybrid = this.getIsHybrid();
@@ -306,7 +320,117 @@ export class Context {
             return `${prefix}_${suffix}`;
         }
 
+        // Git-remote-based naming: all developers who clone the same repo share
+        // one collection regardless of their local checkout path.
+        if (this.isGitRemoteCollectionEnabled()) {
+            const remoteUrl = this.getGitRemoteUrl(normalizedPath);
+            if (remoteUrl) {
+                const normalizedRemote = this.normalizeGitRemoteUrl(remoteUrl);
+                const remoteHash = crypto.createHash('md5').update(normalizedRemote).digest('hex').substring(0, 8);
+                console.log(`[Context] 🔗 Using git remote for collection name: "${normalizedRemote}" → ${prefix}_git_${remoteHash}`);
+                return `${prefix}_git_${remoteHash}`;
+            }
+        }
+
         return `${prefix}_${pathHash}`;
+    }
+
+    /**
+     * Returns true unless CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION is explicitly
+     * set to 'false'.  Enabled by default so teams get shared indexes without
+     * any extra configuration.
+     */
+    private isGitRemoteCollectionEnabled(): boolean {
+        const val = envManager.get('CLAUDE_CONTEXT_GIT_REMOTE_COLLECTION');
+        if (val === undefined || val === null) return true;
+        return val.trim().toLowerCase() !== 'false';
+    }
+
+    /**
+     * Retrieve and cache the git remote origin URL for a codebase directory.
+     * Returns null when the path is not a git repo or has no remote named
+     * "origin".
+     */
+    private getGitRemoteUrl(codebasePath: string): string | null {
+        if (this.gitRemoteCache.has(codebasePath)) {
+            return this.gitRemoteCache.get(codebasePath)!;
+        }
+
+        let remoteUrl: string | null = null;
+        try {
+            const raw = execSync('git remote get-url origin', {
+                cwd: codebasePath,
+                stdio: 'pipe',
+                timeout: 3000,
+            }).toString().trim();
+            remoteUrl = raw.length > 0 ? raw : null;
+        } catch {
+            // Not a git repo, or no remote named "origin" — fall through to path hash.
+        }
+
+        this.gitRemoteCache.set(codebasePath, remoteUrl);
+        return remoteUrl;
+    }
+
+    /**
+     * Normalise a git remote URL so that SSH and HTTPS variants of the same
+     * repository hash to the same value.
+     *
+     * Examples that all normalise to "github.com/org/repo":
+     *   https://github.com/org/repo.git
+     *   https://github.com/org/repo
+     *   git@github.com:org/repo.git
+     *   ssh://git@github.com/org/repo.git
+     */
+    private normalizeGitRemoteUrl(url: string): string {
+        let normalized = url.trim().toLowerCase();
+
+        // Strip trailing ".git"
+        if (normalized.endsWith('.git')) {
+            normalized = normalized.slice(0, -4);
+        }
+
+        // URLs with a scheme (https://, ssh://, git://) must be parsed before
+        // the SCP regex, because "https://..." also matches the <word>:<rest>
+        // SCP pattern and would produce a wrong result.
+        if (normalized.includes('://')) {
+            try {
+                const parsed = new URL(normalized);
+                return `${parsed.hostname}${parsed.pathname}`.replace(/^\/+/, '');
+            } catch {
+                // Malformed URL — fall through to return as-is
+            }
+            return normalized;
+        }
+
+        // Convert SCP-style SSH  (git@host:org/repo) to host/org/repo
+        const scpMatch = normalized.match(/^(?:[\w.-]+@)?([\w.-]+):([\w./-]+)$/);
+        if (scpMatch) {
+            return `${scpMatch[1]}/${scpMatch[2]}`;
+        }
+
+        return normalized;
+    }
+
+    /**
+     * Return the canonical identifier for a codebase directory.
+     *
+     * For git repos with a remote origin this is the normalised remote URL
+     * (e.g. "github.com/org/repo"), which is identical for every developer
+     * who clones the same repository regardless of their local checkout path.
+     *
+     * For non-git directories (or when git-remote collection is disabled) the
+     * canonical key falls back to the resolved absolute path.
+     */
+    public getCanonicalKey(codebasePath: string): string {
+        const normalizedPath = path.resolve(codebasePath);
+        if (this.isGitRemoteCollectionEnabled()) {
+            const remoteUrl = this.getGitRemoteUrl(normalizedPath);
+            if (remoteUrl) {
+                return this.normalizeGitRemoteUrl(remoteUrl);
+            }
+        }
+        return normalizedPath;
     }
 
     private getValidOverrideValue(value?: string): string | undefined {
@@ -794,10 +918,19 @@ export class Context {
         console.log(`[Context] 📏 Detected dimension: ${dimension} for ${this.embedding.getProvider()}`);
         const dirName = path.basename(codebasePath);
 
+        // Store both canonical key (machine-independent identifier — git remote
+        // URL or absolute path) and the local codebasePath. The canonical key is
+        // what sync actually compares against; the local path is preserved for
+        // diagnostics. Format: "canonicalKey:<key>|codebasePath:<path>".
+        // Old collections written before this format are still parseable: the
+        // sync code falls back to deriving the canonical key from the path.
+        const canonicalKey = this.getCanonicalKey(codebasePath);
+        const description = `canonicalKey:${canonicalKey}|codebasePath:${codebasePath}`;
+
         if (isHybrid === true) {
-            await this.vectorDatabase.createHybridCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
+            await this.vectorDatabase.createHybridCollection(collectionName, dimension, description);
         } else {
-            await this.vectorDatabase.createCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
+            await this.vectorDatabase.createCollection(collectionName, dimension, description);
         }
 
         console.log(`[Context] ✅ Collection ${collectionName} created successfully (dimension: ${dimension})`);
