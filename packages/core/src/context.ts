@@ -6,7 +6,9 @@ import {
 import {
     Embedding,
     EmbeddingVector,
-    OpenAIEmbedding
+    OpenAIEmbedding,
+    CachedEmbedding,
+    FileSystemEmbeddingCache
 } from './embedding';
 import {
     VectorDatabase,
@@ -149,6 +151,13 @@ export class Context {
             ...(envManager.get('OPENAI_BASE_URL') && { baseURL: envManager.get('OPENAI_BASE_URL') })
         });
 
+        // Wrap the embedder in a content-addressed cache so an identical chunk
+        // is embedded once and reused across every collection on this machine
+        // (e.g. the same repository checked out into multiple git worktrees, or
+        // a re-clone at a different path). Enabled by default; opt out with
+        // EMBEDDING_CACHE=false. Override the location with EMBEDDING_CACHE_DIR.
+        this.embedding = this.maybeWrapWithEmbeddingCache(this.embedding);
+
         if (!config.vectorDatabase) {
             throw new Error('VectorDatabase is required. Please provide a vectorDatabase instance in the config.');
         }
@@ -190,6 +199,24 @@ export class Context {
         if (envCustomIgnorePatterns.length > 0) {
             console.log(`[Context] 🚫 Loaded ${envCustomIgnorePatterns.length} custom ignore patterns from environment: ${envCustomIgnorePatterns.join(', ')}`);
         }
+    }
+
+    /**
+     * Wrap an embedder in the content-addressed cache unless disabled via
+     * EMBEDDING_CACHE=false. The cache lives under EMBEDDING_CACHE_DIR (default
+     * `~/.context/embedding-cache`) and is safe to share across concurrent
+     * indexers targeting different collections.
+     */
+    private maybeWrapWithEmbeddingCache(embedding: Embedding): Embedding {
+        const disabled = (envManager.get('EMBEDDING_CACHE') || '').trim().toLowerCase() === 'false';
+        if (disabled) {
+            console.log('[Context] 🗃️  Embedding cache disabled (EMBEDDING_CACHE=false)');
+            return embedding;
+        }
+        const cacheDir = envManager.get('EMBEDDING_CACHE_DIR') || undefined;
+        const cache = new FileSystemEmbeddingCache(cacheDir);
+        console.log(`[Context] 🗃️  Embedding cache enabled at ${cacheDir || FileSystemEmbeddingCache.getDefaultCacheDir()}`);
+        return new CachedEmbedding(embedding, cache);
     }
 
     /**
