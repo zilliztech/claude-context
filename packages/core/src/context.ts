@@ -23,8 +23,19 @@ import { envManager } from './utils/env-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { execFileSync } from 'node:child_process';
 import { FileSynchronizer } from './sync/synchronizer';
 import { IgnoreMatcher } from './utils/ignore-matcher';
+
+/**
+ * Branch tag written on every chunk when the branch overlay is disabled or the
+ * codebase is not a git repository. Keeps all rows in a single namespace so the
+ * overlay code paths collapse to exactly today's single-branch behavior.
+ */
+const LEGACY_BRANCH = '_';
+
+/** Delete Milvus ids in batches of at most this many per delete call. */
+const MAX_DELETE_BATCH = 1000;
 
 /**
  * Thrown by indexCodebase / processFileList when an AbortSignal fires
@@ -147,6 +158,12 @@ export class Context {
     private collectionNameOverride?: string;
     private warnedOverrideSanitization = new Set<string>();
     private synchronizers = new Map<string, FileSynchronizer>();
+    // Memoize the resolved git context (branch + per-repo id) per absolute path.
+    // A null entry caches "not a git repo / overlay disabled" so we don't re-shell.
+    private gitCtxCache = new Map<string, { branch: string; repoId: string } | null>();
+    // Cache the branch's touched-file set per `${collectionName}:${branch}` so the
+    // two-pass search merge doesn't re-query Milvus on every search.
+    private branchPathsCache = new Map<string, Set<string>>();
 
     constructor(config: ContextConfig = {}) {
         // Initialize services
@@ -276,10 +293,12 @@ export class Context {
     }
 
     /**
-     * Set synchronizer for a collection
+     * Set synchronizer for a codebase. Keyed by the resolved codebase path (not the
+     * collection name) because the Milvus collection is now shared across every git
+     * worktree of a repo — keying by collection name would collide across worktrees.
      */
-    setSynchronizer(collectionName: string, synchronizer: FileSynchronizer): void {
-        this.synchronizers.set(collectionName, synchronizer);
+    setSynchronizer(codebasePath: string, synchronizer: FileSynchronizer): void {
+        this.synchronizers.set(path.resolve(codebasePath), synchronizer);
     }
 
     /**
@@ -316,13 +335,170 @@ export class Context {
     }
 
     /**
+     * Whether the file-grain git-branch overlay is active. Enabled by default;
+     * opt out with CODEINDEX_BRANCH_OVERLAY=false to restore single-namespace
+     * (pre-overlay) behavior.
+     */
+    private branchOverlayEnabled(): boolean {
+        return (envManager.get('CODEINDEX_BRANCH_OVERLAY') || '').trim().toLowerCase() !== 'false';
+    }
+
+    /**
+     * The base branch a worktree overlays (its untouched files resolve here).
+     * Defaults to 'main'; override with CODEINDEX_BASE_BRANCH.
+     */
+    private baseBranch(): string {
+        return envManager.get('CODEINDEX_BASE_BRANCH') || 'main';
+    }
+
+    /**
+     * Resolve the git context (current branch + a stable per-repo id shared across
+     * all worktrees of the repo) for a codebase path. Returns null when the overlay
+     * is disabled or the path is not a git repository (→ legacy single namespace).
+     * The per-repo id derives from the git common dir, so every linked worktree of
+     * the same repository maps to one Milvus collection.
+     */
+    private gitContext(codebasePath: string): { branch: string; repoId: string } | null {
+        if (!this.branchOverlayEnabled()) {
+            return null;
+        }
+        const cacheKey = path.resolve(codebasePath);
+        if (this.gitCtxCache.has(cacheKey)) {
+            return this.gitCtxCache.get(cacheKey)!;
+        }
+        let result: { branch: string; repoId: string } | null;
+        try {
+            const branch = execFileSync('git', ['-C', codebasePath, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf-8' }).trim();
+            const commonDir = execFileSync('git', ['-C', codebasePath, 'rev-parse', '--git-common-dir'], { encoding: 'utf-8' }).trim();
+            const absCommon = path.resolve(codebasePath, commonDir);
+            const repoId = crypto.createHash('md5').update(absCommon).digest('hex').substring(0, 8);
+            result = { branch: branch || 'HEAD', repoId };
+        } catch {
+            // Not a git repo (or git unavailable) → legacy single-namespace behavior.
+            result = null;
+        }
+        this.gitCtxCache.set(cacheKey, result);
+        return result;
+    }
+
+    /**
+     * Drop memoized git/branch state for a codebase so the next resolve re-reads
+     * git. Called at the start of each top-level op (index/search/clear) so a
+     * branch switch or a fresh index within the long-lived, worktree-shared MCP
+     * server is reflected immediately instead of serving a stale branch or a
+     * stale shadow set.
+     */
+    private refreshGitState(codebasePath: string): void {
+        this.gitCtxCache.delete(path.resolve(codebasePath));
+        this.branchPathsCache.clear();
+    }
+
+    /**
+     * The branch tag a codebase's chunks are stored under. LEGACY_BRANCH when the
+     * overlay is off or the path is not a git repo.
+     */
+    private resolveBranch(codebasePath: string): string {
+        return this.gitContext(codebasePath)?.branch ?? LEGACY_BRANCH;
+    }
+
+    /**
+     * True iff we are on a non-base branch with the overlay active — i.e. this
+     * worktree should overlay the shared base index at file granularity.
+     */
+    private isOverlayBranch(codebasePath: string): boolean {
+        const ctx = this.gitContext(codebasePath);
+        return ctx !== null && ctx.branch !== this.baseBranch();
+    }
+
+    /**
+     * The set of absolute file paths this branch has touched relative to the base
+     * branch (tracked files differing from base tip, plus untracked files). Returns
+     * null when the touched set can't be determined (e.g. base branch unknown
+     * locally) so callers fall back to indexing all files.
+     */
+    private touchedFiles(codebasePath: string): Set<string> | null {
+        const base = this.baseBranch();
+        try {
+            // Tracked files differing from the base tip, excluding deletions.
+            const diff = execFileSync(
+                'git',
+                ['-C', codebasePath, 'diff', '--name-only', '--diff-filter=d', base, '--'],
+                { encoding: 'utf-8' }
+            );
+            const untracked = execFileSync(
+                'git',
+                ['-C', codebasePath, 'ls-files', '--others', '--exclude-standard'],
+                { encoding: 'utf-8' }
+            );
+            const touched = new Set<string>();
+            for (const block of [diff, untracked]) {
+                for (const rel of block.split('\n')) {
+                    const trimmed = rel.trim();
+                    if (trimmed) {
+                        touched.add(path.resolve(codebasePath, trimmed));
+                    }
+                }
+            }
+            return touched;
+        } catch {
+            // e.g. base branch not present locally → can't scope, index everything.
+            return null;
+        }
+    }
+
+    /**
+     * Delete only the rows of a single branch from a shared collection, never the
+     * collection itself. Batches deletes so a large branch doesn't overflow a
+     * single delete call.
+     */
+    private async clearBranchRows(collectionName: string, branch: string): Promise<void> {
+        const rows = await this.vectorDatabase.query(collectionName, `branch == "${branch}"`, ['id']);
+        const ids = rows.map(r => r.id as string).filter(Boolean);
+        if (ids.length === 0) {
+            return;
+        }
+        for (let i = 0; i < ids.length; i += MAX_DELETE_BATCH) {
+            await this.vectorDatabase.delete(collectionName, ids.slice(i, i + MAX_DELETE_BATCH));
+        }
+        console.log(`[Context] 🧹 Cleared ${ids.length} rows for branch '${branch}' in ${collectionName}`);
+    }
+
+    /**
+     * The set of relativePaths a branch has indexed in the shared collection.
+     * Used by the two-pass search merge so a base-branch result is suppressed for
+     * any file the branch shadows. Cached per `${collectionName}:${branch}`.
+     */
+    private async getBranchPaths(collectionName: string, branch: string): Promise<Set<string>> {
+        const cacheKey = `${collectionName}:${branch}`;
+        const cached = this.branchPathsCache.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+        const rows = await this.vectorDatabase.query(collectionName, `branch == "${branch}"`, ['relativePath']);
+        const paths = new Set<string>(rows.map(r => r.relativePath as string).filter(Boolean));
+        this.branchPathsCache.set(cacheKey, paths);
+        return paths;
+    }
+
+    /**
+     * Compose two Milvus filter expressions with AND. Either may be empty.
+     */
+    private composeFilter(a: string | undefined, b: string): string {
+        return a && a.trim().length > 0 ? `(${a}) && (${b})` : b;
+    }
+
+    /**
      * Generate collection name based on codebase path and hybrid mode
      */
     public getCollectionName(codebasePath: string): string {
         const isHybrid = this.getIsHybrid();
         const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
         const normalizedPath = path.resolve(codebasePath);
-        const pathHash = crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
+        // When the path is a git repo (and overlay is on), derive the per-collection
+        // hash from the shared repo id so every worktree of the repo maps to ONE
+        // collection. Otherwise fall back to hashing the absolute path (legacy).
+        const gitCtx = this.gitContext(codebasePath);
+        const pathHash = gitCtx ? gitCtx.repoId : crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
 
         // Overrides always keep the per-codebase `_<pathHash>` suffix so that multiple
         // codebases indexed by the same MCP server can't collapse into one collection.
@@ -393,6 +569,7 @@ export class Context {
         requestSplitter?: Splitter,
         signal?: AbortSignal
     ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
+        this.refreshGitState(codebasePath);
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🚀 Starting to index codebase with ${searchType}: ${codebasePath}`);
@@ -413,7 +590,18 @@ export class Context {
         const codeFiles = await this.getCodeFiles(codebasePath, ignorePatterns, supportedExtensions);
         console.log(`[Context] 📁 Found ${codeFiles.length} code files`);
 
-        if (codeFiles.length === 0) {
+        // On a non-base branch, index only the files this branch has touched; the
+        // rest resolve from the shared base index at search time (file overlay).
+        let filesToProcess = codeFiles;
+        if (this.isOverlayBranch(codebasePath)) {
+            const touched = this.touchedFiles(codebasePath);
+            if (touched) {
+                filesToProcess = codeFiles.filter(f => touched.has(path.resolve(f)));
+            }
+            console.log(`[Context] 🌿 Branch overlay '${this.resolveBranch(codebasePath)}': indexing ${filesToProcess.length}/${codeFiles.length} touched files`);
+        }
+
+        if (filesToProcess.length === 0) {
             progressCallback?.({ phase: 'No files to index', current: 100, total: 100, percentage: 100 });
             return { indexedFiles: 0, totalChunks: 0, status: 'completed' };
         }
@@ -425,7 +613,7 @@ export class Context {
         const indexingRange = indexingEndPercentage - indexingStartPercentage;
 
         const result = await this.processFileList(
-            codeFiles,
+            filesToProcess,
             codebasePath,
             (filePath, fileIndex, totalFiles) => {
                 // Calculate progress percentage
@@ -448,7 +636,7 @@ export class Context {
         progressCallback?.({
             phase: 'Indexing complete!',
             current: result.processedFiles,
-            total: codeFiles.length,
+            total: filesToProcess.length,
             percentage: 100
         });
 
@@ -466,8 +654,13 @@ export class Context {
         additionalSupportedExtensions: string[] = [],
         requestSplitter?: Splitter
     ): Promise<{ added: number, removed: number, modified: number }> {
+        this.refreshGitState(codebasePath);
         const collectionName = this.getCollectionName(codebasePath);
-        const synchronizer = this.synchronizers.get(collectionName);
+        // The synchronizer map is keyed by resolved codebase path, not collection
+        // name: the collection is shared across worktrees, but each worktree needs
+        // its own change-tracking snapshot.
+        const syncKey = path.resolve(codebasePath);
+        const synchronizer = this.synchronizers.get(syncKey);
         const splitter = requestSplitter || this.codeSplitter;
 
         if (!synchronizer) {
@@ -479,10 +672,10 @@ export class Context {
             // To be safe, let's initialize if it's not there.
             const newSynchronizer = new FileSynchronizer(codebasePath, ignorePatterns, supportedExtensions);
             await newSynchronizer.initialize();
-            this.synchronizers.set(collectionName, newSynchronizer);
+            this.synchronizers.set(syncKey, newSynchronizer);
         }
 
-        const currentSynchronizer = this.synchronizers.get(collectionName)!;
+        const currentSynchronizer = this.synchronizers.get(syncKey)!;
 
         progressCallback?.({ phase: 'Checking for file changes...', current: 0, total: 100, percentage: 0 });
         const { added, removed, modified } = await currentSynchronizer.checkForChanges();
@@ -503,15 +696,17 @@ export class Context {
             progressCallback?.({ phase, current: processedChanges, total: totalChanges, percentage });
         };
 
+        const branch = this.resolveBranch(codebasePath);
+
         // Handle removed files
         for (const file of removed) {
-            await this.deleteFileChunks(collectionName, file);
+            await this.deleteFileChunks(collectionName, file, branch);
             updateProgress(`Removed ${file}`);
         }
 
         // Handle modified files
         for (const file of modified) {
-            await this.deleteFileChunks(collectionName, file);
+            await this.deleteFileChunks(collectionName, file, branch);
             updateProgress(`Deleted old chunks for ${file}`);
         }
 
@@ -535,12 +730,14 @@ export class Context {
         return { added: added.length, removed: removed.length, modified: modified.length };
     }
 
-    private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
+    private async deleteFileChunks(collectionName: string, relativePath: string, branch: string): Promise<void> {
         // Escape backslashes for Milvus query expression (Windows path compatibility)
         const escapedPath = relativePath.replace(/\\/g, '\\\\');
+        // Branch-scope the delete: a shared collection holds base + branch rows, so
+        // only remove this branch's chunks for the file — never the base's.
         const results = await this.vectorDatabase.query(
             collectionName,
-            `relativePath == "${escapedPath}"`,
+            `relativePath == "${escapedPath}" && branch == "${branch}"`,
             ['id']
         );
 
@@ -561,6 +758,7 @@ export class Context {
      * @param threshold Similarity threshold
      */
     async semanticSearch(codebasePath: string, query: string, topK: number = 5, threshold: number = 0.5, filterExpr?: string): Promise<SemanticSearchResult[]> {
+        this.refreshGitState(codebasePath);
         const isHybrid = this.getIsHybrid();
         const searchType = isHybrid === true ? 'hybrid search' : 'semantic search';
         console.log(`[Context] 🔍 Executing ${searchType}: "${query}" in ${codebasePath}`);
@@ -575,100 +773,93 @@ export class Context {
             return [];
         }
 
-        if (isHybrid === true) {
-            try {
-                // Check collection stats to see if it has data
-                const stats = await this.vectorDatabase.query(collectionName, '', ['id'], 1);
-                console.log(`[Context] 🔍 Collection '${collectionName}' exists and appears to have data`);
-            } catch (error) {
-                console.log(`[Context] ⚠️  Collection '${collectionName}' exists but may be empty or not properly indexed:`, error);
-            }
+        const branch = this.resolveBranch(codebasePath);
+        const base = this.baseBranch();
 
-            // 1. Generate query vector
-            console.log(`[Context] 🔍 Generating embeddings for query: "${query}"`);
-            const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
-            console.log(`[Context] ✅ Generated embedding vector with dimension: ${queryEmbedding.vector.length}`);
-            console.log(`[Context] 🔍 First 5 embedding values: [${queryEmbedding.vector.slice(0, 5).join(', ')}]`);
-
-            // 2. Prepare hybrid search requests
-            const searchRequests: HybridSearchRequest[] = [
-                {
-                    data: queryEmbedding.vector,
-                    anns_field: "vector",
-                    param: { "nprobe": 10 },
-                    limit: topK
-                },
-                {
-                    data: query,
-                    anns_field: "sparse_vector",
-                    param: { "drop_ratio_search": 0.2 },
-                    limit: topK
-                }
-            ];
-
-            console.log(`[Context] 🔍 Search request 1 (dense): anns_field="${searchRequests[0].anns_field}", vector_dim=${queryEmbedding.vector.length}, limit=${searchRequests[0].limit}`);
-            console.log(`[Context] 🔍 Search request 2 (sparse): anns_field="${searchRequests[1].anns_field}", query_text="${query}", limit=${searchRequests[1].limit}`);
-
-            // 3. Execute hybrid search
-            console.log(`[Context] 🔍 Executing hybrid search with RRF reranking...`);
-            const searchResults: HybridSearchResult[] = await this.vectorDatabase.hybridSearch(
-                collectionName,
-                searchRequests,
-                {
-                    rerank: {
-                        strategy: 'rrf',
-                        params: { k: 100 }
-                    },
-                    limit: topK,
-                    filterExpr
-                }
-            );
-
-            console.log(`[Context] 🔍 Raw search results count: ${searchResults.length}`);
-
-            // 4. Convert to semantic search result format
-            const results: SemanticSearchResult[] = searchResults.map(result => ({
-                content: result.document.content,
-                relativePath: result.document.relativePath,
-                startLine: result.document.startLine,
-                endLine: result.document.endLine,
-                language: result.document.metadata.language || 'unknown',
-                score: result.score
-            }));
-
-            const dedupedResults = this.deduplicateResults(results);
-            console.log(`[Context] ✅ Found ${results.length} results, ${dedupedResults.length} after dedup`);
-            if (dedupedResults.length > 0) {
-                console.log(`[Context] 🔍 Top result score: ${dedupedResults[0].score}, path: ${dedupedResults[0].relativePath}`);
-            }
-
-            return dedupedResults;
-        } else {
-            // Regular semantic search
-            // 1. Generate query vector
-            const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
-
-            // 2. Search in vector database
-            const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
-                collectionName,
-                queryEmbedding.vector,
-                { topK, threshold, filterExpr }
-            );
-
-            // 3. Convert to semantic search result format
-            const results: SemanticSearchResult[] = searchResults.map(result => ({
-                content: result.document.content,
-                relativePath: result.document.relativePath,
-                startLine: result.document.startLine,
-                endLine: result.document.endLine,
-                language: result.document.metadata.language || 'unknown',
-                score: result.score
-            }));
-
+        // A search from the base branch (or with the overlay off) sees only its own
+        // branch's rows — the branch filter scopes it to a single namespace.
+        if (!this.isOverlayBranch(codebasePath)) {
+            const scoped = this.composeFilter(filterExpr, `branch == "${branch}"`);
+            const results = isHybrid === true
+                ? await this.hybridSearchMapped(collectionName, query, topK, scoped)
+                : await this.vectorSearchMapped(collectionName, query, topK, threshold, scoped);
             const dedupedResults = this.deduplicateResults(results);
             console.log(`[Context] ✅ Found ${results.length} results, ${dedupedResults.length} after dedup`);
             return dedupedResults;
         }
+
+        // Overlay branch: two-pass "branch shadows base" merge. The branch's own
+        // rows win; base rows survive only for files the branch never touched.
+        const branchFilter = this.composeFilter(filterExpr, `branch == "${branch}"`);
+        const mainFilter = this.composeFilter(filterExpr, `branch == "${base}"`);
+
+        const branchResults = isHybrid === true
+            ? await this.hybridSearchMapped(collectionName, query, topK, branchFilter)
+            : await this.vectorSearchMapped(collectionName, query, topK, threshold, branchFilter);
+        const mainResults = isHybrid === true
+            ? await this.hybridSearchMapped(collectionName, query, topK, mainFilter)
+            : await this.vectorSearchMapped(collectionName, query, topK, threshold, mainFilter);
+
+        const branchPaths = await this.getBranchPaths(collectionName, branch);
+        const merged = [
+            ...branchResults,
+            ...mainResults.filter(r => !branchPaths.has(r.relativePath))
+        ];
+        merged.sort((a, b) => b.score - a.score);
+        const dedupedResults = this.deduplicateResults(merged).slice(0, topK);
+        console.log(`[Context] 🌿 Overlay '${branch}': ${branchResults.length} branch + ${mainResults.length} base → ${dedupedResults.length} merged`);
+        return dedupedResults;
+    }
+
+    /**
+     * Run a single hybrid (dense + sparse RRF) search and map to SemanticSearchResult[]
+     * without dedup so callers can merge multiple passes. filterExpr scopes the rows.
+     */
+    private async hybridSearchMapped(collectionName: string, query: string, topK: number, filterExpr?: string): Promise<SemanticSearchResult[]> {
+        const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+
+        const searchRequests: HybridSearchRequest[] = [
+            { data: queryEmbedding.vector, anns_field: "vector", param: { "nprobe": 10 }, limit: topK },
+            { data: query, anns_field: "sparse_vector", param: { "drop_ratio_search": 0.2 }, limit: topK }
+        ];
+
+        const searchResults: HybridSearchResult[] = await this.vectorDatabase.hybridSearch(
+            collectionName,
+            searchRequests,
+            { rerank: { strategy: 'rrf', params: { k: 100 } }, limit: topK, filterExpr }
+        );
+
+        return searchResults.map(result => ({
+            content: result.document.content,
+            relativePath: result.document.relativePath,
+            startLine: result.document.startLine,
+            endLine: result.document.endLine,
+            language: result.document.metadata.language || 'unknown',
+            score: result.score
+        }));
+    }
+
+    /**
+     * Run a single dense vector search and map to SemanticSearchResult[] without
+     * dedup so callers can merge multiple passes. filterExpr scopes the rows.
+     */
+    private async vectorSearchMapped(collectionName: string, query: string, topK: number, threshold: number, filterExpr?: string): Promise<SemanticSearchResult[]> {
+        const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+
+        const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
+            collectionName,
+            queryEmbedding.vector,
+            { topK, threshold, filterExpr }
+        );
+
+        return searchResults.map(result => ({
+            content: result.document.content,
+            relativePath: result.document.relativePath,
+            startLine: result.document.startLine,
+            endLine: result.document.endLine,
+            language: result.document.metadata.language || 'unknown',
+            score: result.score
+        }));
     }
 
     /**
@@ -717,6 +908,7 @@ export class Context {
         progressCallback?: (progress: { phase: string; current: number; total: number; percentage: number }) => void
     ): Promise<void> {
         console.log(`[Context] 🧹 Cleaning index data for ${codebasePath}...`);
+        this.refreshGitState(codebasePath);
 
         progressCallback?.({ phase: 'Checking existing index...', current: 0, total: 100, percentage: 0 });
 
@@ -725,7 +917,13 @@ export class Context {
 
         progressCallback?.({ phase: 'Removing index data...', current: 50, total: 100, percentage: 50 });
 
-        if (collectionExists) {
+        if (this.isOverlayBranch(codebasePath)) {
+            // Shared collection: clear only this branch's rows, never drop the
+            // collection (that would take out the base index other worktrees rely on).
+            if (collectionExists) {
+                await this.clearBranchRows(collectionName, this.resolveBranch(codebasePath));
+            }
+        } else if (collectionExists) {
             await this.vectorDatabase.dropCollection(collectionName);
         }
 
@@ -809,6 +1007,21 @@ export class Context {
 
         // Check if collection already exists
         const collectionExists = await this.vectorDatabase.hasCollection(collectionName);
+        const overlayBranch = this.isOverlayBranch(codebasePath);
+
+        if (overlayBranch) {
+            // A non-base branch shares the collection with base (and sibling
+            // worktrees). Never drop it — that would delete the base index. Ensure
+            // it exists, and on force clear only this branch's rows.
+            if (!collectionExists) {
+                await this.createCollectionForMode(collectionName, codebasePath, isHybrid);
+            }
+            if (forceReindex) {
+                console.log(`[Context] 🌿 Force reindex on branch '${this.resolveBranch(codebasePath)}': clearing branch rows only`);
+                await this.clearBranchRows(collectionName, this.resolveBranch(codebasePath));
+            }
+            return;
+        }
 
         if (collectionExists && !forceReindex) {
             console.log(`📋 Collection ${collectionName} already exists, skipping creation`);
@@ -821,10 +1034,16 @@ export class Context {
             console.log(`[Context] ✅ Collection ${collectionName} dropped successfully`);
         }
 
+        await this.createCollectionForMode(collectionName, codebasePath, isHybrid);
+    }
+
+    /**
+     * Detect the embedding dimension and create the hybrid or dense collection.
+     */
+    private async createCollectionForMode(collectionName: string, codebasePath: string, isHybrid: boolean): Promise<void> {
         console.log(`[Context] 🔍 Detecting embedding dimension for ${this.embedding.getProvider()} provider...`);
         const dimension = await this.embedding.detectDimension();
         console.log(`[Context] 📏 Detected dimension: ${dimension} for ${this.embedding.getProvider()}`);
-        const dirName = path.basename(codebasePath);
 
         if (isHybrid === true) {
             await this.vectorDatabase.createHybridCollection(collectionName, dimension, `codebasePath:${codebasePath}`);
@@ -1018,6 +1237,7 @@ export class Context {
      */
     private async processChunkBatch(chunks: CodeChunk[], codebasePath: string): Promise<void> {
         const isHybrid = this.getIsHybrid();
+        const branch = this.resolveBranch(codebasePath);
 
         // Generate embedding vectors
         const chunkContents = chunks.map(chunk => chunk.content);
@@ -1046,13 +1266,14 @@ export class Context {
                 const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
 
                 return {
-                    id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
+                    id: this.generateId(branch, relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
                     content: chunk.content, // Full text content for BM25 and storage
                     vector: embeddings[index].vector, // Dense vector
                     relativePath,
                     startLine: chunk.metadata.startLine || 0,
                     endLine: chunk.metadata.endLine || 0,
                     fileExtension,
+                    branch,
                     metadata: {
                         ...restMetadata,
                         codebasePath,
@@ -1076,13 +1297,14 @@ export class Context {
                 const { filePath, startLine, endLine, ...restMetadata } = chunk.metadata;
 
                 return {
-                    id: this.generateId(relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
+                    id: this.generateId(branch, relativePath, chunk.metadata.startLine || 0, chunk.metadata.endLine || 0, chunk.content),
                     vector: embeddings[index].vector,
                     content: chunk.content,
                     relativePath,
                     startLine: chunk.metadata.startLine || 0,
                     endLine: chunk.metadata.endLine || 0,
                     fileExtension,
+                    branch,
                     metadata: {
                         ...restMetadata,
                         codebasePath,
@@ -1163,15 +1385,19 @@ export class Context {
     }
 
     /**
-     * Generate unique ID based on chunk content and location
+     * Generate unique ID based on branch, chunk content and location.
+     * The branch is folded into the hash so main and branch copies of an
+     * identical chunk get distinct primary keys (otherwise they collide on the
+     * PK and the branch row silently overwrites — or is overwritten by — main).
+     * @param branch Git branch tag the chunk is stored under
      * @param relativePath Relative path to the file
      * @param startLine Start line number
      * @param endLine End line number
      * @param content Chunk content
      * @returns Hash-based unique ID
      */
-    private generateId(relativePath: string, startLine: number, endLine: number, content: string): string {
-        const combinedString = `${relativePath}:${startLine}:${endLine}:${content}`;
+    private generateId(branch: string, relativePath: string, startLine: number, endLine: number, content: string): string {
+        const combinedString = `${branch}:${relativePath}:${startLine}:${endLine}:${content}`;
         const hash = crypto.createHash('sha256').update(combinedString, 'utf-8').digest('hex');
         return `chunk_${hash.substring(0, 16)}`;
     }
