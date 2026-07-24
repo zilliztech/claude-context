@@ -11,6 +11,7 @@ const Go = require('tree-sitter-go');
 const Rust = require('tree-sitter-rust');
 const CSharp = require('tree-sitter-c-sharp');
 const Scala = require('tree-sitter-scala');
+const PHP = require('tree-sitter-php').php;
 
 // Node types that represent logical code units
 const SPLITTABLE_NODE_TYPES = {
@@ -22,7 +23,8 @@ const SPLITTABLE_NODE_TYPES = {
     go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
     rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
     csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration'],
-    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
+    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration'],
+    php: ['class_declaration', 'method_declaration', 'function_definition', 'interface_declaration', 'trait_declaration', 'namespace_definition', 'enum_declaration']
 };
 
 export class AstCodeSplitter implements Splitter {
@@ -100,7 +102,8 @@ export class AstCodeSplitter implements Splitter {
             'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
             'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
             'csharp': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala }
+            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala },
+            'php': { parser: PHP, nodeTypes: SPLITTABLE_NODE_TYPES.php }
         };
 
         return langMap[language.toLowerCase()] || null;
@@ -263,7 +266,7 @@ export class AstCodeSplitter implements Splitter {
     static isLanguageSupported(language: string): boolean {
         const supportedLanguages = [
             'javascript', 'js', 'typescript', 'ts', 'python', 'py',
-            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala'
+            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala', 'php'
         ];
         return supportedLanguages.includes(language.toLowerCase());
     }
