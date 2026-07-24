@@ -260,6 +260,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 max_length: 32,
             },
             {
+                name: 'branch',
+                description: 'Git branch tag for overlay indexing',
+                data_type: DataType.VarChar,
+                max_length: 256,
+            },
+            {
                 name: 'metadata',
                 description: 'Additional document metadata as JSON string',
                 data_type: DataType.VarChar,
@@ -359,6 +365,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             startLine: doc.startLine,
             endLine: doc.endLine,
             fileExtension: doc.fileExtension,
+            branch: doc.branch,
             metadata: JSON.stringify(doc.metadata),
         }));
 
@@ -380,7 +387,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             collection_name: collectionName,
             data: [queryVector],
             limit: options?.topK || 10,
-            output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
+            output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'branch', 'metadata'],
         };
 
         // Apply boolean expression filter if provided (e.g., fileExtension in [".ts",".py"]) 
@@ -411,6 +418,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     startLine: result.startLine,
                     endLine: result.endLine,
                     fileExtension: result.fileExtension,
+                    branch: result.branch,
                     metadata,
                 },
                 score: result.score,
@@ -528,6 +536,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 max_length: 32,
             },
             {
+                name: 'branch',
+                description: 'Git branch tag for overlay indexing',
+                data_type: DataType.VarChar,
+                max_length: 256,
+            },
+            {
                 name: 'metadata',
                 description: 'Additional document metadata as JSON string',
                 data_type: DataType.VarChar,
@@ -615,6 +629,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
             startLine: doc.startLine,
             endLine: doc.endLine,
             fileExtension: doc.fileExtension,
+            branch: doc.branch,
             metadata: JSON.stringify(doc.metadata),
         }));
 
@@ -679,7 +694,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 data: [search_param_1, search_param_2],
                 limit: options?.limit || searchRequests[0]?.limit || 10,
                 rerank: rerank_strategy,
-                output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
+                output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'branch', 'metadata'],
             };
 
             if (options?.filterExpr && options.filterExpr.trim().length > 0) {
@@ -725,6 +740,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                         startLine: result.startLine,
                         endLine: result.endLine,
                         fileExtension: result.fileExtension,
+                        branch: result.branch,
                         metadata,
                     },
                     score: result.score,

@@ -86,6 +86,7 @@ describe('Context embedding failure handling', () => {
     let originalHome: string | undefined;
     let originalHybridMode: string | undefined;
     let originalEmbeddingBatchSize: string | undefined;
+    let originalEmbeddingCache: string | undefined;
 
     beforeEach(async () => {
         tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-context-embedding-error-'));
@@ -94,8 +95,13 @@ describe('Context embedding failure handling', () => {
         originalHome = process.env.HOME;
         originalHybridMode = process.env.HYBRID_MODE;
         originalEmbeddingBatchSize = process.env.EMBEDDING_BATCH_SIZE;
+        originalEmbeddingCache = process.env.EMBEDDING_CACHE;
         process.env.HOME = homeDir;
         process.env.HYBRID_MODE = 'false';
+        // These tests assert on how the embedder itself behaves, so bypass the
+        // content-addressed cache — a cache hit would short-circuit the very
+        // embedder call under test.
+        process.env.EMBEDDING_CACHE = 'false';
     });
 
     afterEach(async () => {
@@ -113,6 +119,11 @@ describe('Context embedding failure handling', () => {
             delete process.env.EMBEDDING_BATCH_SIZE;
         } else {
             process.env.EMBEDDING_BATCH_SIZE = originalEmbeddingBatchSize;
+        }
+        if (originalEmbeddingCache === undefined) {
+            delete process.env.EMBEDDING_CACHE;
+        } else {
+            process.env.EMBEDDING_CACHE = originalEmbeddingCache;
         }
         await fs.rm(tempRoot, { recursive: true, force: true });
     });

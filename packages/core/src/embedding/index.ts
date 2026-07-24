@@ -5,4 +5,8 @@ export * from './base-embedding';
 export * from './openai-embedding';
 export * from './voyageai-embedding';
 export * from './ollama-embedding';
-export * from './gemini-embedding'; 
+export * from './gemini-embedding';
+
+// Content-addressed embedding cache
+export * from './embedding-cache';
+export * from './cached-embedding'; 

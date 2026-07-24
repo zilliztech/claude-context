@@ -576,10 +576,10 @@ export class ToolHandlers {
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, supportedExtensions);
             await synchronizer.initialize();
 
-            // Store synchronizer in the context (let context manage collection names)
+            // Store synchronizer in the context (keyed by codebase path — the
+            // collection is shared across worktrees, so a per-collection key collides).
             await this.context.getPreparedCollection(absolutePath);
-            const collectionName = this.context.getCollectionName(absolutePath);
-            this.context.setSynchronizer(collectionName, synchronizer);
+            this.context.setSynchronizer(absolutePath, synchronizer);
 
             console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 

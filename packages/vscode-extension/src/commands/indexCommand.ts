@@ -81,10 +81,11 @@ export class IndexCommand {
                     this.context.getSupportedExtensions() || []
                 );
                 await synchronizer.initialize();
-                // Store synchronizer in the context's internal map using the collection name from context
+                // Store synchronizer in the context's internal map, keyed by codebase
+                // path (the collection is shared across worktrees, so a per-collection
+                // key would collide).
                 await this.context.getPreparedCollection(selectedFolder.uri.fsPath);
-                const collectionName = this.context.getCollectionName(selectedFolder.uri.fsPath);
-                this.context.setSynchronizer(collectionName, synchronizer);
+                this.context.setSynchronizer(selectedFolder.uri.fsPath, synchronizer);
 
                 // Start indexing with progress callback
                 indexStats = await this.context.indexCodebase(

@@ -169,8 +169,7 @@ describe('Context ignore pattern isolation', () => {
         try {
             await context.reindexByChange(project, undefined, ['*.ts'], ['foo']);
 
-            const collectionName = context.getCollectionName(project);
-            const synchronizer = context.getSynchronizers().get(collectionName);
+            const synchronizer = context.getSynchronizers().get(path.resolve(project));
 
             expect(synchronizer).toBeDefined();
             expect(synchronizer?.getFileHash('custom.foo')).toBeDefined();

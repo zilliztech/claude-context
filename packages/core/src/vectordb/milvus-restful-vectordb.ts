@@ -243,6 +243,13 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                             }
                         },
                         {
+                            fieldName: "branch",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 256
+                            }
+                        },
+                        {
                             fieldName: "metadata",
                             dataType: "VarChar",
                             elementTypeParams: {
@@ -374,6 +381,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 startLine: doc.startLine,
                 endLine: doc.endLine,
                 fileExtension: doc.fileExtension,
+                branch: doc.branch,
                 metadata: JSON.stringify(doc.metadata) // Convert metadata object to JSON string
             }));
 
@@ -412,6 +420,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                     "startLine",
                     "endLine",
                     "fileExtension",
+                    "branch",
                     "metadata"
                 ],
                 searchParams: {
@@ -447,6 +456,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                         startLine: item.startLine || 0,
                         endLine: item.endLine || 0,
                         fileExtension: item.fileExtension || '',
+                        branch: item.branch || '',
                         metadata: metadata
                     },
                     score: item.distance || 0
@@ -593,6 +603,13 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                             }
                         },
                         {
+                            fieldName: "branch",
+                            dataType: "VarChar",
+                            elementTypeParams: {
+                                max_length: 256
+                            }
+                        },
+                        {
                             fieldName: "metadata",
                             dataType: "VarChar",
                             elementTypeParams: {
@@ -673,6 +690,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 startLine: doc.startLine,
                 endLine: doc.endLine,
                 fileExtension: doc.fileExtension,
+                branch: doc.branch,
                 metadata: JSON.stringify(doc.metadata),
             }));
 
@@ -760,7 +778,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 search: [search_param_1, search_param_2],
                 rerank: rerank_strategy,
                 limit: options?.limit || searchRequests[0]?.limit || 10,
-                outputFields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
+                outputFields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'branch', 'metadata'],
             };
 
             console.log(`[MilvusRestfulDB] 🔍 Executing REST API hybrid search...`);
@@ -792,6 +810,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                         startLine: result.startLine,
                         endLine: result.endLine,
                         fileExtension: result.fileExtension,
+                        branch: result.branch,
                         metadata,
                     },
                     score: result.score || result.distance || 0,
