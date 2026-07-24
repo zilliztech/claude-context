@@ -116,7 +116,12 @@ const DEFAULT_IGNORE_PATTERNS = [
     '*.map', // source map files
     'node_modules', '.git', '.svn', '.hg', 'build', 'dist', 'out',
     'target', '.vscode', '.idea', '__pycache__', '.pytest_cache',
-    'coverage', '.nyc_output', 'logs', 'tmp', 'temp'
+    'coverage', '.nyc_output', 'logs', 'tmp', 'temp',
+    // Storybook build output: content-hashed single-line bundles (e.g.
+    // storybook-static/assets/*.js) whose extension is plain .js, so the *.min.js
+    // / *.bundle.js patterns above miss them. Feeding one to a CPU embedder can
+    // hang the request and wedge indexing — exclude the whole tree by directory.
+    'storybook-static', 'storybook-static/**'
 ];
 
 export interface ContextConfig {

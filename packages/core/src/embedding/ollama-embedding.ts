@@ -1,6 +1,18 @@
 import { Ollama } from 'ollama';
 import { Embedding, EmbeddingVector } from './base-embedding';
 
+// Per-request embed timeout. A single chunk embed on a CPU embedder finishes in
+// well under this; without a bound, one request that never returns (e.g. a
+// pathological minified/single-line bundle) hangs indexing forever with no
+// self-recovery. AbortSignal.timeout cancels the socket so the request rejects
+// instead of wedging. Override via OLLAMA_EMBED_TIMEOUT_MS.
+const EMBED_REQUEST_TIMEOUT_MS = Number(process.env.OLLAMA_EMBED_TIMEOUT_MS) || 120_000;
+// Bounded retries for TRANSIENT failures only (connection reset, 5xx). A timeout
+// is deterministic for a given input, so it is never retried — we fail fast and
+// let the caller drop/skip. Override via OLLAMA_EMBED_MAX_ATTEMPTS.
+const EMBED_MAX_ATTEMPTS = Number(process.env.OLLAMA_EMBED_MAX_ATTEMPTS) || 2;
+const EMBED_RETRY_DELAY_MS = 1_000;
+
 export interface OllamaEmbeddingConfig {
     model: string;
     host?: string;
@@ -21,10 +33,7 @@ export class OllamaEmbedding extends Embedding {
     constructor(config: OllamaEmbeddingConfig) {
         super();
         this.config = config;
-        this.client = new Ollama({
-            host: config.host || 'http://127.0.0.1:11434',
-            fetch: config.fetch,
-        });
+        this.client = this.makeClient(config.host || 'http://127.0.0.1:11434');
 
         // Set dimension based on config or will be detected on first use
         if (config.dimension) {
@@ -41,6 +50,45 @@ export class OllamaEmbedding extends Embedding {
         }
 
         // If no dimension is provided, it will be detected in the first embed call
+    }
+
+    /**
+     * Build an Ollama client whose requests are bounded by EMBED_REQUEST_TIMEOUT_MS.
+     * The Ollama SDK has no per-request timeout, so we inject a fetch that attaches
+     * an AbortSignal.timeout — a hung embed then rejects (and is caught upstream)
+     * instead of wedging indexing forever. A caller-provided signal is respected.
+     */
+    private makeClient(host: string): Ollama {
+        const providedFetch = this.config.fetch;
+        const timeoutFetch = (input: any, init: any = {}) => {
+            const signal = init?.signal ?? AbortSignal.timeout(EMBED_REQUEST_TIMEOUT_MS);
+            return (providedFetch ?? fetch)(input, { ...init, signal });
+        };
+        return new Ollama({ host, fetch: timeoutFetch });
+    }
+
+    /**
+     * Run a single embed request with a bounded per-request timeout (via the
+     * client's timeout fetch) and retry only transient failures. A timeout is
+     * deterministic for a given input, so it is never retried: we throw so the
+     * caller drops the batch rather than looping on a request that will hang again.
+     */
+    private async embedWithRetry(embedOptions: any): Promise<any> {
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= EMBED_MAX_ATTEMPTS; attempt++) {
+            try {
+                return await this.client.embed(embedOptions);
+            } catch (error) {
+                lastError = error;
+                const name = (error as { name?: string })?.name;
+                const message = error instanceof Error ? error.message : String(error);
+                const isTimeout = name === 'TimeoutError' || name === 'AbortError';
+                console.error(`[OllamaEmbedding] embed attempt ${attempt}/${EMBED_MAX_ATTEMPTS} failed (${name || 'Error'}): ${message}`);
+                if (isTimeout || attempt >= EMBED_MAX_ATTEMPTS) break;
+                await new Promise(resolve => setTimeout(resolve, EMBED_RETRY_DELAY_MS));
+            }
+        }
+        throw lastError;
     }
 
     private setDefaultMaxTokensForModel(model: string): void {
@@ -76,7 +124,7 @@ export class OllamaEmbedding extends Embedding {
             embedOptions.keep_alive = this.config.keepAlive;
         }
 
-        const response = await this.client.embed(embedOptions);
+        const response = await this.embedWithRetry(embedOptions);
 
         if (!response.embeddings || !response.embeddings[0]) {
             throw new Error('Ollama API returned invalid response');
@@ -111,7 +159,7 @@ export class OllamaEmbedding extends Embedding {
             embedOptions.keep_alive = this.config.keepAlive;
         }
 
-        const response = await this.client.embed(embedOptions);
+        const response = await this.embedWithRetry(embedOptions);
 
         if (!response.embeddings || !Array.isArray(response.embeddings)) {
             throw new Error('Ollama API returned invalid batch response');
@@ -161,10 +209,7 @@ export class OllamaEmbedding extends Embedding {
      */
     setHost(host: string): void {
         this.config.host = host;
-        this.client = new Ollama({
-            host: host,
-            fetch: this.config.fetch,
-        });
+        this.client = this.makeClient(host);
     }
 
     /**
@@ -214,7 +259,7 @@ export class OllamaEmbedding extends Embedding {
                 embedOptions.keep_alive = this.config.keepAlive;
             }
 
-            const response = await this.client.embed(embedOptions);
+            const response = await this.embedWithRetry(embedOptions);
 
             if (!response.embeddings || !response.embeddings[0]) {
                 throw new Error('Ollama API returned invalid response');
