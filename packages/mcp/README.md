@@ -34,7 +34,7 @@ Claude Context MCP supports multiple embedding providers. Choose the one that be
 > 📋 **Quick Reference**: For a complete list of environment variables and their descriptions, see the [Environment Variables Guide](../../docs/getting-started/environment-variables.md).
 
 ```bash
-# Supported providers: OpenAI, VoyageAI, Gemini, Ollama
+# Supported providers: OpenAI, VoyageAI, Gemini, Ollama, OpenRouter, Bedrock
 EMBEDDING_PROVIDER=OpenAI
 ```
 
@@ -152,6 +152,45 @@ EMBEDDING_DIMENSION=768
 
 </details>
 
+<details>
+<summary><strong>5. Amazon Bedrock Configuration</strong></summary>
+
+Amazon Bedrock lets you use managed embedding models (Titan, Cohere) from your own AWS account, keeping traffic inside your AWS network/VPC.
+
+```bash
+EMBEDDING_PROVIDER=Bedrock
+
+# Required: AWS region for Bedrock Runtime (falls back to AWS_REGION)
+BEDROCK_REGION=us-east-1
+
+# Optional: Specify embedding model (default: amazon.titan-embed-text-v2:0)
+EMBEDDING_MODEL=amazon.titan-embed-text-v2:0
+
+# Optional: static credentials. If omitted, the default AWS credential chain
+# is used (env vars, shared config/profile, IAM role, ECS/EC2 instance role, etc).
+BEDROCK_ACCESS_KEY_ID=your-access-key-id
+BEDROCK_SECRET_ACCESS_KEY=your-secret-access-key
+BEDROCK_SESSION_TOKEN=your-session-token
+
+# Optional: custom endpoint, e.g. a VPC interface endpoint for Bedrock Runtime
+BEDROCK_ENDPOINT=https://vpce-xxxx.bedrock-runtime.us-east-1.vpce.amazonaws.com
+
+# Optional: dimension override (only honored by amazon.titan-embed-text-v2:0,
+# which supports 256/512/1024)
+BEDROCK_EMBEDDING_DIMENSION=1024
+```
+
+**Available Models:**
+See `getSupportedModels` in [`bedrock-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/bedrock-embedding.ts) for the full list of supported models (Titan and Cohere embedding models).
+
+**Prerequisites:**
+
+1. Request access to the embedding model(s) you want in the [Bedrock console model access page](https://console.aws.amazon.com/bedrock/home#/modelaccess) for your chosen region.
+2. Either configure AWS credentials locally (`aws configure`, an assumed role, or an EC2/ECS instance role) or set `BEDROCK_ACCESS_KEY_ID`/`BEDROCK_SECRET_ACCESS_KEY` explicitly.
+3. Grant the credentials the `bedrock:InvokeModel` IAM permission for the embedding model(s) you use.
+
+</details>
+
 #### Get a free vector database on Zilliz Cloud
 
 Claude Context needs a vector database. You can [sign up](https://cloud.zilliz.com/signup?utm_source=github&utm_medium=referral&utm_campaign=2507-codecontext-readme) on Zilliz Cloud to get an API key.
@@ -199,6 +238,17 @@ CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project
 ```
 
 The per-codebase `<pathHash>` suffix is preserved even when the override is set, so the same MCP server can still index multiple repos without collapsing them onto one collection. The override value is sanitized to letters, numbers, and underscores, and truncated to keep the full name within Milvus's 255-char limit. If you unset the variable later, Claude Context switches back to the plain `code_chunks_<pathHash>` naming.
+
+#### Collection Key Source (Optional)
+
+By default, the `<pathHash>` in a collection name is derived from the codebase's absolute local path, so two checkouts of the same repo (e.g. a CI runner and your laptop) get different collections. Use this to key it off the repo's git remote instead, so every checkout of the same repo converges on one shared collection:
+
+```bash
+# Hash the "origin" remote URL instead of the local path
+CODE_CHUNKS_COLLECTION_KEY_SOURCE=git-remote
+```
+
+SSH and HTTPS forms of the same remote (`git@github.com:org/repo.git` vs `https://github.com/org/repo.git`) normalize to the same identity and hash. Falls back to the path-based hash when the codebase isn't a git repo or has no `origin` remote.
 
 #### Trigger File Watcher (Optional)
 

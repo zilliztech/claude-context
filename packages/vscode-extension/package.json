@@ -83,7 +83,8 @@
                         "OpenAI",
                         "VoyageAI",
                         "Ollama",
-                        "Gemini"
+                        "Gemini",
+                        "Bedrock"
                     ],
                     "description": "Embedding service provider"
                 },
@@ -110,6 +111,30 @@
                 "semanticCodeSearch.embeddingProvider.outputDimensionality": {
                     "type": "number",
                     "description": "Output dimension for Gemini embedding (supports Matryoshka representation: 3072, 1536, 768, 256)"
+                },
+                "semanticCodeSearch.embeddingProvider.region": {
+                    "type": "string",
+                    "description": "AWS region for Bedrock Runtime (e.g., us-east-1)"
+                },
+                "semanticCodeSearch.embeddingProvider.accessKeyId": {
+                    "type": "string",
+                    "description": "AWS access key ID for Bedrock (optional; uses the default AWS credential chain if omitted)"
+                },
+                "semanticCodeSearch.embeddingProvider.secretAccessKey": {
+                    "type": "string",
+                    "description": "AWS secret access key for Bedrock (required if access key ID is set)"
+                },
+                "semanticCodeSearch.embeddingProvider.sessionToken": {
+                    "type": "string",
+                    "description": "AWS session token for Bedrock temporary credentials (optional)"
+                },
+                "semanticCodeSearch.embeddingProvider.endpoint": {
+                    "type": "string",
+                    "description": "Custom Bedrock endpoint URL, e.g. a VPC interface endpoint (optional)"
+                },
+                "semanticCodeSearch.embeddingProvider.dimension": {
+                    "type": "number",
+                    "description": "Embedding dimension override for Bedrock (only honored by amazon.titan-embed-text-v2:0: 256, 512, or 1024)"
                 },
                 "semanticCodeSearch.milvus.address": {
                     "type": "string",

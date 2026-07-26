@@ -5,7 +5,7 @@ export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
-    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'OpenRouter';
+    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'OpenRouter' | 'Bedrock';
     embeddingModel: string;
     // Provider-specific API keys
     openaiApiKey?: string;
@@ -19,6 +19,13 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     ollamaDimension?: number;
+    // Bedrock configuration
+    bedrockRegion?: string;
+    bedrockAccessKeyId?: string;
+    bedrockSecretAccessKey?: string;
+    bedrockSessionToken?: string;
+    bedrockEndpoint?: string;
+    bedrockDimension?: number;
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
@@ -94,6 +101,8 @@ export function getDefaultModelForProvider(provider: string): string {
             return 'openai/text-embedding-3-small';
         case 'Ollama':
             return 'nomic-embed-text';
+        case 'Bedrock':
+            return 'amazon.titan-embed-text-v2:0';
         default:
             return 'text-embedding-3-small';
     }
@@ -159,15 +168,18 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   BEDROCK_REGION: ${envManager.get('BEDROCK_REGION') || envManager.get('AWS_REGION') || 'NOT SET'}`);
+    console.log(`[DEBUG]   BEDROCK_ACCESS_KEY_ID: ${envManager.get('BEDROCK_ACCESS_KEY_ID') ? 'SET' : 'NOT SET (using default AWS credential chain)'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   CODE_CHUNKS_COLLECTION_NAME_OVERRIDE: ${envManager.get('CODE_CHUNKS_COLLECTION_NAME_OVERRIDE') || 'NOT SET'}`);
+    console.log(`[DEBUG]   CODE_CHUNKS_COLLECTION_KEY_SOURCE: ${envManager.get('CODE_CHUNKS_COLLECTION_KEY_SOURCE') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: ContextMcpConfig = {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || defaultMcpServerVersion,
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'OpenRouter') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'OpenRouter' | 'Bedrock') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
@@ -181,6 +193,13 @@ export function createMcpConfig(): ContextMcpConfig {
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
         ollamaDimension: getPositiveIntegerFromEnv('EMBEDDING_DIMENSION'),
+        // Bedrock configuration
+        bedrockRegion: envManager.get('BEDROCK_REGION') || envManager.get('AWS_REGION'),
+        bedrockAccessKeyId: envManager.get('BEDROCK_ACCESS_KEY_ID'),
+        bedrockSecretAccessKey: envManager.get('BEDROCK_SECRET_ACCESS_KEY'),
+        bedrockSessionToken: envManager.get('BEDROCK_SESSION_TOKEN'),
+        bedrockEndpoint: envManager.get('BEDROCK_ENDPOINT'),
+        bedrockDimension: getPositiveIntegerFromEnv('BEDROCK_EMBEDDING_DIMENSION'),
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
@@ -229,6 +248,16 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
                 console.log(`[MCP]   Ollama Embedding Dimension: ${config.ollamaDimension}`);
             }
             break;
+        case 'Bedrock':
+            console.log(`[MCP]   Bedrock Region: ${config.bedrockRegion || '❌ Missing'}`);
+            console.log(`[MCP]   Bedrock Credentials: ${config.bedrockAccessKeyId ? '✅ Explicit keys configured' : 'Using default AWS credential chain'}`);
+            if (config.bedrockEndpoint) {
+                console.log(`[MCP]   Bedrock Endpoint: ${config.bedrockEndpoint}`);
+            }
+            if (config.bedrockDimension) {
+                console.log(`[MCP]   Bedrock Embedding Dimension: ${config.bedrockDimension}`);
+            }
+            break;
     }
 
     console.log(`[MCP] 🔧 Initializing server components...`);
@@ -248,10 +277,10 @@ Environment Variables:
   MCP_SERVER_VERSION      Server version
   
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama, OpenRouter (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama, OpenRouter, Bedrock (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
   EMBEDDING_DIMENSION     Optional embedding dimension override for Ollama
-  
+
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
@@ -263,7 +292,19 @@ Environment Variables:
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
-  
+
+  Bedrock Configuration (required for Bedrock provider):
+  BEDROCK_REGION          AWS region for Bedrock Runtime (falls back to AWS_REGION)
+  BEDROCK_ACCESS_KEY_ID   Optional static access key (falls back to the default
+                          AWS credential chain: env vars, shared config, IAM role, etc)
+  BEDROCK_SECRET_ACCESS_KEY
+                          Optional static secret key, required if BEDROCK_ACCESS_KEY_ID is set
+  BEDROCK_SESSION_TOKEN   Optional session token for temporary credentials
+  BEDROCK_ENDPOINT        Optional custom endpoint (e.g. a VPC interface endpoint)
+  BEDROCK_EMBEDDING_DIMENSION
+                          Optional dimension override (only honored by
+                          amazon.titan-embed-text-v2:0, which supports 256/512/1024)
+
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
@@ -273,6 +314,13 @@ Environment Variables:
                           after sanitization (letters/digits/underscore, 255 chars max).
                           The per-codebase pathHash is preserved so multiple
                           codebases stay distinct under the same override.
+  CODE_CHUNKS_COLLECTION_KEY_SOURCE
+                          Set to "git-remote" to hash the codebase's git
+                          "origin" remote URL instead of its absolute path,
+                          so every checkout of the same repo (CI, laptops, ...)
+                          converges on the same collection. Falls back to the
+                          path if the codebase isn't a git repo or has no
+                          origin remote. Default: path.
 
   MCP Sync Configuration:
   CLAUDE_CONTEXT_BACKGROUND_SYNC
@@ -312,8 +360,18 @@ Examples:
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
 
+  # Start MCP server with Bedrock, using the default AWS credential chain
+  EMBEDDING_PROVIDER=Bedrock BEDROCK_REGION=us-east-1 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with Bedrock and explicit credentials/model
+  EMBEDDING_PROVIDER=Bedrock BEDROCK_REGION=us-east-1 BEDROCK_ACCESS_KEY_ID=AKIA... BEDROCK_SECRET_ACCESS_KEY=xxx EMBEDDING_MODEL=cohere.embed-english-v3 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
   # Start MCP server with a human-readable collection name override
   OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server keyed by the repo's git remote instead of its local path
+  # (so a shared Milvus stays in sync across every checkout of the same repo)
+  OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CODE_CHUNKS_COLLECTION_KEY_SOURCE=git-remote npx @zilliz/claude-context-mcp@latest
 
   # Start MCP server with background sync enabled every minute
   OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CLAUDE_CONTEXT_BACKGROUND_SYNC=true CLAUDE_CONTEXT_SYNC_INTERVAL_MS=60000 npx @zilliz/claude-context-mcp@latest

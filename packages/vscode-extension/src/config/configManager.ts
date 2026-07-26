@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, GeminiEmbedding, GeminiEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
+import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, GeminiEmbedding, GeminiEmbeddingConfig, BedrockEmbedding, BedrockEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
 
 // Simplified Milvus configuration interface for frontend
 export interface MilvusWebConfig {
@@ -19,6 +19,9 @@ export type EmbeddingProviderConfig = {
 } | {
     provider: 'Gemini';
     config: GeminiEmbeddingConfig;
+} | {
+    provider: 'Bedrock';
+    config: BedrockEmbeddingConfig;
 };
 
 export type SplitterProviderConfig = {
@@ -102,6 +105,25 @@ const EMBEDDING_PROVIDERS = {
         ] as FieldDefinition[],
         defaultConfig: {
             model: 'gemini-embedding-001'
+        }
+    },
+    'Bedrock': {
+        name: 'Bedrock',
+        class: BedrockEmbedding,
+        requiredFields: [
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select-with-custom', required: true },
+            { name: 'region', type: 'string', description: 'AWS region for Bedrock Runtime', inputType: 'text', required: true, placeholder: 'us-east-1' }
+        ] as FieldDefinition[],
+        optionalFields: [
+            { name: 'accessKeyId', type: 'string', description: 'AWS access key ID (optional; uses the default AWS credential chain if omitted)', inputType: 'text' },
+            { name: 'secretAccessKey', type: 'string', description: 'AWS secret access key (required if access key ID is set)', inputType: 'password' },
+            { name: 'sessionToken', type: 'string', description: 'AWS session token for temporary credentials (optional)', inputType: 'password' },
+            { name: 'endpoint', type: 'string', description: 'Custom endpoint URL, e.g. a VPC interface endpoint (optional)', inputType: 'url' },
+            { name: 'dimension', type: 'number', description: 'Embedding dimension override (only honored by amazon.titan-embed-text-v2:0: 256, 512, or 1024)', inputType: 'text', placeholder: '1024' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            model: 'amazon.titan-embed-text-v2:0',
+            region: 'us-east-1'
         }
     }
 } as const;
@@ -205,7 +227,7 @@ export class ConfigManager {
         if (!configObject) return undefined;
 
         return {
-            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini',
+            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini' | 'Bedrock',
             config: configObject
         };
     }

@@ -48,7 +48,7 @@ Packages depend on `core` via `workspace:*`, so **rebuild core (`pnpm build:core
 ```bash
 pnpm --filter @zilliz/claude-context-mcp start        # tsx src/index.ts
 ```
-Configuration is entirely via environment variables (see `.env.example` and `packages/mcp/src/config.ts`). Key vars: `EMBEDDING_PROVIDER` (OpenAI | VoyageAI | Gemini | Ollama | OpenRouter), provider API key, `EMBEDDING_MODEL`, `MILVUS_ADDRESS` and/or `MILVUS_TOKEN` (address can be auto-resolved from a Zilliz token), `CODE_CHUNKS_COLLECTION_NAME_OVERRIDE`.
+Configuration is entirely via environment variables (see `.env.example` and `packages/mcp/src/config.ts`). Key vars: `EMBEDDING_PROVIDER` (OpenAI | VoyageAI | Gemini | Ollama | OpenRouter | Bedrock), provider API key, `EMBEDDING_MODEL`, `MILVUS_ADDRESS` and/or `MILVUS_TOKEN` (address can be auto-resolved from a Zilliz token), `CODE_CHUNKS_COLLECTION_NAME_OVERRIDE`, `CODE_CHUNKS_COLLECTION_KEY_SOURCE` (set to `git-remote` to key a codebase's collection off its git `origin` remote instead of its local path, so multiple checkouts of the same repo share one collection).
 
 ## Architecture
 
@@ -56,7 +56,7 @@ Configuration is entirely via environment variables (see `.env.example` and `pac
 
 `Context` ties together three pluggable interfaces injected through its constructor config:
 
-- **Embedding** (`src/embedding/`) — `base-embedding.ts` interface with `OpenAIEmbedding`, `VoyageAIEmbedding`, `GeminiEmbedding`, `OllamaEmbedding` implementations.
+- **Embedding** (`src/embedding/`) — `base-embedding.ts` interface with `OpenAIEmbedding`, `VoyageAIEmbedding`, `GeminiEmbedding`, `OllamaEmbedding`, `BedrockEmbedding` implementations.
 - **VectorDatabase** (`src/vectordb/`) — `MilvusVectorDatabase` (gRPC, Node-only) and `MilvusRestfulVectorDatabase` (HTTP, browser-safe). `zilliz-utils.ts` (`ClusterManager`) can provision a free Zilliz cluster and resolve an address from a token.
 - **Splitter** (`src/splitter/`) — `AstCodeSplitter` (tree-sitter, the default at 2500/300 chunk/overlap) which falls back to `LangChainCodeSplitter` for unsupported languages or parse failures.
 

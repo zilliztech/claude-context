@@ -20,7 +20,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ### Embedding Provider
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
+| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama`, `OpenRouter`, `Bedrock` | `OpenAI` |
 | `EMBEDDING_MODEL` | Embedding model name (works for all providers) | Provider-specific default |
 | `OPENAI_API_KEY` | OpenAI API key | Required for OpenAI |
 | `OPENAI_BASE_URL` | OpenAI API base URL (optional, for custom endpoints) | `https://api.openai.com/v1` |
@@ -39,6 +39,8 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 > - Gemini Models: See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/gemini-embedding.ts) for the full list of supported models.
 > 
 > - Ollama Models: Depends on the model you install locally.
+> 
+> - Bedrock Models: See `getSupportedModels` in [`bedrock-embedding.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/embedding/bedrock-embedding.ts) for the full list of supported models.
 
 > **📖 For detailed provider-specific configuration examples and setup instructions, see the [MCP Configuration Guide](../../packages/mcp/README.md#embedding-provider-configuration).**
 
@@ -55,6 +57,16 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `OLLAMA_HOST` | Ollama server URL | `http://127.0.0.1:11434` |
 | `OLLAMA_MODEL`(alternative to `EMBEDDING_MODEL`) | Model name |  |
 
+### Bedrock (Required when `EMBEDDING_PROVIDER=Bedrock`)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BEDROCK_REGION` | AWS region for Bedrock Runtime (falls back to `AWS_REGION`) | Required |
+| `BEDROCK_ACCESS_KEY_ID` | Optional static access key. Omit to use the default AWS credential chain (env vars, shared config, IAM role) | Default AWS credential chain |
+| `BEDROCK_SECRET_ACCESS_KEY` | Optional static secret key, required if `BEDROCK_ACCESS_KEY_ID` is set | — |
+| `BEDROCK_SESSION_TOKEN` | Optional session token for temporary credentials | — |
+| `BEDROCK_ENDPOINT` | Optional custom endpoint, e.g. a VPC interface endpoint | — |
+| `BEDROCK_EMBEDDING_DIMENSION` | Optional dimension override (only honored by `amazon.titan-embed-text-v2:0`, which supports 256/512/1024) | Model default |
+
 
 ### Advanced Configuration
 | Variable | Description | Default |
@@ -65,8 +77,11 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `CUSTOM_EXTENSIONS` | Additional file extensions to include (comma-separated, e.g., `.vue,.svelte,.astro`) | None |
 | `CUSTOM_IGNORE_PATTERNS` | Additional ignore patterns (comma-separated, e.g., `temp/**,*.backup,private/**`) | None |
 | `CODE_CHUNKS_COLLECTION_NAME_OVERRIDE` | Optional custom prefix for collection names. Produces `code_chunks_<suffix>_<pathHash>` or `hybrid_code_chunks_<suffix>_<pathHash>` after sanitization. The path hash stays appended so collections remain unique per codebase even when the override is set | None |
+| `CODE_CHUNKS_COLLECTION_KEY_SOURCE` | Set to `git-remote` to derive the collection's hash from the codebase's git remote URL (`origin`) instead of its absolute path. Falls back to the path when the codebase isn't a git repo or has no `origin` remote | `path` |
 
 When `CODE_CHUNKS_COLLECTION_NAME_OVERRIDE` is set, Claude Context writes to an override-named collection instead of the default `code_chunks_<pathHash>`. The per-codebase `<pathHash>` suffix is preserved to keep multiple codebases distinct under the same override. If you later unset the variable, Claude Context returns to the plain hash-based naming for that path.
+
+`CODE_CHUNKS_COLLECTION_KEY_SOURCE=git-remote` is useful when several machines index the same repository from different checkout paths (for example, a CI job and every teammate's laptop) and should all converge on the same collection instead of each getting a private one. The remote URL is normalized so SSH and HTTPS forms of the same repo (e.g. `git@github.com:org/repo.git` and `https://github.com/org/repo.git`) hash identically.
 
 ## 🚀 Quick Setup
 
