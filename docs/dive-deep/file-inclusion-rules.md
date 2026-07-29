@@ -14,7 +14,7 @@ Final Files = (All Supported Extensions) - (All Ignore Patterns)
 
 Where:
 - **All Supported Extensions** = Default + MCP Custom + Environment Variable Extensions
-- **All Ignore Patterns** = Default + MCP Custom + Environment Variable + .gitignore + .xxxignore + Global .contextignore
+- **All Ignore Patterns** = Default + MCP Custom + Environment Variable + .gitignore + .contextignore + Global .contextignore
 
 ## File Inclusion Flow
 
@@ -91,12 +91,16 @@ See [Environment Variables](../getting-started/environment-variables.md) for mor
 ### 4. .gitignore Files
 Standard Git ignore patterns in codebase root.
 
-### 5. .xxxignore Files
-Any file in codebase root matching pattern `.xxxignore`:
-- `.cursorignore`
-- `.codeiumignore` 
-- `.contextignore`
-- etc.
+### 5. .contextignore File
+Project-local patterns in `<codebase>/.contextignore`.
+
+Only `.gitignore` and `.contextignore` are read from the codebase root.
+Tool-specific ignore files (`.prettierignore`, `.dockerignore`,
+`.eslintignore`, `.cursorignore`, …) are intentionally skipped: their
+contents follow tool-defined semantics (e.g. prettier's allowlist idiom
+`*` + `!path`) that the indexer's flat exclude-list loader cannot
+faithfully interpret, and historically caused entire codebases to be
+silently excluded. Use `.contextignore` for any indexer-specific patterns.
 
 ### 6. Global .contextignore
 User-wide patterns in `~/.context/.contextignore`.
