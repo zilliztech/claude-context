@@ -227,6 +227,11 @@ export class SyncManager {
                     totalStats.removed += stats.removed;
                     totalStats.modified += stats.modified;
 
+                    const recorded = this.snapshotManager.recordIncrementalSyncSuccess(codebasePath, stats);
+                    if (recorded) {
+                        this.snapshotManager.saveCodebaseSnapshot();
+                    }
+
                     if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
                         console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
                     } else {

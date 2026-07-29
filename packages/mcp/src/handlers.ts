@@ -1035,7 +1035,23 @@ export class ToolHandlers {
                         statusMessage = `✅ Codebase '${statusCodebasePath}' is fully indexed and ready for search.`;
                         statusMessage += `\n📊 Statistics: ${indexedInfo.indexedFiles} files, ${indexedInfo.totalChunks} chunks`;
                         statusMessage += `\n📅 Status: ${indexedInfo.indexStatus}`;
-                        statusMessage += `\n🕐 Last updated: ${new Date(indexedInfo.lastUpdated).toLocaleString()}`;
+                        const lastFullAt = indexedInfo.lastFullIndexAt ?? indexedInfo.lastUpdated;
+                        statusMessage += `\n🕐 Last full index: ${new Date(lastFullAt).toLocaleString()}`;
+                        if (indexedInfo.lastIncrementalSyncAt) {
+                            statusMessage += `\n🔄 Last incremental sync: ${new Date(indexedInfo.lastIncrementalSyncAt).toLocaleString()}`;
+                            const syncStats = indexedInfo.lastSyncStats;
+                            if (syncStats) {
+                                const { added, removed, modified } = syncStats;
+                                if (added === 0 && removed === 0 && modified === 0) {
+                                    statusMessage += ' (no file changes)';
+                                } else {
+                                    statusMessage += ` (added: ${added}, removed: ${removed}, modified: ${modified})`;
+                                }
+                            }
+                        } else {
+                            statusMessage += `\n🔄 Last incremental sync: not recorded yet (run background/trigger sync to refresh)`;
+                        }
+                        statusMessage += `\n🕐 Index freshness: ${new Date(indexedInfo.lastUpdated).toLocaleString()}`;
                     } else {
                         statusMessage = `✅ Codebase '${statusCodebasePath}' is fully indexed and ready for search.`;
                     }

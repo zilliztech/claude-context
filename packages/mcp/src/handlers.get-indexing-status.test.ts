@@ -61,6 +61,8 @@ test("get_indexing_status syncs cloud state before reading the snapshot", async 
         assert.equal(result.isError, undefined);
         assert.match(result.content[0].text, /fully indexed and ready for search/);
         assert.match(result.content[0].text, /3 files, 5 chunks/);
+        assert.match(result.content[0].text, /Last full index:/);
+        assert.match(result.content[0].text, /Index freshness:/);
         assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "indexed");
     });
 });
