@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Context, SearchQuery, SemanticSearchResult } from '@zilliz/claude-context-core';
 import * as path from 'path';
+import { TaggedResult, mergeAndSortResults } from '../utils/pathUtils';
 
 export class SearchCommand {
     private context: Context;
@@ -164,25 +165,29 @@ export class SearchCommand {
     }
 
     /**
-     * Execute search for webview (without UI prompts)
+     * Execute search across one or more indexed folders (webview entry point).
+     * @param searchTerm query string
+     * @param limit max merged results
+     * @param fileExtensions optional extension filter (e.g. ['.ts'])
+     * @param indexedPaths absolute folder paths to search; empty => workspace root
      */
-    async executeForWebview(searchTerm: string, limit: number = 50, fileExtensions: string[] = []): Promise<SemanticSearchResult[]> {
-        // Get workspace root for codebase path
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            throw new Error('No workspace folder found. Please open a folder first.');
+    async executeForWebview(
+        searchTerm: string,
+        limit: number = 50,
+        fileExtensions: string[] = [],
+        indexedPaths: string[] = []
+    ): Promise<TaggedResult[]> {
+        // Determine which folders to search. Fall back to the workspace root.
+        let folders = indexedPaths.filter(Boolean);
+        if (folders.length === 0) {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                throw new Error('No workspace folder found. Please open a folder first.');
+            }
+            folders = [workspaceFolders[0].uri.fsPath];
         }
-        const codebasePath = workspaceFolders[0].uri.fsPath;
 
-        // Check if index exists
-        const hasIndex = await this.context.hasIndex(codebasePath);
-        if (!hasIndex) {
-            throw new Error('Index not found. Please index the codebase first.');
-        }
-
-        console.log('🔍 Using semantic search for webview...');
-
-        // Validate extensions strictly and build filter expression
+        // Build the extension filter expression (unchanged validation rules).
         let filterExpr: string | undefined = undefined;
         if (fileExtensions && fileExtensions.length > 0) {
             const invalid = fileExtensions.filter(e => !(typeof e === 'string' && e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
@@ -193,14 +198,35 @@ export class SearchCommand {
             filterExpr = `fileExtension in [${quoted}]`;
         }
 
-        let results = await this.context.semanticSearch(
-            codebasePath,
-            searchTerm,
-            limit,
-            0.3, // similarity threshold
-            filterExpr
+        // Only search folders that actually have an index. Skip the rest.
+        const indexedOnly: string[] = [];
+        for (const folder of folders) {
+            if (await this.context.hasIndex(folder)) {
+                indexedOnly.push(folder);
+            } else {
+                console.warn(`[Search] Skipping folder without an index: ${folder}`);
+            }
+        }
+        if (indexedOnly.length === 0) {
+            throw new Error('Index not found. Please index the codebase first.');
+        }
+
+        // Fan out: one semantic search per folder, in parallel.
+        const perFolder: TaggedResult[][] = await Promise.all(
+            indexedOnly.map(async folder => {
+                const results = await this.context.semanticSearch(folder, searchTerm, limit, 0.3, filterExpr);
+                return results.map(r => this.tagResult(r, folder));
+            })
         );
-        return results;
+
+        return mergeAndSortResults(perFolder, limit);
+    }
+
+    /** Attach origin folder + absolute path to a raw search result. */
+    private tagResult(result: SemanticSearchResult, folder: string): TaggedResult {
+        const isAbsolute = result.relativePath.startsWith('/') || result.relativePath.includes(':');
+        const absolutePath = isAbsolute ? result.relativePath : path.join(folder, result.relativePath);
+        return { ...result, searchFolder: folder, absolutePath };
     }
 
     /**

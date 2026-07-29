@@ -94,9 +94,20 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
    - Open Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac)
    - Run "Semantic Code Search: Index Codebase"
 
+   Or use the panel for finer control:
+   - **Folder(s) to index**: leave empty to index the whole workspace, or
+     enter one or more paths (comma- or newline-separated) relative to the
+     workspace root to index only those subfolders — for example `backend, frontend/src`.
+     Each folder is indexed into its own collection, and search fans out across
+     all of them.
+   - **Exclude folders**: glob patterns to skip inside the indexed folders,
+     for example `dist, **/*.test.ts`. `node_modules`, `venv`, and `.venv`
+     are ignored by default.
+
 3. **Start Searching**:
    - Open Semantic Code Search panel in sidebar
    - Enter search query or right-click on selected code to search
+   - Results are tagged with the folder they came from
 
 ## Commands
 

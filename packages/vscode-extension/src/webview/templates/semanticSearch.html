@@ -37,9 +37,18 @@
             <input type="text" id="extFilterInput" class="search-input" style="margin-top: 6px;"
                 placeholder="e.g. .ts,.py,.java" />
             <button id="searchButton" class="search-button">Search</button>
+
+            <label for="folderInput" class="input-label" style="margin-top: 10px; display: block;">Folder(s) to index (optional, relative to workspace; blank = whole workspace)</label>
+            <textarea id="folderInput" class="search-input" style="margin-top: 6px; min-height: 48px; resize: vertical;"
+                placeholder="e.g. sub1, sub2 (comma or newline separated)"></textarea>
+
+            <label for="excludeInput" class="input-label" style="margin-top: 10px; display: block;">Exclude folders (optional)</label>
+            <input type="text" id="excludeInput" class="search-input" style="margin-top: 6px;"
+                placeholder="e.g. venv, .venv, build" />
+
             <button id="indexButton" class="search-button"
-                style="margin-top: 4px; background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">
-                Index Current Codebase
+                style="margin-top: 8px; background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);">
+                Index Folder(s)
             </button>
         </div>
 

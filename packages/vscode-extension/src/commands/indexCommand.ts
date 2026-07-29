@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Context } from '@zilliz/claude-context-core';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export class IndexCommand {
     private context: Context;
@@ -133,6 +134,85 @@ export class IndexCommand {
                 vscode.window.showErrorMessage(`❌ Indexing failed: ${errorString}`);
             }
         }
+    }
+
+    /**
+     * Index a single absolute folder path with the given extra ignore patterns.
+     * Clears any existing index for that folder first.
+     */
+    private async indexOneFolder(
+        folderPath: string,
+        excludePatterns: string[],
+        progress: vscode.Progress<{ increment?: number; message?: string }>,
+        label: string
+    ): Promise<{ indexedFiles: number; totalChunks: number; status: 'completed' | 'limit_reached' }> {
+        let lastPercentage = 0;
+
+        await this.context.clearIndex(folderPath, (info) => {
+            progress.report({ increment: 0, message: `${label} ${info.phase}` });
+        });
+
+        const { FileSynchronizer } = await import('@zilliz/claude-context-core');
+        const ignorePatterns = [...(this.context.getIgnorePatterns() || []), ...excludePatterns];
+        const synchronizer = new FileSynchronizer(
+            folderPath,
+            ignorePatterns,
+            this.context.getSupportedExtensions() || []
+        );
+        await synchronizer.initialize();
+        await this.context.getPreparedCollection(folderPath);
+        const collectionName = this.context.getCollectionName(folderPath);
+        this.context.setSynchronizer(collectionName, synchronizer);
+
+        return this.context.indexCodebase(
+            folderPath,
+            (info) => {
+                const increment = info.percentage - lastPercentage;
+                lastPercentage = info.percentage;
+                progress.report({ increment, message: `${label} ${info.phase}` });
+            },
+            false,
+            excludePatterns
+        );
+    }
+
+    /**
+     * Index a list of absolute folder paths (webview entry point).
+     * @param folders absolute folder paths (already validated/resolved by the caller)
+     * @param excludePatterns extra ignore patterns applied to every folder
+     * @returns the folders that were successfully indexed, plus aggregate stats
+     */
+    async executeForWebview(
+        folders: string[],
+        excludePatterns: string[]
+    ): Promise<{ indexedPaths: string[]; indexedFiles: number; totalChunks: number }> {
+        // Validate every folder exists and is a directory before doing any work.
+        for (const folder of folders) {
+            if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) {
+                throw new Error(`Not a folder: ${folder}`);
+            }
+        }
+
+        const indexedPaths: string[] = [];
+        let indexedFiles = 0;
+        let totalChunks = 0;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Indexing Codebase',
+            cancellable: false
+        }, async (progress) => {
+            for (let i = 0; i < folders.length; i++) {
+                const folder = folders[i];
+                const label = folders.length > 1 ? `(${i + 1}/${folders.length} ${path.basename(folder)})` : '';
+                const stats = await this.indexOneFolder(folder, excludePatterns, progress, label);
+                indexedPaths.push(folder);
+                indexedFiles += stats.indexedFiles;
+                totalChunks += stats.totalChunks;
+            }
+        });
+
+        return { indexedPaths, indexedFiles, totalChunks };
     }
 
     async clearIndex(): Promise<void> {
