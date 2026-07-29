@@ -18,6 +18,44 @@ export interface MilvusConfig {
     ssl?: boolean;
 }
 
+/**
+ * Thrown when a Milvus server rejects SparseFloatVector (data type 104) during
+ * hybrid collection creation. Older self-hosted Milvus releases (and some
+ * embedded deployments such as `MILVUS_LITE`) do not implement this type.
+ *
+ * Callers can catch this to fall back to a dense-only collection.
+ */
+export class MilvusUnsupportedSparseVectorError extends Error {
+    public readonly milvusReason: string;
+    constructor(milvusReason: string) {
+        super(
+            `Milvus server does not support SparseFloatVector (data type 104). ` +
+            `This usually means the server version is too old for hybrid search. ` +
+            `Reason: ${milvusReason}`
+        );
+        this.name = 'MilvusUnsupportedSparseVectorError';
+        this.milvusReason = milvusReason;
+        Object.setPrototypeOf(this, MilvusUnsupportedSparseVectorError.prototype);
+    }
+}
+
+function extractMilvusErrorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (err && typeof err === 'object') {
+        const anyErr = err as Record<string, unknown>;
+        if (typeof anyErr.reason === 'string' && anyErr.reason.length > 0) return anyErr.reason as string;
+        if (typeof anyErr.message === 'string' && anyErr.message.length > 0) return anyErr.message as string;
+        try { return JSON.stringify(err); } catch { /* ignore */ }
+    }
+    return String(err);
+}
+
+function isSparseFloatVectorUnsupported(text: string): boolean {
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    // Milvus surfaces this as "field data type: 104 is not supported" on older servers.
+    return lower.includes('data type: 104') || lower.includes('data type 104');
+}
 
 
 export class MilvusVectorDatabase implements VectorDatabase {
@@ -558,7 +596,27 @@ export class MilvusVectorDatabase implements VectorDatabase {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
-        await this.client.createCollection(createCollectionParams);
+        let createResult: any;
+        try {
+            createResult = await this.client.createCollection(createCollectionParams);
+        } catch (err) {
+            const message = extractMilvusErrorMessage(err);
+            if (isSparseFloatVectorUnsupported(message)) {
+                throw new MilvusUnsupportedSparseVectorError(message);
+            }
+            throw new Error(`Failed to create hybrid collection '${collectionName}': ${message}`);
+        }
+
+        // Some SDK versions do not throw on server-side errors and instead return a
+        // ResStatus object. Surface that explicitly so the caller sees a real error
+        // instead of a stringified `[object Object]` later in the pipeline.
+        if (createResult && typeof createResult === 'object' && 'error_code' in createResult && createResult.error_code !== 'Success') {
+            const reason = extractMilvusErrorMessage(createResult);
+            if (isSparseFloatVectorUnsupported(reason)) {
+                throw new MilvusUnsupportedSparseVectorError(reason);
+            }
+            throw new Error(`Failed to create hybrid collection '${collectionName}': ${reason}`);
+        }
 
         // Create indexes for both vector fields
         // Index for dense vector
