@@ -4,6 +4,8 @@
 
 ### Your entire codebase as Claude's context
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fzilliztech%2Fclaude-context.svg)](https://mcptoplist.com/server/glama%2Fzilliztech%2Fclaude-context)
+
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
 [![Documentation](https://img.shields.io/badge/Documentation-📚-orange.svg)](docs/)
