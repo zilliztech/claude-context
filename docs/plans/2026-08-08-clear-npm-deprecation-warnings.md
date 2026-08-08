@@ -28,7 +28,7 @@ execution: code
 
 ### Problem Frame
 
-Downstream consumers (e.g. Docker images running `npm install @zilliz/claude-context-mcp`) see 6 `npm warn deprecated` lines on every fresh install. Five distinct packages are implicated: `q`, `prebuild-install`, `node-domexception`, `glob`, `uuid`. Only `glob` is a direct dependency of this project, per the issue. Research shows `prebuild-install` is also clearable because `faiss-node` is unused.
+Downstream consumers (e.g. Docker images running `npm install @zilliz/claude-context-mcp`) see 6 `npm warn deprecated` lines on every fresh install. Five distinct packages are implicated: `q`, `prebuild-install`, `node-domexception`, `glob`, `uuid`. The issue identified `glob` as a direct dependency of this project; research found `faiss-node` (also a direct dependency) clearable as well because it is unused.
 
 ### Requirements
 
@@ -87,21 +87,21 @@ KTD2. Do not use pnpm `overrides` to silence the remaining warnings. (chosen ove
   5. Run `pnpm --filter @zilliz/claude-context-core build`, `typecheck`, and `test`.
 - **Test Scenarios.**
   - T1. `grep -rn "glob\|faiss" packages/core/src` returns no import statements.
-  - T2. `pnpm why glob` and `pnpm why faiss-node` report no projects depend on them.
+  - T2. `packages/core` no longer lists `glob` or `faiss-node` in its lockfile importer entry; `pnpm why faiss-node` reports nothing. (`glob` remains in the lockfile only as a transitive dependency of jest, a devDependency — out of scope.)
   - T3. Core package build, typecheck, and test suite pass with the removals.
-  - T4. `pnpm install` output no longer mentions `glob` or `prebuild-install` deprecations.
+  - T4. A downstream consumer install (`npm pack` of the core tarball, then `npm install` in a temp dir) emits no `glob` or `prebuild-install` deprecation warnings. Repo-root `pnpm install` may still surface `prebuild-install` via dev-only chains (e.g. vscode-extension's `@vscode/vsce` → `keytar`), which is out of scope.
 - **Verification.** U1's Test Scenarios T1-T4; runs the repo commands from the Verification Contract.
 
 ## Verification Contract
 
 Repo commands, run at `packages/core` unless noted:
 
-- `pnpm install` (repo root) — must succeed; lockfile updated; no `glob`/`prebuild-install` deprecation warnings in output.
+- `pnpm install` (repo root) — must succeed; lockfile updated and consistent.
 - `pnpm --filter @zilliz/claude-context-core build`
 - `pnpm --filter @zilliz/claude-context-core typecheck`
 - `pnpm --filter @zilliz/claude-context-core test`
-- `pnpm why glob` and `pnpm why faiss-node` — must report no dependents.
-- Optional downstream smoke check: `npm pack --dry-run` in `packages/core` and `npm install` of the tarball in a temp dir to confirm the two warnings are gone from a consumer install.
+- `pnpm why faiss-node` — must report no dependents.
+- Downstream smoke check: `npm pack` in `packages/core` and `npm install` of the tarball in a temp dir to confirm the `glob` and `prebuild-install` deprecation warnings are gone from a consumer install.
 
 Quality gate: all commands exit 0, and the build output is unchanged in behavior (no source files modified).
 
