@@ -16,9 +16,7 @@
     "dependencies": {
         "@google/genai": "^1.9.0",
         "@zilliz/milvus2-sdk-node": "^2.5.10",
-        "faiss-node": "^0.5.1",
         "fs-extra": "^11.0.0",
-        "glob": "^10.0.0",
         "ignore": "^7.0.5",
         "langchain": "^0.3.27",
         "ollama": "^0.5.16",
