@@ -250,6 +250,31 @@ describe('Context ignore pattern isolation', () => {
         ]);
     });
 
+    it('honors repository-local rules in .git/info/exclude during indexing', async () => {
+        const project = path.join(tempRoot, 'project-with-git-exclude');
+        await fs.mkdir(path.join(project, '.git', 'info'), { recursive: true });
+        await fs.writeFile(path.join(project, '.git', 'info', 'exclude'), 'local-only.md\n');
+        await fs.writeFile(path.join(project, 'local-only.md'), 'should be ignored');
+        await fs.writeFile(path.join(project, 'tracked.md'), 'should be indexed');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual(['tracked.md']);
+    });
+
     it('skips dotfiles and dot directories during initial indexing', async () => {
         const project = path.join(tempRoot, 'project');
         await fs.mkdir(path.join(project, '.config'), { recursive: true });
