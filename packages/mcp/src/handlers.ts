@@ -28,6 +28,28 @@ export class ToolHandlers {
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
     }
 
+    private async cancelAndAwaitIndexingTask(absolutePath: string): Promise<void> {
+        const activeTask = this.indexingTasks.get(absolutePath);
+        if (!activeTask) {
+            return;
+        }
+
+        console.log(`[INDEX] Cancelling in-flight background indexing for: ${absolutePath}`);
+        activeTask.controller.abort();
+        try {
+            await activeTask.promise;
+        } catch (waitError: any) {
+            // startBackgroundIndexing normally handles aborts, but keep this
+            // boundary safe if its error handling changes in the future.
+            console.warn(`[INDEX] Background indexing wind-down reported: ${waitError?.message || waitError}`);
+        }
+
+        // Do not delete a newer run that replaced this task while we waited.
+        if (this.indexingTasks.get(absolutePath) === activeTask) {
+            this.indexingTasks.delete(absolutePath);
+        }
+    }
+
     /**
      * Query Milvus for the real row count of a codebase's collection.
      * Returns null if the count cannot be determined — callers must NOT write a
@@ -377,6 +399,9 @@ export class ToolHandlers {
             // Check if already indexing
             if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
                 if (forceReindex) {
+                    // The snapshot only tracks state; cancel and await the
+                    // real background task before replacing that state.
+                    await this.cancelAndAwaitIndexingTask(absolutePath);
                     console.log(`[FORCE-REINDEX] Clearing stale indexing state for '${absolutePath}'`);
                     this.snapshotManager.removeCodebaseCompletely(absolutePath);
                     this.snapshotManager.saveCodebaseSnapshot();
@@ -910,19 +935,7 @@ export class ToolHandlers {
             // wait for it to wind down before we drop the collection.
             // Otherwise the background task keeps embedding chunks and writes
             // them into the just-cleared collection (issue #199).
-            const activeTask = this.indexingTasks.get(absolutePath);
-            if (activeTask) {
-                console.log(`[CLEAR] Cancelling in-flight background indexing for: ${absolutePath}`);
-                activeTask.controller.abort();
-                try {
-                    await activeTask.promise;
-                } catch (waitError: any) {
-                    // startBackgroundIndexing already logs and never re-throws,
-                    // so this catch only guards against future refactors.
-                    console.warn(`[CLEAR] Background indexing wind-down reported: ${waitError?.message || waitError}`);
-                }
-                this.indexingTasks.delete(absolutePath);
-            }
+            await this.cancelAndAwaitIndexingTask(absolutePath);
 
             try {
                 await this.context.clearIndex(absolutePath);
