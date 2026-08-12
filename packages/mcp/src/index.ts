@@ -299,6 +299,22 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
+// A rejection escaping a background task must never take the server down with
+// it. Node's default is to promote an unhandled rejection to a fatal uncaught
+// exception, and the rejection we hit in practice — the Milvus gRPC client
+// reporting ECONNREFUSED while the backend is stopped — settles moments AFTER
+// the MCP handshake has already advertised the tools. The client is left with a
+// dead stdio server and no error to surface, so `search_code` simply vanishes
+// for the rest of the session and agents fall back to grep without noticing.
+//
+// Staying up is strictly better: every tool already answers with `isError` when
+// the backend is unreachable, which is a signal the caller can act on. Note this
+// deliberately does NOT trap `uncaughtException` — a synchronous throw can leave
+// genuinely inconsistent state, and the failure this guards against is async.
+process.on('unhandledRejection', (reason) => {
+    console.error('[MCP] Unhandled promise rejection — server stays up:', reason);
+});
+
 // Always start the server - this is designed to be the main entry point
 main().catch((error) => {
     console.error("Fatal error:", error);

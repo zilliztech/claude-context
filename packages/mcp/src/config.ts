@@ -201,6 +201,8 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     if (config.collectionNameOverride) {
         console.log(`[MCP]   Collection Name Override: ✅ Configured`);
     }
+    const embeddingCacheOn = (envManager.get('EMBEDDING_CACHE') || '').trim().toLowerCase() !== 'false';
+    console.log(`[MCP]   Embedding Cache: ${embeddingCacheOn ? '✅ Enabled' : '❌ Disabled'}`);
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -273,6 +275,16 @@ Environment Variables:
                           after sanitization (letters/digits/underscore, 255 chars max).
                           The per-codebase pathHash is preserved so multiple
                           codebases stay distinct under the same override.
+
+  Embedding Cache Configuration:
+  EMBEDDING_CACHE         Cache embeddings by content hash so an identical chunk
+                          is embedded once and reused across every collection on
+                          this machine — e.g. the same repo in multiple git
+                          worktrees, or a re-clone at a different path. Greatly
+                          speeds up (re)indexing, especially on CPU embedders.
+                          Enabled by default; set to "false" to disable.
+  EMBEDDING_CACHE_DIR     Directory for the embedding cache
+                          (default: ~/.context/embedding-cache).
 
   MCP Sync Configuration:
   CLAUDE_CONTEXT_BACKGROUND_SYNC

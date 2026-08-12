@@ -63,6 +63,7 @@ export class SyncManager {
     private syncLockToken: string | null = null;
     private triggerWatcher: fs.FSWatcher | null = null;
     private triggerDebounceTimer: NodeJS.Timeout | null = null;
+    private syncInterval: NodeJS.Timeout | null = null;
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
@@ -302,12 +303,30 @@ export class SyncManager {
 
         // Periodically check for file changes and update the index
         console.log(`[SYNC-DEBUG] Setting up periodic sync every ${syncIntervalMs}ms`);
-        const syncInterval = setInterval(() => {
+        this.syncInterval = setInterval(() => {
             console.log('[SYNC-DEBUG] Executing scheduled periodic sync');
-            this.handleSyncIndex();
+            // Fire-and-forget with an explicit catch, like the initial sync above
+            // and the trigger watcher below: a rejection here has no caller to
+            // propagate to, so without this it escapes as an unhandled rejection
+            // and — before the guard in index.ts — killed the whole server.
+            void this.handleSyncIndex().catch((error) => {
+                console.error('[SYNC-DEBUG] Periodic sync failed:', error);
+            });
         }, syncIntervalMs);
 
-        console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', syncInterval);
+        console.log('[SYNC-DEBUG] Background sync setup complete. Interval ID:', this.syncInterval);
+    }
+
+    /**
+     * Stop the periodic sync. The handle used to be a local that nothing kept,
+     * so the timer could not be cancelled once started — which also made the
+     * loop untestable without leaking a live interval into the test runner.
+     */
+    public stopBackgroundSync(): void {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            this.syncInterval = null;
+        }
     }
 
     /**

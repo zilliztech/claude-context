@@ -5,7 +5,17 @@ import { Context, COLLECTION_LIMIT_MESSAGE, FileSynchronizer, IndexAbortError } 
 import { SnapshotManager } from "./snapshot.js";
 import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
-import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
+import {
+    ensureAbsolutePath,
+    truncateContent,
+    trackCodebasePath,
+    describeToolError,
+    isBackendUnreachableError,
+    rerankByCodeRole,
+    isTestPath,
+    MAX_SEARCH_RESULTS,
+    RERANK_OVERFETCH_FACTOR,
+} from "./utils.js";
 
 export class ToolHandlers {
     private context: Context;
@@ -576,10 +586,10 @@ export class ToolHandlers {
             const synchronizer = new FileSynchronizer(absolutePath, ignorePatterns, supportedExtensions);
             await synchronizer.initialize();
 
-            // Store synchronizer in the context (let context manage collection names)
+            // Store synchronizer in the context (keyed by codebase path — the
+            // collection is shared across worktrees, so a per-collection key collides).
             await this.context.getPreparedCollection(absolutePath);
-            const collectionName = this.context.getCollectionName(absolutePath);
-            this.context.setSynchronizer(collectionName, synchronizer);
+            this.context.setSynchronizer(absolutePath, synchronizer);
 
             console.log(`[BACKGROUND-INDEX] Starting indexing with ${splitterType} splitter for: ${absolutePath}`);
 
@@ -759,13 +769,18 @@ export class ToolHandlers {
             }
 
             // Search in the specified codebase
-            const searchResults = await this.context.semanticSearch(
+            // Search wider than asked, re-rank, then trim: a re-rank confined to
+            // the caller's limit can only reorder what already won, so an
+            // implementation crowded out by its own tests never enters the list.
+            const rawResults = await this.context.semanticSearch(
                 searchCodebasePath,
                 query,
-                Math.min(resultLimit, 50),
+                Math.min(resultLimit * RERANK_OVERFETCH_FACTOR, MAX_SEARCH_RESULTS),
                 0.3,
                 filterExpr
             );
+
+            const searchResults = rerankByCodeRole(rawResults, query).slice(0, resultLimit);
 
             console.log(`[SEARCH] ✅ Search completed! Found ${searchResults.length} results using ${embeddingProvider.getProvider()} embeddings`);
 
@@ -803,8 +818,13 @@ export class ToolHandlers {
                 const context = truncateContent(result.content, 5000);
                 const codebaseInfo = path.basename(searchCodebasePath);
 
+                // Mark tests explicitly: a reader scanning locations should not
+                // have to infer from the path whether they are looking at the
+                // implementation or at something exercising it.
+                const roleTag = isTestPath(result.relativePath) ? ' [test]' : '';
+
                 return `${index + 1}. Code snippet (${result.language}) [${codebaseInfo}]\n` +
-                    `   Location: ${location}\n` +
+                    `   Location: ${location}${roleTag}\n` +
                     `   Rank: ${index + 1}\n` +
                     `   Context: \n\`\`\`${result.language}\n${context}\n\`\`\`\n`;
             }).join('\n');
@@ -812,6 +832,16 @@ export class ToolHandlers {
             let resultMessage = `Found ${searchResults.length} results for query: "${query}" in codebase '${searchCodebasePath}'${indexingStatusMessage}`;
             if (searchCodebasePath !== absolutePath) {
                 resultMessage += `\nRequested path '${absolutePath}' is covered by indexed codebase '${searchCodebasePath}'.`;
+            }
+            // Say it on the results, not in a log nobody reads: a drifted base index
+            // answers plausibly about code that has already moved.
+            for (const notice of [
+                this.context.pendingOverlayNotice(searchCodebasePath),
+                this.context.baseStalenessNotice(searchCodebasePath),
+            ]) {
+                if (notice) {
+                    resultMessage += `\n${notice}`;
+                }
             }
             resultMessage += `\n\n${formattedResults}`;
 
@@ -844,7 +874,9 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Error searching code: ${errorMessage} Please check if the codebase has been indexed first.`
+                    text: isBackendUnreachableError(error)
+                        ? describeToolError(error, 'searching code')
+                        : `Error searching code: ${errorMessage} Please check if the codebase has been indexed first.`
                 }],
                 isError: true
             };
@@ -982,7 +1014,7 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Error clearing index: ${errorMessage}`
+                    text: describeToolError(error, 'clearing index')
                 }],
                 isError: true
             };
@@ -1098,7 +1130,7 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Error getting indexing status: ${error.message || error}`
+                    text: describeToolError(error, 'getting indexing status')
                 }],
                 isError: true
             };

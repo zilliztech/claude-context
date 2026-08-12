@@ -148,7 +148,7 @@ describe('Context request-scoped splitters', () => {
                 context.getEffectiveSupportedExtensions()
             );
             await synchronizer.initialize();
-            context.setSynchronizer(context.getCollectionName(project), synchronizer);
+            context.setSynchronizer(project, synchronizer);
 
             await fs.writeFile(filePath, 'second version');
             await context.reindexByChange(project, undefined, [], [], requestSplitter);

@@ -73,4 +73,15 @@ export abstract class Embedding {
      * @returns Provider name
      */
     abstract getProvider(): string;
+
+    /**
+     * Fully-qualified model identity, used to key the embedding cache so that
+     * two different models can never collide. Subclasses that support multiple
+     * models should override this to include the model name; the default is the
+     * provider name alone.
+     * @returns A stable identifier for the (provider, model) pair
+     */
+    getModelIdentifier(): string {
+        return this.getProvider();
+    }
 } 

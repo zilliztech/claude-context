@@ -103,6 +103,10 @@ export class VoyageAIEmbedding extends Embedding {
         return 'VoyageAI';
     }
 
+    getModelIdentifier(): string {
+        return `${this.getProvider()}:${this.config.model || 'voyage-code-3'}`;
+    }
+
     /**
      * Set model type
      * @param model Model name

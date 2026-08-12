@@ -138,6 +138,10 @@ export class GeminiEmbedding extends Embedding {
         return 'Gemini';
     }
 
+    getModelIdentifier(): string {
+        return `${this.getProvider()}:${this.config.model || 'gemini-embedding-001'}`;
+    }
+
     /**
      * Set model type
      * @param model Model name
