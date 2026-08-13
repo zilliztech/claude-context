@@ -292,6 +292,13 @@ export class ToolHandlers {
             // Query Milvus for the real row count — if unknown/empty, skip the write
             // so we don't persist a poisoning 0/0+completed entry (Issue #295).
             for (const cloudCodebase of cloudCodebases) {
+                // A codebase that is genuinely indexing right now is not in the
+                // local *indexed* set, but its partial chunk batches already exist
+                // in Milvus. Treating those partial rows as a complete index would
+                // silently truncate the real run (Issue #419).
+                if (this.snapshotManager.getCodebaseStatus(cloudCodebase) === 'indexing') {
+                    continue;
+                }
                 if (!localCodebases.has(cloudCodebase)) {
                     const stats = await this.queryCollectionStats(cloudCodebase);
                     if (stats) {
