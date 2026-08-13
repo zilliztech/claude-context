@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'c*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'pnpm'
+        
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      
+    - name: Setup npm auth
+      run: |
+        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+      
+    - name: Build packages
+      run: pnpm build
+      
+    - name: Publish core package to npm
+      run: pnpm --filter @zilliz/claude-context-core publish --access public --no-git-checks
+        
+    - name: Publish mcp package to npm
+      run: pnpm --filter @zilliz/claude-context-mcp publish --access public --no-git-checks
+        
+    - name: Publish vscode extension
+      run: pnpm release:vscode
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        
+    

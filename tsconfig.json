@@ -1,0 +1,47 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "commonjs",
+        "lib": [
+            "ES2020"
+        ],
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "moduleResolution": "node",
+        "composite": true,
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+        "baseUrl": ".",
+        "downlevelIteration": true,
+        "incremental": true,
+        "tsBuildInfoFile": ".tsbuildinfo",
+        "paths": {
+            "@zilliz/claude-context-core": [
+                "./packages/core/src"
+            ],
+            "@zilliz/claude-context-core/*": [
+                "./packages/core/src/*"
+            ]
+        }
+    },
+    "references": [
+        {
+            "path": "./packages/core"
+        },
+        {
+            "path": "./packages/vscode-extension"
+        },
+        {
+            "path": "./packages/chrome-extension"
+        },
+        {
+            "path": "./packages/mcp"
+        }
+    ],
+    "files": []
+}

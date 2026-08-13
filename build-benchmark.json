@@ -1,0 +1,39 @@
+[
+  {
+    "timestamp": "2025-08-25T19:04:13.664Z",
+    "platform": "win32",
+    "nodeVersion": "v22.15.1",
+    "results": [
+      {
+        "success": true,
+        "duration": 1849,
+        "command": "pnpm clean",
+        "description": "Clean all packages"
+      },
+      {
+        "success": true,
+        "duration": 6754,
+        "command": "pnpm build:core",
+        "description": "Build core package"
+      },
+      {
+        "success": true,
+        "duration": 9782,
+        "command": "pnpm build:mcp",
+        "description": "Build MCP package"
+      },
+      {
+        "success": true,
+        "duration": 6821,
+        "command": "pnpm build:vscode",
+        "description": "Build VSCode extension"
+      },
+      {
+        "success": true,
+        "duration": 14526,
+        "command": "pnpm -r --filter=\"./packages/chrome-extension\" build",
+        "description": "Build Chrome extension"
+      }
+    ]
+  }
+]

@@ -1,0 +1,26 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+	"files.exclude": {
+		"**/node_modules": true,
+		"**/dist": false,
+		"**/out": false
+	},
+	"search.exclude": {
+		"**/node_modules": true,
+		"**/dist": true,
+		"**/out": true
+	},
+	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
+	"typescript.tsc.autoDetect": "off",
+	"typescript.preferences.includePackageJsonAutoImports": "on",
+	// ESLint settings
+	"eslint.workingDirectories": [
+		"packages/vscode-extension",
+		"packages/core"
+	],
+	// Format on save
+	"editor.formatOnSave": true,
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit"
+	}
+}

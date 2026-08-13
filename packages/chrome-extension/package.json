@@ -1,0 +1,57 @@
+{
+    "name": "@zilliz/claude-context-chrome-extension",
+    "version": "0.1.4",
+    "description": "Claude Context Chrome extension for web-based code indexing",
+    "private": true,
+    "scripts": {
+        "build": "webpack --mode=production",
+        "dev": "webpack --mode=development --watch",
+        "clean": "rimraf dist",
+        "lint": "eslint src --ext .ts,.tsx",
+        "lint:fix": "eslint src --ext .ts,.tsx --fix",
+        "typecheck": "tsc --noEmit",
+        "build:milvus": "echo 'build:milvus script not implemented'"
+    },
+    "dependencies": {
+        "@zilliz/claude-context-core": "workspace:*"
+    },
+    "overrides": {
+        "@zilliz/milvus2-sdk-node": false
+    },
+    "devDependencies": {
+        "@types/chrome": "^0.0.246",
+        "@types/node": "^20.0.0",
+        "assert": "^2.1.0",
+        "browserify-zlib": "^0.2.0",
+        "buffer": "^6.0.3",
+        "copy-webpack-plugin": "^11.0.0",
+        "crypto-browserify": "^3.12.1",
+        "https-browserify": "^1.0.0",
+        "os-browserify": "^0.3.0",
+        "path-browserify": "^1.0.1",
+        "process": "^0.11.10",
+        "stream-browserify": "^3.0.0",
+        "stream-http": "^3.2.0",
+        "terser-webpack-plugin": "^5.3.14",
+        "ts-loader": "^9.0.0",
+        "typescript": "^5.0.0",
+        "url": "^0.11.4",
+        "util": "^0.12.5",
+        "vm-browserify": "^1.1.2",
+        "webpack": "^5.0.0",
+        "webpack-cli": "^5.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zilliztech/claude-context.git",
+        "directory": "packages/chrome-extension"
+    },
+    "license": "MIT",
+    "main": "content.js",
+    "keywords": [],
+    "author": "",
+    "bugs": {
+        "url": "https://github.com/zilliztech/claude-context/issues"
+    },
+    "homepage": "https://github.com/zilliztech/claude-context#readme"
+}
