@@ -414,14 +414,17 @@ export class ToolHandlers {
                 }
             }
 
-            // Check if already indexed (unless force is true)
+            // Check if already indexed (unless force is true).
+            // Already-indexed is a success state, not an error: the background sync
+            // keeps the index current. Reporting it as an error with a force=true
+            // remedy is read by the client as an instruction and drives re-index loops.
             if (!forceReindex && this.snapshotManager.getIndexedCodebases().includes(absolutePath)) {
                 return {
                     content: [{
                         type: "text",
-                        text: `Codebase '${absolutePath}' is already indexed. Use force=true to re-index.`
+                        text: `Codebase '${absolutePath}' is already indexed. File changes are picked up automatically by the background sync. No action needed.`
                     }],
-                    isError: true
+                    isError: false
                 };
             }
 
@@ -709,7 +712,7 @@ export class ToolHandlers {
                         return {
                             content: [{
                                 type: "text",
-                                text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first using the index_codebase tool.`
+                                text: `Error: Codebase '${absolutePath}' is not indexed.`
                             }],
                             isError: true
                         };
@@ -718,7 +721,7 @@ export class ToolHandlers {
                     return {
                         content: [{
                             type: "text",
-                            text: `Error: Codebase '${absolutePath}' is not indexed. Please index it first using the index_codebase tool.`
+                            text: `Error: Codebase '${absolutePath}' is not indexed.`
                         }],
                         isError: true
                     };
@@ -776,7 +779,7 @@ export class ToolHandlers {
                     const hasCollection = await this.context.getVectorDatabase().hasCollection(collectionName);
                     if (!hasCollection) {
                         return {
-                            content: [{ type: "text", text: `Error: Index data for '${searchCodebasePath}' has been lost (collection not found in Milvus). Please re-index using index_codebase with force=true.` }],
+                            content: [{ type: "text", text: `Error: Index data for '${searchCodebasePath}' was not found in Milvus. This may be a transient connectivity issue — retry the search before taking other action.` }],
                             isError: true
                         };
                     }
@@ -844,7 +847,7 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Error searching code: ${errorMessage} Please check if the codebase has been indexed first.`
+                    text: `Error searching code: ${errorMessage}`
                 }],
                 isError: true
             };
@@ -1068,15 +1071,14 @@ export class ToolHandlers {
                             statusMessage += `\n📊 Failed at: ${failedInfo.lastAttemptedPercentage.toFixed(1)}% progress`;
                         }
                         statusMessage += `\n🕐 Failed at: ${new Date(failedInfo.lastUpdated).toLocaleString()}`;
-                        statusMessage += `\n💡 You can retry indexing by running the index_codebase command again.`;
                     } else {
-                        statusMessage = `❌ Codebase '${statusCodebasePath}' indexing failed. You can retry indexing.`;
+                        statusMessage = `❌ Codebase '${statusCodebasePath}' indexing failed.`;
                     }
                     break;
 
                 case 'not_found':
                 default:
-                    statusMessage = `❌ Codebase '${absolutePath}' is not indexed. Please use the index_codebase tool to index it first.`;
+                    statusMessage = `❌ Codebase '${absolutePath}' is not indexed.`;
                     break;
             }
 
