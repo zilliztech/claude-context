@@ -377,6 +377,25 @@ export class ToolHandlers {
             // Check if already indexing
             if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
                 if (forceReindex) {
+                    // Dropping the snapshot entry does NOT stop an in-flight background
+                    // index: it keeps embedding and writing chunks into the collection
+                    // this force re-index is about to rebuild — the same orphaned-writer
+                    // bug that was fixed for clear_index in issue #199. Cancel it and
+                    // wait for wind-down first, using the same AbortController machinery.
+                    const activeTask = this.indexingTasks.get(absolutePath);
+                    if (activeTask) {
+                        console.log(`[FORCE-REINDEX] Cancelling in-flight background indexing for: ${absolutePath}`);
+                        activeTask.controller.abort();
+                        try {
+                            await activeTask.promise;
+                        } catch (waitError: any) {
+                            // startBackgroundIndexing already logs and never re-throws,
+                            // so this catch only guards against future refactors.
+                            console.warn(`[FORCE-REINDEX] Background indexing wind-down reported: ${waitError?.message || waitError}`);
+                        }
+                        this.indexingTasks.delete(absolutePath);
+                    }
+
                     console.log(`[FORCE-REINDEX] Clearing stale indexing state for '${absolutePath}'`);
                     this.snapshotManager.removeCodebaseCompletely(absolutePath);
                     this.snapshotManager.saveCodebaseSnapshot();
