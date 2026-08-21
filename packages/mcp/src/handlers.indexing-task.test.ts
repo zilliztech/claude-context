@@ -46,3 +46,30 @@ test("cancelAndAwaitIndexingTask preserves a newer task for the same path", asyn
     assert.equal(oldController.signal.aborted, true);
     assert.equal(indexingTasks.get("/tmp/example"), newTask);
 });
+
+test("withIndexingPathLock serializes operations for the same path", async () => {
+    const handlers = new ToolHandlers({} as any, {} as any);
+    const events: string[] = [];
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+    });
+
+    const first = (handlers as any).withIndexingPathLock("/tmp/example", async () => {
+        events.push("first-start");
+        await firstGate;
+        events.push("first-end");
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const second = (handlers as any).withIndexingPathLock("/tmp/example", async () => {
+        events.push("second-start");
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(events, ["first-start"]);
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    assert.deepEqual(events, ["first-start", "first-end", "second-start"]);
+});
