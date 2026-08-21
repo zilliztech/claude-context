@@ -60,6 +60,19 @@ export interface CodebaseInfoIndexed extends CodebaseInfoBase {
     indexedFiles: number;        // Number of files indexed
     totalChunks: number;         // Total number of chunks generated
     indexStatus: 'completed' | 'limit_reached';  // Status from indexing result
+    /** ISO timestamp of the last successful full index (index_codebase). */
+    lastFullIndexAt?: string;
+    /** ISO timestamp of the last successful incremental sync. */
+    lastIncrementalSyncAt?: string;
+    /** Stats from the most recent incremental sync, if any. */
+    lastSyncStats?: CodebaseIncrementalSyncStats;
+}
+
+/** Change counts returned by the incremental reindex operation. */
+export interface CodebaseIncrementalSyncStats {
+    added: number;
+    removed: number;
+    modified: number;
 }
 
 // Index failed state - when indexing failed
