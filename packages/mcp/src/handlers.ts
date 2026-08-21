@@ -20,12 +20,60 @@ export class ToolHandlers {
      * just-cleared collection (issue #199).
      */
     private indexingTasks: Map<string, { controller: AbortController; promise: Promise<void> }> = new Map();
+    /**
+     * Serializes the force-reindex setup sequence per codebase path. The lock
+     * is released after the new background task is registered, not after the
+     * whole index finishes, so a later force request can cancel that task.
+     */
+    private indexingPathLocks: Map<string, Promise<void>> = new Map();
 
     constructor(context: Context, snapshotManager: SnapshotManager) {
         this.context = context;
         this.snapshotManager = snapshotManager;
         this.currentWorkspace = process.cwd();
         console.log(`[WORKSPACE] Current workspace: ${this.currentWorkspace}`);
+    }
+
+    private async cancelAndAwaitIndexingTask(absolutePath: string): Promise<void> {
+        const activeTask = this.indexingTasks.get(absolutePath);
+        if (!activeTask) {
+            return;
+        }
+
+        console.log(`[INDEX] Cancelling in-flight background indexing for: ${absolutePath}`);
+        activeTask.controller.abort();
+        try {
+            await activeTask.promise;
+        } catch (waitError: any) {
+            // startBackgroundIndexing normally handles aborts, but keep this
+            // boundary safe if its error handling changes in the future.
+            console.warn(`[INDEX] Background indexing wind-down reported: ${waitError?.message || waitError}`);
+        }
+
+        // Do not delete a newer run that replaced this task while we waited.
+        if (this.indexingTasks.get(absolutePath) === activeTask) {
+            this.indexingTasks.delete(absolutePath);
+        }
+    }
+
+    private async withIndexingPathLock<T>(absolutePath: string, operation: () => Promise<T>): Promise<T> {
+        const previous = this.indexingPathLocks.get(absolutePath) || Promise.resolve();
+        let release!: () => void;
+        const current = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const queued = previous.then(() => current);
+        this.indexingPathLocks.set(absolutePath, queued);
+
+        await previous;
+        try {
+            return await operation();
+        } finally {
+            release();
+            if (this.indexingPathLocks.get(absolutePath) === queued) {
+                this.indexingPathLocks.delete(absolutePath);
+            }
+        }
     }
 
     /**
@@ -374,22 +422,26 @@ export class ToolHandlers {
                 };
             }
 
-            // Check if already indexing
-            if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
-                if (forceReindex) {
-                    console.log(`[FORCE-REINDEX] Clearing stale indexing state for '${absolutePath}'`);
-                    this.snapshotManager.removeCodebaseCompletely(absolutePath);
-                    this.snapshotManager.saveCodebaseSnapshot();
-                } else {
-                    return {
-                        content: [{
-                            type: "text",
-                            text: `Codebase '${absolutePath}' is already being indexed in the background. Please wait for completion.`
-                        }],
-                        isError: true
-                    };
+            return await this.withIndexingPathLock(absolutePath, async () => {
+                // Check if already indexing
+                if (this.snapshotManager.getIndexingCodebases().includes(absolutePath)) {
+                    if (forceReindex) {
+                        // The snapshot only tracks state; cancel and await the
+                        // real background task before replacing that state.
+                        await this.cancelAndAwaitIndexingTask(absolutePath);
+                        console.log(`[FORCE-REINDEX] Clearing stale indexing state for '${absolutePath}'`);
+                        this.snapshotManager.removeCodebaseCompletely(absolutePath);
+                        this.snapshotManager.saveCodebaseSnapshot();
+                    } else {
+                        return {
+                            content: [{
+                                type: "text",
+                                text: `Codebase '${absolutePath}' is already being indexed in the background. Please wait for completion.`
+                            }],
+                            isError: true
+                        };
+                    }
                 }
-            }
 
             //Check if the snapshot and cloud index are in sync
             const snapshotHasIndex = this.snapshotManager.getIndexedCodebases().includes(absolutePath);
@@ -518,12 +570,13 @@ export class ToolHandlers {
                 ? `\nUsing ${customIgnorePatterns.length} custom ignore patterns: ${customIgnorePatterns.join(', ')}`
                 : '';
 
-            return {
-                content: [{
-                    type: "text",
-                    text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}${extensionInfo}${ignoreInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
-                }]
-            };
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Started background indexing for codebase '${absolutePath}' using ${splitterType.toUpperCase()} splitter.${pathInfo}${extensionInfo}${ignoreInfo}\n\nIndexing is running in the background. You can search the codebase while indexing is in progress, but results may be incomplete until indexing completes.`
+                    }]
+                };
+            });
 
         } catch (error: any) {
             // Enhanced error handling to prevent MCP service crash
@@ -910,19 +963,7 @@ export class ToolHandlers {
             // wait for it to wind down before we drop the collection.
             // Otherwise the background task keeps embedding chunks and writes
             // them into the just-cleared collection (issue #199).
-            const activeTask = this.indexingTasks.get(absolutePath);
-            if (activeTask) {
-                console.log(`[CLEAR] Cancelling in-flight background indexing for: ${absolutePath}`);
-                activeTask.controller.abort();
-                try {
-                    await activeTask.promise;
-                } catch (waitError: any) {
-                    // startBackgroundIndexing already logs and never re-throws,
-                    // so this catch only guards against future refactors.
-                    console.warn(`[CLEAR] Background indexing wind-down reported: ${waitError?.message || waitError}`);
-                }
-                this.indexingTasks.delete(absolutePath);
-            }
+            await this.cancelAndAwaitIndexingTask(absolutePath);
 
             try {
                 await this.context.clearIndex(absolutePath);
