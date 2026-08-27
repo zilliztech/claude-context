@@ -91,9 +91,13 @@ test("cloud recovery skips malformed metadata and uses a later valid row", async
 
         assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "indexed");
         const recovered = snapshotManager.getCodebaseInfo(codebasePath);
+        assert.ok(recovered);
+        assert.equal(recovered.status, "indexed");
+        if (recovered.status !== "indexed") {
+            throw new Error("expected recovered codebase to be indexed");
+        }
         assert.equal(recovered?.indexedFiles, 4);
         assert.equal(recovered?.totalChunks, 4);
-        assert.equal(recovered?.status, "indexed");
     });
 });
 
@@ -122,8 +126,12 @@ test("cloud recovery keeps the local snapshot when every metadata row is malform
 
         assert.equal(snapshotManager.getCodebaseStatus(existingCodebase), "indexed");
         const existing = snapshotManager.getCodebaseInfo(existingCodebase);
+        assert.ok(existing);
+        assert.equal(existing.status, "indexed");
+        if (existing.status !== "indexed") {
+            throw new Error("expected existing codebase to remain indexed");
+        }
         assert.equal(existing?.indexedFiles, 2);
         assert.equal(existing?.totalChunks, 3);
-        assert.equal(existing?.status, "indexed");
     });
 });
