@@ -64,3 +64,74 @@ test("get_indexing_status syncs cloud state before reading the snapshot", async 
         assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "indexed");
     });
 });
+
+test("cloud recovery skips malformed metadata and uses a later valid row", async () => {
+    await withTempHome(async (tempRoot) => {
+        const codebasePath = path.join(tempRoot, "recovered-repo");
+        const vectorDb = {
+            listCollections: async () => ["code_chunks_recovery"],
+            getCollectionDescription: async () => "",
+            query: async (...args: unknown[]) => {
+                assert.equal(args[3], 10);
+                return [
+                    { metadata: "not-json" },
+                    { metadata: JSON.stringify({ codebasePath }) },
+                ];
+            },
+            getCollectionRowCount: async () => 4,
+        };
+        const context = {
+            getVectorDatabase: () => vectorDb,
+            getCollectionName: () => "code_chunks_recovery",
+        };
+        const snapshotManager = new SnapshotManager();
+        const handlers = new ToolHandlers(context as any, snapshotManager);
+
+        await (handlers as any).syncIndexedCodebasesFromCloud();
+
+        assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "indexed");
+        const recovered = snapshotManager.getCodebaseInfo(codebasePath);
+        assert.ok(recovered);
+        assert.equal(recovered.status, "indexed");
+        if (recovered.status !== "indexed") {
+            throw new Error("expected recovered codebase to be indexed");
+        }
+        assert.equal(recovered?.indexedFiles, 4);
+        assert.equal(recovered?.totalChunks, 4);
+    });
+});
+
+test("cloud recovery keeps the local snapshot when every metadata row is malformed", async () => {
+    await withTempHome(async (tempRoot) => {
+        const existingCodebase = path.join(tempRoot, "existing-repo");
+        const vectorDb = {
+            listCollections: async () => ["code_chunks_recovery"],
+            getCollectionDescription: async () => "",
+            query: async () => [{ metadata: "not-json" }, { metadata: "also-not-json" }],
+            getCollectionRowCount: async () => 4,
+        };
+        const context = {
+            getVectorDatabase: () => vectorDb,
+            getCollectionName: () => "code_chunks_recovery",
+        };
+        const snapshotManager = new SnapshotManager();
+        snapshotManager.setCodebaseIndexed(existingCodebase, {
+            indexedFiles: 2,
+            totalChunks: 3,
+            status: "completed",
+        });
+        const handlers = new ToolHandlers(context as any, snapshotManager);
+
+        await (handlers as any).syncIndexedCodebasesFromCloud();
+
+        assert.equal(snapshotManager.getCodebaseStatus(existingCodebase), "indexed");
+        const existing = snapshotManager.getCodebaseInfo(existingCodebase);
+        assert.ok(existing);
+        assert.equal(existing.status, "indexed");
+        if (existing.status !== "indexed") {
+            throw new Error("expected existing codebase to remain indexed");
+        }
+        assert.equal(existing?.indexedFiles, 2);
+        assert.equal(existing?.totalChunks, 3);
+    });
+});
