@@ -222,26 +222,38 @@ export class ToolHandlers {
                                 collectionName,
                                 undefined as any, // Don't pass empty filter
                                 ['metadata'], // Only fetch metadata field
-                                1 // Only need one result to extract codebasePath
+                                10 // Scan a bounded window so one bad row cannot hide valid metadata
                             );
 
                             if (results && results.length > 0) {
-                                const firstResult = results[0];
-                                const metadataStr = firstResult.metadata;
+                                for (const result of results) {
+                                    const metadataValue = result.metadata;
 
-                                if (metadataStr) {
-                                    const metadata = JSON.parse(metadataStr);
-                                    const codebasePath = metadata.codebasePath;
+                                    if (!metadataValue) {
+                                        console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
+                                        continue;
+                                    }
 
+                                    let metadata: any;
+                                    try {
+                                        metadata = typeof metadataValue === 'string'
+                                            ? JSON.parse(metadataValue)
+                                            : metadataValue;
+                                    } catch (metadataError: any) {
+                                        console.warn(`[SYNC-CLOUD] ⚠️  Skipping malformed metadata in collection ${collectionName}:`, metadataError.message || metadataError);
+                                        continue;
+                                    }
+
+                                    const codebasePath = metadata?.codebasePath;
                                     if (codebasePath && typeof codebasePath === 'string') {
                                         console.log(`[SYNC-CLOUD] 📍 Found codebase path from query: ${codebasePath} in collection: ${collectionName}`);
                                         cloudCodebases.add(codebasePath);
                                         successfulExtractions++;
-                                    } else {
-                                        console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
+                                        extracted = true;
+                                        break;
                                     }
-                                } else {
-                                    console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
+
+                                    console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
                                 }
                             } else {
                                 console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
