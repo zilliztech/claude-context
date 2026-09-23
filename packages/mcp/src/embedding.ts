@@ -34,9 +34,30 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
             return voyageEmbedding;
 
         case 'Gemini':
+            if (config.geminiUseVertexAI) {
+                if (!config.googleCloudProject || !config.googleCloudLocation) {
+                    console.error(`[EMBEDDING] ❌ GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are required when GOOGLE_GENAI_USE_VERTEXAI=true`);
+                    throw new Error('GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are required for Gemini embedding provider when GOOGLE_GENAI_USE_VERTEXAI=true');
+                }
+                if (config.geminiApiKey) {
+                    console.warn(`[EMBEDDING] ⚠️  GEMINI_API_KEY is ignored because GOOGLE_GENAI_USE_VERTEXAI=true (Vertex AI uses Application Default Credentials)`);
+                }
+                if (config.geminiBaseUrl) {
+                    console.warn(`[EMBEDDING] ⚠️  GEMINI_BASE_URL is ignored because GOOGLE_GENAI_USE_VERTEXAI=true`);
+                }
+                console.log(`[EMBEDDING] 🔧 Configuring Gemini on Vertex AI (Application Default Credentials) with model: ${config.embeddingModel}, project: ${config.googleCloudProject}, location: ${config.googleCloudLocation}`);
+                const vertexGeminiEmbedding = new GeminiEmbedding({
+                    model: config.embeddingModel,
+                    vertexai: true,
+                    project: config.googleCloudProject,
+                    location: config.googleCloudLocation,
+                });
+                console.log(`[EMBEDDING] ✅ Gemini embedding instance created successfully`);
+                return vertexGeminiEmbedding;
+            }
             if (!config.geminiApiKey) {
                 console.error(`[EMBEDDING] ❌ Gemini API key is required but not provided`);
-                throw new Error('GEMINI_API_KEY is required for Gemini embedding provider');
+                throw new Error('GEMINI_API_KEY is required for Gemini embedding provider (or set GOOGLE_GENAI_USE_VERTEXAI=true to use Vertex AI with Application Default Credentials)');
             }
             console.log(`[EMBEDDING] 🔧 Configuring Gemini with model: ${config.embeddingModel}`);
             const geminiEmbedding = new GeminiEmbedding({
@@ -92,7 +113,11 @@ export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: Op
             console.log(`[EMBEDDING] VoyageAI configuration - API Key: ${config.voyageaiApiKey ? '✅ Provided' : '❌ Missing'}`);
             break;
         case 'Gemini':
-            console.log(`[EMBEDDING] Gemini configuration - API Key: ${config.geminiApiKey ? '✅ Provided' : '❌ Missing'}, Base URL: ${config.geminiBaseUrl || 'Default'}`);
+            if (config.geminiUseVertexAI) {
+                console.log(`[EMBEDDING] Gemini configuration - Vertex AI (Application Default Credentials), Project: ${config.googleCloudProject}, Location: ${config.googleCloudLocation}`);
+            } else {
+                console.log(`[EMBEDDING] Gemini configuration - API Key: ${config.geminiApiKey ? '✅ Provided' : '❌ Missing'}, Base URL: ${config.geminiBaseUrl || 'Default'}`);
+            }
             break;
         case 'OpenRouter':
             console.log(`[EMBEDDING] OpenRouter configuration - API Key: ${config.openrouterApiKey ? '✅ Provided' : '❌ Missing'}`);

@@ -19,6 +19,9 @@ export type EmbeddingProviderConfig = {
 } | {
     provider: 'Gemini';
     config: GeminiEmbeddingConfig;
+} | {
+    provider: 'GeminiVertexAI';
+    config: GeminiEmbeddingConfig;
 };
 
 export type SplitterProviderConfig = {
@@ -103,6 +106,21 @@ const EMBEDDING_PROVIDERS = {
         defaultConfig: {
             model: 'gemini-embedding-001'
         }
+    },
+    'GeminiVertexAI': {
+        name: 'Gemini (Vertex AI)',
+        class: GeminiEmbedding,
+        requiredFields: [
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select-with-custom', required: true },
+            { name: 'project', type: 'string', description: 'Google Cloud project ID', inputType: 'text', required: true },
+            { name: 'location', type: 'string', description: 'Google Cloud region, e.g. us-central1', inputType: 'text', required: true, placeholder: 'us-central1' }
+        ] as FieldDefinition[],
+        optionalFields: [
+            { name: 'outputDimensionality', type: 'number', description: 'Output dimension (supports Matryoshka representation)', inputType: 'text', placeholder: '3072' }
+        ] as FieldDefinition[],
+        defaultConfig: {
+            model: 'gemini-embedding-001'
+        }
     }
 } as const;
 
@@ -165,6 +183,45 @@ export class ConfigManager {
     }
 
     /**
+     * Normalize fields declared as type 'number' so they are numbers rather than
+     * strings before they are persisted or passed to an embedding provider constructor.
+     */
+    private static normalizeNumberFields(
+        providerInfo: { requiredFields: readonly FieldDefinition[]; optionalFields: readonly FieldDefinition[] },
+        config: any
+    ): any {
+        const result = { ...config };
+        const numberFields = [...providerInfo.requiredFields, ...providerInfo.optionalFields].filter(
+            field => field.type === 'number'
+        );
+
+        for (const field of numberFields) {
+            const value = result[field.name];
+
+            if (value === undefined || value === null || typeof value === 'number') {
+                continue;
+            }
+
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (trimmed === '') {
+                    delete result[field.name];
+                    continue;
+                }
+
+                const numericValue = Number(trimmed);
+                if (!Number.isFinite(numericValue)) {
+                    throw new Error(`${field.description || field.name} must be a number (got "${value}")`);
+                }
+
+                result[field.name] = numericValue;
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Build configuration object
      */
     private buildConfigObject(provider: string, vscodeConfig: vscode.WorkspaceConfiguration): any {
@@ -205,7 +262,7 @@ export class ConfigManager {
         if (!configObject) return undefined;
 
         return {
-            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini',
+            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini' | 'GeminiVertexAI',
             config: configObject
         };
     }
@@ -231,13 +288,15 @@ export class ConfigManager {
             throw new Error(`Unknown provider: ${provider}`);
         }
 
+        const normalizedConfig = ConfigManager.normalizeNumberFields(providerInfo, config);
+
         // Save provider type
         await workspaceConfig.update('embeddingProvider.provider', provider, vscode.ConfigurationTarget.Global);
 
         // Save all fields
         const allFields = [...providerInfo.requiredFields, ...providerInfo.optionalFields];
         for (const field of allFields) {
-            const value = (config as any)[field.name];
+            const value = (normalizedConfig as any)[field.name];
 
             // For empty strings, save undefined to avoid validation errors
             const saveValue = (value === '' || value === null) ? undefined : value;
@@ -258,7 +317,13 @@ export class ConfigManager {
         if (!providerInfo) {
             throw new Error(`Unknown provider: ${provider}`);
         }
-        return new providerInfo.class(config);
+
+        const normalizedConfig = ConfigManager.normalizeNumberFields(providerInfo, config);
+
+        if (provider === 'GeminiVertexAI') {
+            return new GeminiEmbedding({ ...normalizedConfig, vertexai: true });
+        }
+        return new providerInfo.class(normalizedConfig);
     }
 
     /**
