@@ -25,6 +25,12 @@ const SPLITTABLE_NODE_TYPES = {
     scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
 };
 
+// Non-comment sibling nodes that annotate the declaration written below them
+// (TypeScript/JavaScript decorators, Rust `#[...]` attributes). Comment nodes
+// are matched by name instead, since grammars use `comment`, `line_comment`,
+// `block_comment`, etc.
+const LEADING_ANNOTATION_NODE_TYPES = ['decorator', 'attribute_item'];
+
 export class AstCodeSplitter implements Splitter {
     private chunkSize: number = 2500;
     private chunkOverlap: number = 300;
@@ -115,16 +121,29 @@ export class AstCodeSplitter implements Splitter {
     ): CodeChunk[] {
         const chunks: CodeChunk[] = [];
         const codeLines = code.split('\n');
+        const emittedRanges = new Set<string>();
 
         const traverse = (currentNode: Parser.SyntaxNode) => {
             // Check if this node type should be split into a chunk
             if (splittableTypes.includes(currentNode.type)) {
-                const startLine = currentNode.startPosition.row + 1;
+                // Start the chunk at the doc comments, decorators and attributes
+                // written directly above the declaration so they are indexed
+                // together with the code they describe.
+                const startNode = this.findLeadingContextStart(currentNode, code, splittableTypes);
+                const startLine = startNode.startPosition.row + 1;
                 const endLine = currentNode.endPosition.row + 1;
-                const nodeText = code.slice(currentNode.startIndex, currentNode.endIndex);
+                const nodeText = code.slice(startNode.startIndex, currentNode.endIndex);
+
+                // A nested declaration can end up covering exactly the same
+                // source range as its enclosing chunk (e.g. a Python
+                // function_definition whose decorators were attached, inside
+                // decorated_definition); emitting it again would only add a
+                // duplicate chunk.
+                const rangeKey = `${startNode.startIndex}:${currentNode.endIndex}`;
 
                 // Only create chunk if it has meaningful content
-                if (nodeText.trim().length > 0) {
+                if (nodeText.trim().length > 0 && !emittedRanges.has(rangeKey)) {
+                    emittedRanges.add(rangeKey);
                     chunks.push({
                         content: nodeText,
                         metadata: {
@@ -159,6 +178,80 @@ export class AstCodeSplitter implements Splitter {
         }
 
         return chunks;
+    }
+
+    /**
+     * Walk backwards from a declaration over the comments, decorators and
+     * attributes written directly above it and return the earliest of them
+     * (or the declaration itself when there are none).
+     *
+     * A preceding node is only attached when it starts on its own line, so a
+     * trailing comment of the previous statement is left alone, and when no
+     * blank line separates it from what follows, so detached comments such as
+     * license headers are not pulled into the chunk.
+     */
+    private findLeadingContextStart(
+        node: Parser.SyntaxNode,
+        code: string,
+        splittableTypes: string[]
+    ): Parser.SyntaxNode {
+        let start = node;
+        let candidate = this.getPrecedingNode(start, splittableTypes);
+
+        while (
+            candidate &&
+            this.isLeadingContextNode(candidate) &&
+            start.startPosition.row - this.getLastContentRow(candidate) <= 1 &&
+            this.startsOnOwnLine(candidate, code)
+        ) {
+            start = candidate;
+            candidate = this.getPrecedingNode(start, splittableTypes);
+        }
+
+        return start;
+    }
+
+    /**
+     * Return the node written immediately before `node`. When `node` opens its
+     * parent (e.g. the first statement of a Python block, whose leading
+     * comments tree-sitter-python places before the block node), continue from
+     * the parent unless the parent is itself chunked, since that chunk already
+     * carries the context.
+     */
+    private getPrecedingNode(node: Parser.SyntaxNode, splittableTypes: string[]): Parser.SyntaxNode | null {
+        let current = node;
+        while (!current.previousSibling) {
+            const parent = current.parent;
+            if (!parent || parent.startIndex !== current.startIndex || splittableTypes.includes(parent.type)) {
+                return null;
+            }
+            current = parent;
+        }
+        return current.previousSibling;
+    }
+
+    private isLeadingContextNode(node: Parser.SyntaxNode): boolean {
+        return node.type === 'comment' ||
+            node.type.endsWith('_comment') ||
+            LEADING_ANNOTATION_NODE_TYPES.includes(node.type);
+    }
+
+    /**
+     * Last row that holds the node's content. Some grammars (e.g. Rust line
+     * comments) include the trailing newline in the node, which places its end
+     * position at column 0 of the following row.
+     */
+    private getLastContentRow(node: Parser.SyntaxNode): number {
+        const { startPosition, endPosition } = node;
+        if (endPosition.column === 0 && endPosition.row > startPosition.row) {
+            return endPosition.row - 1;
+        }
+        return endPosition.row;
+    }
+
+    private startsOnOwnLine(node: Parser.SyntaxNode, code: string): boolean {
+        const lineStart = code.lastIndexOf('\n', node.startIndex - 1) + 1;
+        return code.slice(lineStart, node.startIndex).trim().length === 0;
     }
 
     private async refineChunks(chunks: CodeChunk[], originalCode: string): Promise<CodeChunk[]> {
