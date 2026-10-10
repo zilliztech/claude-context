@@ -202,9 +202,14 @@ export class FileSynchronizer {
             fileHashesArray.push([key, this.fileHashes.get(key)!]);
         });
 
+        // Only the file hashes are persisted. The Merkle DAG is derived from
+        // them and rebuilt by initialize() right after loading, while its
+        // serialized form (one node per file plus a root holding every hash)
+        // was several times larger than the hashes themselves. For very large
+        // codebases that pushed the JSON past V8's maximum string length and
+        // indexing failed with "RangeError: Invalid string length".
         const data = JSON.stringify({
-            fileHashes: fileHashesArray,
-            merkleDAG: this.merkleDAG.serialize()
+            fileHashes: fileHashesArray
         });
         await fs.writeFile(this.snapshotPath, data, 'utf-8');
         console.log(`Saved snapshot to ${this.snapshotPath}`);
@@ -221,9 +226,9 @@ export class FileSynchronizer {
                 this.fileHashes.set(key, value);
             }
 
-            if (obj.merkleDAG) {
-                this.merkleDAG = MerkleDAG.deserialize(obj.merkleDAG);
-            }
+            // Snapshots written by older versions also contain a serialized
+            // `merkleDAG`. It is ignored because initialize() always rebuilds
+            // the DAG from the file hashes.
             console.log(`Loaded snapshot from ${this.snapshotPath}`);
         } catch (error: any) {
             if (error.code === 'ENOENT') {
