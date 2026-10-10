@@ -192,4 +192,39 @@ describe('Context request-scoped splitters', () => {
         expect(insertedDocuments).toHaveLength(1);
         expect(insertedDocuments[0].relativePath).toBe('Token.sol');
     });
+
+    it('indexes Lua and Luau files by default and maps them to their languages', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(project);
+        await fs.writeFile(path.join(project, 'init.lua'), 'local function greet() return "hi" end');
+        await fs.writeFile(path.join(project, 'Player.luau'), 'local function spawn(): boolean return true end');
+
+        const vectorDatabase = createVectorDatabase();
+        const splitter = new RecordingSplitter('context');
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: splitter,
+        });
+
+        await context.indexCodebase(project);
+
+        expect(splitter.calls).toHaveLength(2);
+        expect(splitter.calls).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                language: 'lua',
+                filePath: path.join(project, 'init.lua'),
+            }),
+            expect.objectContaining({
+                language: 'luau',
+                filePath: path.join(project, 'Player.luau'),
+            }),
+        ]));
+
+        const insertedPaths = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents)
+            .map((document) => document.relativePath)
+            .sort();
+        expect(insertedPaths).toEqual(['Player.luau', 'init.lua']);
+    });
 });
