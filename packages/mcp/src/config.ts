@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { envManager } from "@zilliz/claude-context-core";
 
 export interface ContextMcpConfig {
@@ -118,6 +119,22 @@ export function getEmbeddingModelForProvider(provider: string): string {
     }
 }
 
+function readMcpPackageVersion(): string {
+    try {
+        const packageJsonUrl = new URL("../package.json", import.meta.url);
+        const packageJson = JSON.parse(readFileSync(packageJsonUrl, "utf8")) as { version?: unknown };
+        if (typeof packageJson.version === "string" && packageJson.version.trim()) {
+            return packageJson.version;
+        }
+    } catch (error) {
+        console.warn(`[DEBUG] ⚠️  Unable to read MCP package version: ${error}`);
+    }
+
+    return "1.0.0";
+}
+
+const defaultMcpServerVersion = readMcpPackageVersion();
+
 function getPositiveIntegerFromEnv(name: string): number | undefined {
     const rawValue = envManager.get(name);
     if (!rawValue) {
@@ -148,7 +165,7 @@ export function createMcpConfig(): ContextMcpConfig {
 
     const config: ContextMcpConfig = {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
-        version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
+        version: envManager.get('MCP_SERVER_VERSION') || defaultMcpServerVersion,
         // Embedding provider configuration
         embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'OpenRouter') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),

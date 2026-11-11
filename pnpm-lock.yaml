@@ -157,6 +157,9 @@ importers:
       glob:
         specifier: ^10.0.0
         version: 10.4.5
+      ignore:
+        specifier: ^7.0.5
+        version: 7.0.5
       langchain:
         specifier: ^0.3.27
         version: 0.3.27(@langchain/core@0.3.57(openai@5.1.1(ws@8.18.3)(zod@3.25.55)))(cheerio@1.0.0)(openai@5.1.1(ws@8.18.3)(zod@3.25.55))(ws@8.18.3)

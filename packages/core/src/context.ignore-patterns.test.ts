@@ -211,6 +211,103 @@ describe('Context ignore pattern isolation', () => {
         ]);
     });
 
+    it('honors gitignore negation patterns during indexing', async () => {
+        const project = path.join(tempRoot, 'project-with-negation');
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'app'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'backoffice'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'unused'), { recursive: true });
+        await fs.writeFile(
+            path.join(project, '.gitignore'),
+            [
+                'wp-content/plugins/*',
+                '!wp-content/plugins/app',
+                '!wp-content/plugins/backoffice',
+                '',
+            ].join('\n')
+        );
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'app', 'main.md'), 'app should stay');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'backoffice', 'admin.md'), 'backoffice should stay');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'unused', 'skip.md'), 'unused should be ignored');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual([
+            'wp-content/plugins/app/main.md',
+            'wp-content/plugins/backoffice/admin.md',
+        ]);
+    });
+
+    it('skips dotfiles and dot directories during initial indexing', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(path.join(project, '.config'), { recursive: true });
+        await fs.mkdir(path.join(project, '.github', 'workflows'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src', '.cache'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src'), { recursive: true });
+
+        await fs.writeFile(path.join(project, '.hidden.md'), 'root hidden file should be ignored');
+        await fs.writeFile(path.join(project, '.config', 'settings.md'), 'hidden dir should be ignored');
+        await fs.writeFile(path.join(project, '.github', 'workflows', 'ci.md'), 'hidden nested dir should be ignored');
+        await fs.writeFile(path.join(project, 'src', '.cache', 'generated.md'), 'nested hidden dir should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'keep.md'), 'regular file should stay');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual(['src/keep.md']);
+    });
+
+    it('keeps dotfile skipping active when request ignore patterns are provided', async () => {
+        const project = path.join(tempRoot, 'project-with-request-ignores');
+        await fs.mkdir(path.join(project, '.config'), { recursive: true });
+        await fs.mkdir(path.join(project, 'src'), { recursive: true });
+
+        await fs.writeFile(path.join(project, '.config', 'settings.ts'), 'hidden dir should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'ignored.ts'), 'request ignore should be ignored');
+        await fs.writeFile(path.join(project, 'src', 'keep.ts'), 'regular file should stay');
+
+        const vectorDatabase = createVectorDatabase();
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: new TestSplitter(),
+        });
+
+        await context.indexCodebase(project, undefined, false, ['src/ignored.ts']);
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        const indexedPaths = insertedDocuments
+            .map(document => document.relativePath.replace(/\\/g, '/'))
+            .sort();
+
+        expect(indexedPaths).toEqual(['src/keep.ts']);
+    });
+
     it('treats leading-slash directory ignore patterns as root-anchored and recursive during sync', async () => {
         const project = path.join(tempRoot, 'project');
         await fs.mkdir(path.join(project, 'Library'), { recursive: true });
@@ -225,5 +322,30 @@ describe('Context ignore pattern isolation', () => {
         expect(fileHashes.has(path.join('Library', 'generated.md'))).toBe(false);
         expect(fileHashes.has(path.join('src', 'Library', 'nested.md'))).toBe(true);
         expect(fileHashes.has(path.join('src', 'keep.md'))).toBe(true);
+    });
+
+    it('honors gitignore negation patterns during sync hashing', async () => {
+        const project = path.join(tempRoot, 'sync-project-with-negation');
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'app'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'backoffice'), { recursive: true });
+        await fs.mkdir(path.join(project, 'wp-content', 'plugins', 'unused'), { recursive: true });
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'app', 'main.md'), 'app should stay');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'backoffice', 'admin.md'), 'backoffice should stay');
+        await fs.writeFile(path.join(project, 'wp-content', 'plugins', 'unused', 'skip.md'), 'unused should be ignored');
+
+        const synchronizer = new FileSynchronizer(
+            project,
+            [
+                'wp-content/plugins/*',
+                '!wp-content/plugins/app',
+                '!wp-content/plugins/backoffice',
+            ],
+            ['.md']
+        );
+        const fileHashes = await (synchronizer as any).generateFileHashes(project) as Map<string, string>;
+
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'app', 'main.md'))).toBe(true);
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'backoffice', 'admin.md'))).toBe(true);
+        expect(fileHashes.has(path.join('wp-content', 'plugins', 'unused', 'skip.md'))).toBe(false);
     });
 });
