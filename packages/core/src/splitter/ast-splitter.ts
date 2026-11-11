@@ -1,19 +1,8 @@
 import Parser from 'tree-sitter';
 import { Splitter, CodeChunk } from './index';
 
-// Language parsers
-const JavaScript = require('tree-sitter-javascript');
-const TypeScript = require('tree-sitter-typescript').typescript;
-const Python = require('tree-sitter-python');
-const Java = require('tree-sitter-java');
-const Cpp = require('tree-sitter-cpp');
-const Go = require('tree-sitter-go');
-const Rust = require('tree-sitter-rust');
-const CSharp = require('tree-sitter-c-sharp');
-const Scala = require('tree-sitter-scala');
-
 // Node types that represent logical code units
-const SPLITTABLE_NODE_TYPES = {
+const SPLITTABLE_NODE_TYPES: Record<string, string[]> = {
     javascript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement'],
     typescript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement', 'interface_declaration', 'type_alias_declaration'],
     python: ['function_definition', 'class_definition', 'decorated_definition', 'async_function_definition'],
@@ -24,6 +13,68 @@ const SPLITTABLE_NODE_TYPES = {
     csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration'],
     scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
 };
+
+// Maps every accepted language alias to its canonical SPLITTABLE_NODE_TYPES key
+const LANGUAGE_ALIASES: Record<string, string> = {
+    'javascript': 'javascript',
+    'js': 'javascript',
+    'typescript': 'typescript',
+    'ts': 'typescript',
+    'python': 'python',
+    'py': 'python',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c++': 'cpp',
+    'c': 'cpp',
+    'go': 'go',
+    'rust': 'rust',
+    'rs': 'rust',
+    'cs': 'csharp',
+    'csharp': 'csharp',
+    'scala': 'scala'
+};
+
+/**
+ * Loaders for each language's tree-sitter grammar. Grammars are loaded
+ * lazily on first use — not at module load — so a single broken grammar
+ * (e.g. an unsigned native prebuild on macOS arm64) cannot crash the whole
+ * server for every language. A failed load only disables AST splitting for
+ * that one language, falling back to the LangChain splitter for its files.
+ */
+const LANGUAGE_PARSER_LOADERS: Record<string, () => any> = {
+    javascript: () => require('tree-sitter-javascript'),
+    typescript: () => require('tree-sitter-typescript').typescript,
+    python: () => require('tree-sitter-python'),
+    java: () => require('tree-sitter-java'),
+    cpp: () => require('tree-sitter-cpp'),
+    go: () => require('tree-sitter-go'),
+    rust: () => require('tree-sitter-rust'),
+    csharp: () => require('tree-sitter-c-sharp'),
+    scala: () => require('tree-sitter-scala')
+};
+
+// Successfully loaded grammars, keyed by canonical language.
+const loadedParsers: Record<string, any> = {};
+// Languages whose grammar failed to load; AST splitting is disabled for them.
+const failedLanguages = new Set<string>();
+
+function loadLanguageParser(language: string): any | null {
+    if (loadedParsers[language]) return loadedParsers[language];
+    if (failedLanguages.has(language)) return null;
+
+    const loader = LANGUAGE_PARSER_LOADERS[language];
+    if (!loader) return null;
+
+    try {
+        const parser = loader();
+        loadedParsers[language] = parser;
+        return parser;
+    } catch (error) {
+        failedLanguages.add(language);
+        console.warn(`[ASTSplitter] ⚠️  Failed to load ${language} grammar (${error}); using LangChain splitter for ${language} files`);
+        return null;
+    }
+}
 
 export class AstCodeSplitter implements Splitter {
     private chunkSize: number = 2500;
@@ -84,26 +135,13 @@ export class AstCodeSplitter implements Splitter {
     }
 
     private getLanguageConfig(language: string): { parser: any; nodeTypes: string[] } | null {
-        const langMap: Record<string, { parser: any; nodeTypes: string[] }> = {
-            'javascript': { parser: JavaScript, nodeTypes: SPLITTABLE_NODE_TYPES.javascript },
-            'js': { parser: JavaScript, nodeTypes: SPLITTABLE_NODE_TYPES.javascript },
-            'typescript': { parser: TypeScript, nodeTypes: SPLITTABLE_NODE_TYPES.typescript },
-            'ts': { parser: TypeScript, nodeTypes: SPLITTABLE_NODE_TYPES.typescript },
-            'python': { parser: Python, nodeTypes: SPLITTABLE_NODE_TYPES.python },
-            'py': { parser: Python, nodeTypes: SPLITTABLE_NODE_TYPES.python },
-            'java': { parser: Java, nodeTypes: SPLITTABLE_NODE_TYPES.java },
-            'cpp': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
-            'c++': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
-            'c': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
-            'go': { parser: Go, nodeTypes: SPLITTABLE_NODE_TYPES.go },
-            'rust': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
-            'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
-            'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'csharp': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala }
-        };
+        const canonical = LANGUAGE_ALIASES[language.toLowerCase()];
+        if (!canonical) return null;
 
-        return langMap[language.toLowerCase()] || null;
+        const parser = loadLanguageParser(canonical);
+        if (!parser) return null;
+
+        return { parser, nodeTypes: SPLITTABLE_NODE_TYPES[canonical] };
     }
 
     private extractChunks(
@@ -261,10 +299,16 @@ export class AstCodeSplitter implements Splitter {
      * Check if AST splitting is supported for the given language
      */
     static isLanguageSupported(language: string): boolean {
-        const supportedLanguages = [
-            'javascript', 'js', 'typescript', 'ts', 'python', 'py',
-            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala'
-        ];
-        return supportedLanguages.includes(language.toLowerCase());
+        const canonical = LANGUAGE_ALIASES[language.toLowerCase()];
+        return canonical !== undefined && loadLanguageParser(canonical) !== null;
+    }
+
+    /**
+     * Canonical language names the AST splitter has node definitions for.
+     * Note: a language may still fall back to LangChain at split time if
+     * its grammar fails to load on the current platform.
+     */
+    static getSupportedLanguages(): string[] {
+        return Object.keys(SPLITTABLE_NODE_TYPES);
     }
 }
