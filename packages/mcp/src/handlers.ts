@@ -154,19 +154,14 @@ export class ToolHandlers {
     }
 
     /**
-     * Sync indexed codebases from Zilliz Cloud collections
-     * This method fetches all collections from the vector database,
-     * extracts codebasePath from collection description (preferred) or falls back
-     * to querying document metadata for old collections,
-     * and updates the snapshot with discovered codebases.
-     *
-     * Logic: Compare mcp-codebase-snapshot.json with zilliz cloud collections
-     * - If local snapshot has extra directories (not in cloud), remove them
-     * - If local snapshot is missing directories (exist in cloud), ignore them
+     * Reconcile local snapshot entries with vector database collections.
+     * Read collection metadata and row counts to recover missing entries, and
+     * remove indexed entries whose collections are absent. Guard against empty
+     * listings and failed metadata extraction before removing local entries.
      */
-    private async syncIndexedCodebasesFromCloud(): Promise<void> {
+    private async reconcileSnapshotWithVectorDatabase(): Promise<void> {
         try {
-            console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
+            console.log(`[SNAPSHOT-RECONCILE] 🔄 Reconciling snapshot entries with vector database collections...`);
 
             // Get all collections using the interface method
             const vectorDb = this.context.getVectorDatabase();
@@ -174,14 +169,14 @@ export class ToolHandlers {
             // Use the new listCollections method from the interface
             const collections = await vectorDb.listCollections();
 
-            console.log(`[SYNC-CLOUD] 📋 Found ${collections.length} collections in Zilliz Cloud`);
+            console.log(`[SNAPSHOT-RECONCILE] 📋 Found ${collections.length} collections in the vector database`);
 
             if (collections.length === 0) {
-                console.log(`[SYNC-CLOUD] ✅ No collections found in cloud. Skipping deletion of local codebases to avoid data loss from transient errors.`);
+                console.log(`[SNAPSHOT-RECONCILE] ✅ No collections found in the vector database. Skipping deletion of local codebases to avoid data loss from transient errors.`);
                 return;
             }
 
-            const cloudCodebases = new Set<string>();
+            const databaseCodebases = new Set<string>();
             let codeCollectionsChecked = 0;
             let successfulExtractions = 0;
 
@@ -190,12 +185,12 @@ export class ToolHandlers {
                 try {
                     // Skip collections that don't match the code_chunks pattern (support both legacy and new collections)
                     if (!collectionName.startsWith('code_chunks_') && !collectionName.startsWith('hybrid_code_chunks_')) {
-                        console.log(`[SYNC-CLOUD] ⏭️  Skipping non-code collection: ${collectionName}`);
+                        console.log(`[SNAPSHOT-RECONCILE] ⏭️  Skipping non-code collection: ${collectionName}`);
                         continue;
                     }
 
                     codeCollectionsChecked++;
-                    console.log(`[SYNC-CLOUD] 🔍 Checking collection: ${collectionName}`);
+                    console.log(`[SNAPSHOT-RECONCILE] 🔍 Checking collection: ${collectionName}`);
 
                     // Try to extract codebasePath from collection description first (new format)
                     let extracted = false;
@@ -204,19 +199,19 @@ export class ToolHandlers {
                         if (description && description.startsWith('codebasePath:')) {
                             const codebasePath = description.substring('codebasePath:'.length);
                             if (codebasePath.length > 0) {
-                                console.log(`[SYNC-CLOUD] 📍 Found codebase path from description: ${codebasePath} in collection: ${collectionName}`);
-                                cloudCodebases.add(codebasePath);
+                                console.log(`[SNAPSHOT-RECONCILE] 📍 Found codebase path from description: ${codebasePath} in collection: ${collectionName}`);
+                                databaseCodebases.add(codebasePath);
                                 successfulExtractions++;
                                 extracted = true;
                             }
                         }
                     } catch (descError: any) {
-                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to get description for collection ${collectionName}:`, descError.message || descError);
+                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Failed to get description for collection ${collectionName}:`, descError.message || descError);
                     }
 
                     // Fallback: query document metadata for old collections without new description format
                     if (!extracted) {
-                        console.log(`[SYNC-CLOUD] 🔄 Falling back to query-based extraction for collection: ${collectionName}`);
+                        console.log(`[SNAPSHOT-RECONCILE] 🔄 Falling back to query-based extraction for collection: ${collectionName}`);
                         try {
                             const results = await vectorDb.query(
                                 collectionName,
@@ -234,89 +229,104 @@ export class ToolHandlers {
                                     const codebasePath = metadata.codebasePath;
 
                                     if (codebasePath && typeof codebasePath === 'string') {
-                                        console.log(`[SYNC-CLOUD] 📍 Found codebase path from query: ${codebasePath} in collection: ${collectionName}`);
-                                        cloudCodebases.add(codebasePath);
+                                        console.log(`[SNAPSHOT-RECONCILE] 📍 Found codebase path from query: ${codebasePath} in collection: ${collectionName}`);
+                                        databaseCodebases.add(codebasePath);
                                         successfulExtractions++;
                                     } else {
-                                        console.warn(`[SYNC-CLOUD] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
+                                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  No codebasePath found in metadata for collection: ${collectionName}`);
                                     }
                                 } else {
-                                    console.warn(`[SYNC-CLOUD] ⚠️  No metadata found in collection: ${collectionName}`);
+                                    console.warn(`[SNAPSHOT-RECONCILE] ⚠️  No metadata found in collection: ${collectionName}`);
                                 }
                             } else {
-                                console.log(`[SYNC-CLOUD] ℹ️  Collection ${collectionName} is empty`);
+                                console.log(`[SNAPSHOT-RECONCILE] ℹ️  Collection ${collectionName} is empty`);
                             }
                         } catch (queryError: any) {
-                            console.warn(`[SYNC-CLOUD] ⚠️  Fallback query failed for collection ${collectionName}:`, queryError.message || queryError);
+                            console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Fallback query failed for collection ${collectionName}:`, queryError.message || queryError);
                         }
                     }
                 } catch (collectionError: any) {
-                    console.warn(`[SYNC-CLOUD] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
+                    console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
                     // Continue with next collection
                 }
             }
 
-            console.log(`[SYNC-CLOUD] 📊 Found ${cloudCodebases.size} valid codebases in cloud (checked ${codeCollectionsChecked} code collections, ${successfulExtractions} successfully extracted)`);
+            console.log(`[SNAPSHOT-RECONCILE] 📊 Found ${databaseCodebases.size} valid codebases in the vector database (checked ${codeCollectionsChecked} code collections, ${successfulExtractions} successfully extracted)`);
 
             // Safety guard: if we checked code collections but none returned results,
-            // treat this as an extraction failure rather than "cloud is empty".
+            // treat this as an extraction failure rather than an empty database.
             // This prevents deleting all local codebases due to transient errors.
             if (codeCollectionsChecked > 0 && successfulExtractions === 0) {
-                console.warn(`[SYNC-CLOUD] ⚠️  All ${codeCollectionsChecked} code collection extractions failed. Skipping sync to avoid accidental deletion of local codebases.`);
+                console.warn(`[SNAPSHOT-RECONCILE] ⚠️  All ${codeCollectionsChecked} code collection extractions failed. Skipping sync to avoid accidental deletion of local codebases.`);
                 return;
             }
 
             // Get current local codebases
             const localCodebases = new Set(this.snapshotManager.getIndexedCodebases());
-            console.log(`[SYNC-CLOUD] 📊 Found ${localCodebases.size} local codebases in snapshot`);
+            console.log(`[SNAPSHOT-RECONCILE] 📊 Found ${localCodebases.size} local codebases in snapshot`);
 
             let hasChanges = false;
 
-            // Remove local codebases that don't exist in cloud
+            // Remove local codebases that don't exist in the vector database
             for (const localCodebase of localCodebases) {
-                if (!cloudCodebases.has(localCodebase)) {
+                if (!databaseCodebases.has(localCodebase)) {
                     this.snapshotManager.removeCodebaseCompletely(localCodebase);
                     hasChanges = true;
 
                     try {
                         await FileSynchronizer.deleteSnapshot(localCodebase);
                     } catch (error: any) {
-                        console.warn(`[SYNC-CLOUD] ⚠️  Failed to delete local merkle snapshot for removed codebase '${localCodebase}':`, error?.message || error);
+                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Failed to delete local merkle snapshot for removed codebase '${localCodebase}':`, error?.message || error);
                     }
 
-                    console.log(`[SYNC-CLOUD] ➖ Removed local codebase (not in cloud): ${localCodebase}`);
+                    console.log(`[SNAPSHOT-RECONCILE] ➖ Removed local codebase (not in the vector database): ${localCodebase}`);
                 }
             }
 
-            // Add cloud codebases that are missing from local snapshot (recovery).
+            // Add database codebases that are missing from local snapshot (recovery).
             // Query Milvus for the real row count — if unknown/empty, skip the write
             // so we don't persist a poisoning 0/0+completed entry (Issue #295).
-            for (const cloudCodebase of cloudCodebases) {
-                if (!localCodebases.has(cloudCodebase)) {
-                    const stats = await this.queryCollectionStats(cloudCodebase);
+            for (const databaseCodebase of databaseCodebases) {
+                // Partial rows from our active task do not establish completion.
+                // Persisted 'indexing' entries alone may be stale and still need recovery.
+                if (this.indexingTasks.has(databaseCodebase)) {
+                    continue;
+                }
+
+                if (!localCodebases.has(databaseCodebase)) {
+                    const infoBeforeQuery = this.snapshotManager.getCodebaseInfo(databaseCodebase);
+                    const stats = await this.queryCollectionStats(databaseCodebase);
+
+                    // A task can start, finish, or fail while the database query awaits I/O.
+                    // State transitions replace the info object; preserve the newer state.
+                    if (this.indexingTasks.has(databaseCodebase)
+                        || this.snapshotManager.getCodebaseInfo(databaseCodebase) !== infoBeforeQuery) {
+                        continue;
+                    }
+
                     if (stats) {
-                        this.snapshotManager.setCodebaseIndexed(cloudCodebase, {
+                        this.snapshotManager.setCodebaseIndexed(databaseCodebase, {
                             ...stats,
                             status: 'completed' as const
                         });
                         hasChanges = true;
-                        console.log(`[SYNC-CLOUD] ➕ Recovered codebase from cloud: ${cloudCodebase} (rows=${stats.totalChunks})`);
+                        console.log(`[SNAPSHOT-RECONCILE] ➕ Recovered codebase from the vector database: ${databaseCodebase} (rows=${stats.totalChunks})`);
                     } else {
-                        console.log(`[SYNC-CLOUD] ⏭️  Skipped recovery for ${cloudCodebase} (row count unknown or zero)`);
+                        console.log(`[SNAPSHOT-RECONCILE] ⏭️  Skipped recovery for ${databaseCodebase} (row count unknown or zero)`);
                     }
                 }
             }
 
             if (hasChanges) {
                 this.snapshotManager.saveCodebaseSnapshot();
-                console.log(`[SYNC-CLOUD] 💾 Updated snapshot to match cloud state`);
+                console.log(`[SNAPSHOT-RECONCILE] 💾 Updated snapshot to match vector database state`);
             } else {
-                console.log(`[SYNC-CLOUD] ✅ Local snapshot already matches cloud state`);
+                console.log(`[SNAPSHOT-RECONCILE] ✅ Local snapshot already matches vector database state`);
             }
 
-            console.log(`[SYNC-CLOUD] ✅ Cloud sync completed successfully`);
+            console.log(`[SNAPSHOT-RECONCILE] ✅ Snapshot reconciliation completed successfully`);
         } catch (error: any) {
-            console.error(`[SYNC-CLOUD] ❌ Error syncing codebases from cloud:`, error.message || error);
+            console.error(`[SNAPSHOT-RECONCILE] ❌ Error reconciling snapshot entries with the vector database:`, error.message || error);
             // Don't throw - this is not critical for the main functionality
         }
     }
@@ -329,8 +339,8 @@ export class ToolHandlers {
         const customIgnorePatterns = ignorePatterns || [];
 
         try {
-            // Sync indexed codebases from cloud first
-            await this.syncIndexedCodebasesFromCloud();
+            // Reconcile snapshot entries with the vector database first
+            await this.reconcileSnapshotWithVectorDatabase();
 
             // Validate splitter parameter
             if (!isRequestSplitterType(requestedSplitter)) {
@@ -649,8 +659,8 @@ export class ToolHandlers {
         const resultLimit = limit || 10;
 
         try {
-            // Sync indexed codebases from cloud first
-            await this.syncIndexedCodebasesFromCloud();
+            // Reconcile snapshot entries with the vector database first
+            await this.reconcileSnapshotWithVectorDatabase();
 
             // Force absolute path resolution - warn if relative path provided
             const absolutePath = ensureAbsolutePath(codebasePath);
@@ -1019,7 +1029,7 @@ export class ToolHandlers {
                 };
             }
 
-            await this.syncIndexedCodebasesFromCloud();
+            await this.reconcileSnapshotWithVectorDatabase();
 
             // Check indexing status using new status system
             const statusCodebasePath = this.snapshotManager.findTrackedCodebasePath(absolutePath) || absolutePath;
