@@ -287,8 +287,23 @@ export class ToolHandlers {
             // Query Milvus for the real row count — if unknown/empty, skip the write
             // so we don't persist a poisoning 0/0+completed entry (Issue #295).
             for (const databaseCodebase of databaseCodebases) {
+                // Partial rows from our active task do not establish completion.
+                // Persisted 'indexing' entries alone may be stale and still need recovery.
+                if (this.indexingTasks.has(databaseCodebase)) {
+                    continue;
+                }
+
                 if (!localCodebases.has(databaseCodebase)) {
+                    const infoBeforeQuery = this.snapshotManager.getCodebaseInfo(databaseCodebase);
                     const stats = await this.queryCollectionStats(databaseCodebase);
+
+                    // A task can start, finish, or fail while the database query awaits I/O.
+                    // State transitions replace the info object; preserve the newer state.
+                    if (this.indexingTasks.has(databaseCodebase)
+                        || this.snapshotManager.getCodebaseInfo(databaseCodebase) !== infoBeforeQuery) {
+                        continue;
+                    }
+
                     if (stats) {
                         this.snapshotManager.setCodebaseIndexed(databaseCodebase, {
                             ...stats,
