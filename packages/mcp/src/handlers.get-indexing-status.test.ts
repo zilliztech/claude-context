@@ -36,7 +36,7 @@ async function withTempHome(run: (tempRoot: string) => Promise<void>): Promise<v
     }
 }
 
-test("get_indexing_status syncs cloud state before reading the snapshot", async () => {
+test("get_indexing_status reconciles vector database state before reading the snapshot", async () => {
     await withTempHome(async (tempRoot) => {
         const codebasePath = path.join(tempRoot, "repo");
         await mkdir(codebasePath, { recursive: true });
@@ -45,9 +45,9 @@ test("get_indexing_status syncs cloud state before reading the snapshot", async 
         assert.equal(snapshotManager.getCodebaseStatus(codebasePath), "not_found");
 
         const handlers = new ToolHandlers({} as any, snapshotManager);
-        let syncCalls = 0;
-        (handlers as any).syncIndexedCodebasesFromCloud = async () => {
-            syncCalls += 1;
+        let reconcileCalls = 0;
+        (handlers as any).reconcileSnapshotWithVectorDatabase = async () => {
+            reconcileCalls += 1;
             snapshotManager.setCodebaseIndexed(codebasePath, {
                 indexedFiles: 3,
                 totalChunks: 5,
@@ -57,7 +57,7 @@ test("get_indexing_status syncs cloud state before reading the snapshot", async 
 
         const result = await handlers.handleGetIndexingStatus({ path: codebasePath });
 
-        assert.equal(syncCalls, 1);
+        assert.equal(reconcileCalls, 1);
         assert.equal(result.isError, undefined);
         assert.match(result.content[0].text, /fully indexed and ready for search/);
         assert.match(result.content[0].text, /3 files, 5 chunks/);
