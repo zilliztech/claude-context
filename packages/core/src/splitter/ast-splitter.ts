@@ -1,7 +1,6 @@
 import Parser from 'tree-sitter';
-import { Splitter, CodeChunk } from './index';
+import type { Splitter, CodeChunk } from './index';
 
-// Language parsers
 const JavaScript = require('tree-sitter-javascript');
 const TypeScript = require('tree-sitter-typescript').typescript;
 const Python = require('tree-sitter-python');
@@ -12,259 +11,159 @@ const Rust = require('tree-sitter-rust');
 const CSharp = require('tree-sitter-c-sharp');
 const Scala = require('tree-sitter-scala');
 
-// Node types that represent logical code units
-const SPLITTABLE_NODE_TYPES = {
-    javascript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement'],
-    typescript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement', 'interface_declaration', 'type_alias_declaration'],
-    python: ['function_definition', 'class_definition', 'decorated_definition', 'async_function_definition'],
-    java: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration'],
-    cpp: ['function_definition', 'class_specifier', 'namespace_definition', 'declaration'],
-    go: ['function_declaration', 'method_declaration', 'type_declaration', 'var_declaration', 'const_declaration'],
-    rust: ['function_item', 'impl_item', 'struct_item', 'enum_item', 'trait_item', 'mod_item'],
-    csharp: ['method_declaration', 'class_declaration', 'interface_declaration', 'struct_declaration', 'enum_declaration'],
-    scala: ['method_declaration', 'class_declaration', 'interface_declaration', 'constructor_declaration']
+const LANGUAGE_PARSERS: Record<string, any> = {
+    javascript: JavaScript, js: JavaScript,
+    typescript: TypeScript, ts: TypeScript,
+    python: Python, py: Python,
+    java: Java,
+    cpp: Cpp, 'c++': Cpp, c: Cpp,
+    go: Go,
+    rust: Rust, rs: Rust,
+    csharp: CSharp, cs: CSharp,
+    scala: Scala,
 };
 
+interface SourceRange {
+    start: number;
+    end: number;
+}
+
 export class AstCodeSplitter implements Splitter {
-    private chunkSize: number = 2500;
-    private chunkOverlap: number = 300;
+    private chunkSize = 2500;
+    private chunkOverlap = 300;
     private parser: Parser;
-    private langchainFallback: any; // LangChainCodeSplitter for fallback
 
-    constructor(chunkSize?: number, chunkOverlap?: number) {
-        if (chunkSize) this.chunkSize = chunkSize;
-        if (chunkOverlap) this.chunkOverlap = chunkOverlap;
+    constructor(chunkSize = 2500, chunkOverlap = 300) {
+        this.setChunkSize(chunkSize);
+        this.setChunkOverlap(chunkOverlap);
         this.parser = new Parser();
-
-        // Initialize fallback splitter
-        const { LangChainCodeSplitter } = require('./langchain-splitter');
-        this.langchainFallback = new LangChainCodeSplitter(chunkSize, chunkOverlap);
     }
 
     async split(code: string, language: string, filePath?: string): Promise<CodeChunk[]> {
-        // Check if language is supported by AST splitter
-        const langConfig = this.getLanguageConfig(language);
-        if (!langConfig) {
-            console.log(`📝 Language ${language} not supported by AST, using LangChain splitter for: ${filePath || 'unknown'}`);
-            return await this.langchainFallback.split(code, language, filePath);
-        }
+        if (code.length === 0) return [];
 
-        try {
-            console.log(`🌳 Using AST splitter for ${language} file: ${filePath || 'unknown'}`);
-
-            this.parser.setLanguage(langConfig.parser);
-            const tree = this.parser.parse(code);
-
-            if (!tree.rootNode) {
-                console.warn(`[ASTSplitter] ⚠️  Failed to parse AST for ${language}, falling back to LangChain: ${filePath || 'unknown'}`);
-                return await this.langchainFallback.split(code, language, filePath);
+        let root: Parser.SyntaxNode | undefined;
+        if (AstCodeSplitter.isLanguageSupported(language)) {
+            try {
+                this.parser.setLanguage(LANGUAGE_PARSERS[language.toLowerCase()]);
+                const tree = this.parser.parse(code);
+                if (!tree.rootNode.hasError) root = tree.rootNode;
+            } catch (error) {
+                console.warn('[ASTSplitter] Using text boundaries for ' + (filePath || language) + ': ' + error);
             }
-
-            // Extract chunks based on AST nodes
-            const chunks = this.extractChunks(tree.rootNode, code, langConfig.nodeTypes, language, filePath);
-
-            // If chunks are too large, split them further
-            const refinedChunks = await this.refineChunks(chunks, code);
-
-            return refinedChunks;
-        } catch (error) {
-            console.warn(`[ASTSplitter] ⚠️  AST splitter failed for ${language}, falling back to LangChain: ${error}`);
-            return await this.langchainFallback.split(code, language, filePath);
         }
+
+        // Ranges partition the entire source. Pack adjacent ranges without
+        // emitting a parent node again alongside its children.
+        const ranges: SourceRange[] = [];
+        for (const range of this.splitRange(code, 0, code.length, root)) {
+            const previous = ranges[ranges.length - 1];
+            if (previous && range.end - previous.start <= this.chunkSize) {
+                previous.end = range.end;
+            } else {
+                ranges.push({ ...range });
+            }
+        }
+
+        const lineStarts = [0];
+        for (let i = 0; i < code.length; i++) {
+            if (code[i] === '\n') lineStarts.push(i + 1);
+        }
+
+        return ranges.map(range => {
+            // Overlap is an optional prefix of the original source and must
+            // fit within the final size limit, even for nearly full functions.
+            const overlap = Math.min(this.chunkOverlap, this.chunkSize - (range.end - range.start));
+            let start = Math.max(0, range.start - overlap);
+            if (start < range.start && this.isSurrogateBoundary(code, start)) start++;
+            return {
+                content: code.slice(start, range.end),
+                metadata: {
+                    startLine: this.lineAt(lineStarts, start),
+                    endLine: this.lineAt(lineStarts, range.end - 1),
+                    language,
+                    filePath,
+                },
+            };
+        });
     }
 
     setChunkSize(chunkSize: number): void {
+        if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+            throw new RangeError('chunkSize must be a positive integer');
+        }
         this.chunkSize = chunkSize;
-        this.langchainFallback.setChunkSize(chunkSize);
     }
 
     setChunkOverlap(chunkOverlap: number): void {
+        if (!Number.isInteger(chunkOverlap) || chunkOverlap < 0) {
+            throw new RangeError('chunkOverlap must be a non-negative integer');
+        }
         this.chunkOverlap = chunkOverlap;
-        this.langchainFallback.setChunkOverlap(chunkOverlap);
     }
 
-    private getLanguageConfig(language: string): { parser: any; nodeTypes: string[] } | null {
-        const langMap: Record<string, { parser: any; nodeTypes: string[] }> = {
-            'javascript': { parser: JavaScript, nodeTypes: SPLITTABLE_NODE_TYPES.javascript },
-            'js': { parser: JavaScript, nodeTypes: SPLITTABLE_NODE_TYPES.javascript },
-            'typescript': { parser: TypeScript, nodeTypes: SPLITTABLE_NODE_TYPES.typescript },
-            'ts': { parser: TypeScript, nodeTypes: SPLITTABLE_NODE_TYPES.typescript },
-            'python': { parser: Python, nodeTypes: SPLITTABLE_NODE_TYPES.python },
-            'py': { parser: Python, nodeTypes: SPLITTABLE_NODE_TYPES.python },
-            'java': { parser: Java, nodeTypes: SPLITTABLE_NODE_TYPES.java },
-            'cpp': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
-            'c++': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
-            'c': { parser: Cpp, nodeTypes: SPLITTABLE_NODE_TYPES.cpp },
-            'go': { parser: Go, nodeTypes: SPLITTABLE_NODE_TYPES.go },
-            'rust': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
-            'rs': { parser: Rust, nodeTypes: SPLITTABLE_NODE_TYPES.rust },
-            'cs': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'csharp': { parser: CSharp, nodeTypes: SPLITTABLE_NODE_TYPES.csharp },
-            'scala': { parser: Scala, nodeTypes: SPLITTABLE_NODE_TYPES.scala }
-        };
-
-        return langMap[language.toLowerCase()] || null;
-    }
-
-    private extractChunks(
-        node: Parser.SyntaxNode,
-        code: string,
-        splittableTypes: string[],
-        language: string,
-        filePath?: string
-    ): CodeChunk[] {
-        const chunks: CodeChunk[] = [];
-        const codeLines = code.split('\n');
-
-        const traverse = (currentNode: Parser.SyntaxNode) => {
-            // Check if this node type should be split into a chunk
-            if (splittableTypes.includes(currentNode.type)) {
-                const startLine = currentNode.startPosition.row + 1;
-                const endLine = currentNode.endPosition.row + 1;
-                const nodeText = code.slice(currentNode.startIndex, currentNode.endIndex);
-
-                // Only create chunk if it has meaningful content
-                if (nodeText.trim().length > 0) {
-                    chunks.push({
-                        content: nodeText,
-                        metadata: {
-                            startLine,
-                            endLine,
-                            language,
-                            filePath,
-                        }
-                    });
-                }
+    private *splitRange(code: string, start: number, end: number, node?: Parser.SyntaxNode): Generator<SourceRange> {
+        // An explicit stack also handles deeply nested generated source.
+        const pending: Array<SourceRange & { node?: Parser.SyntaxNode }> = [{ start, end, node }];
+        while (pending.length > 0) {
+            const current = pending.pop()!;
+            if (current.start === current.end) continue;
+            if (current.end - current.start <= this.chunkSize) {
+                yield { start: current.start, end: current.end };
+                continue;
             }
 
-            // Continue traversing child nodes
-            for (const child of currentNode.children) {
-                traverse(child);
+            const children = current.node?.namedChildren || [];
+            if (children.length === 0) {
+                yield* this.splitTextRange(code, current.start, current.end);
+                continue;
             }
-        };
 
-        traverse(node);
-
-        // If no meaningful chunks found, create a single chunk with the entire code
-        if (chunks.length === 0) {
-            chunks.push({
-                content: code,
-                metadata: {
-                    startLine: 1,
-                    endLine: codeLines.length,
-                    language,
-                    filePath,
-                }
-            });
-        }
-
-        return chunks;
-    }
-
-    private async refineChunks(chunks: CodeChunk[], originalCode: string): Promise<CodeChunk[]> {
-        const refinedChunks: CodeChunk[] = [];
-
-        for (const chunk of chunks) {
-            if (chunk.content.length <= this.chunkSize) {
-                refinedChunks.push(chunk);
-            } else {
-                // Split large chunks using character-based splitting
-                const subChunks = this.splitLargeChunk(chunk, originalCode);
-                refinedChunks.push(...subChunks);
-            }
-        }
-
-        return this.addOverlap(refinedChunks);
-    }
-
-    private splitLargeChunk(chunk: CodeChunk, originalCode: string): CodeChunk[] {
-        const lines = chunk.content.split('\n');
-        const subChunks: CodeChunk[] = [];
-        let currentChunk = '';
-        let currentStartLine = chunk.metadata.startLine;
-        let currentLineCount = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const lineWithNewline = i === lines.length - 1 ? line : line + '\n';
-
-            if (currentChunk.length + lineWithNewline.length > this.chunkSize && currentChunk.length > 0) {
-                // Create a sub-chunk
-                subChunks.push({
-                    content: currentChunk.trim(),
-                    metadata: {
-                        startLine: currentStartLine,
-                        endLine: currentStartLine + currentLineCount - 1,
-                        language: chunk.metadata.language,
-                        filePath: chunk.metadata.filePath,
-                    }
+            pending.push({ start: children[children.length - 1].endIndex, end: current.end });
+            for (let i = children.length - 1; i >= 0; i--) {
+                // Starting at the previous end retains all text between nodes.
+                // Push in reverse order so ranges are consumed in source order.
+                pending.push({
+                    start: i === 0 ? current.start : children[i - 1].endIndex,
+                    end: children[i].endIndex,
+                    node: children[i],
                 });
-
-                currentChunk = lineWithNewline;
-                currentStartLine = chunk.metadata.startLine + i;
-                currentLineCount = 1;
-            } else {
-                currentChunk += lineWithNewline;
-                currentLineCount++;
             }
         }
-
-        // Add the last sub-chunk
-        if (currentChunk.trim().length > 0) {
-            subChunks.push({
-                content: currentChunk.trim(),
-                metadata: {
-                    startLine: currentStartLine,
-                    endLine: currentStartLine + currentLineCount - 1,
-                    language: chunk.metadata.language,
-                    filePath: chunk.metadata.filePath,
-                }
-            });
-        }
-
-        return subChunks;
     }
 
-    private addOverlap(chunks: CodeChunk[]): CodeChunk[] {
-        if (chunks.length <= 1 || this.chunkOverlap <= 0) {
-            return chunks;
-        }
-
-        const overlappedChunks: CodeChunk[] = [];
-
-        for (let i = 0; i < chunks.length; i++) {
-            let content = chunks[i].content;
-            const metadata = { ...chunks[i].metadata };
-
-            // Add overlap from previous chunk
-            if (i > 0 && this.chunkOverlap > 0) {
-                const prevChunk = chunks[i - 1];
-                const overlapText = prevChunk.content.slice(-this.chunkOverlap);
-                content = overlapText + '\n' + content;
-                metadata.startLine = Math.max(1, metadata.startLine - this.getLineCount(overlapText));
+    private *splitTextRange(code: string, start: number, end: number): Generator<SourceRange> {
+        while (start < end) {
+            let next = Math.min(start + this.chunkSize, end);
+            if (next < end) {
+                const newline = code.lastIndexOf('\n', next - 1);
+                if (newline >= start) next = newline + 1;
+                // Keep surrogate pairs together whenever the size allows it.
+                if (next - start > 1 && this.isSurrogateBoundary(code, next)) next--;
             }
-
-            overlappedChunks.push({
-                content,
-                metadata
-            });
+            yield { start, end: next };
+            start = next;
         }
-
-        return overlappedChunks;
     }
 
-    private getLineCount(text: string): number {
-        return text.split('\n').length;
+    private isSurrogateBoundary(code: string, offset: number): boolean {
+        const previous = code.charCodeAt(offset - 1);
+        const current = code.charCodeAt(offset);
+        return previous >= 0xD800 && previous <= 0xDBFF && current >= 0xDC00 && current <= 0xDFFF;
     }
 
-    /**
-     * Check if AST splitting is supported for the given language
-     */
+    private lineAt(lineStarts: number[], offset: number): number {
+        let low = 0;
+        let high = lineStarts.length;
+        while (low < high) {
+            const middle = Math.floor((low + high) / 2);
+            if (lineStarts[middle] <= offset) low = middle + 1;
+            else high = middle;
+        }
+        return low;
+    }
+
     static isLanguageSupported(language: string): boolean {
-        const supportedLanguages = [
-            'javascript', 'js', 'typescript', 'ts', 'python', 'py',
-            'java', 'cpp', 'c++', 'c', 'go', 'rust', 'rs', 'cs', 'csharp', 'scala'
-        ];
-        return supportedLanguages.includes(language.toLowerCase());
+        return Object.prototype.hasOwnProperty.call(LANGUAGE_PARSERS, language.toLowerCase());
     }
 }
