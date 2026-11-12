@@ -10,9 +10,12 @@ type GeminiModelInfo = {
 
 export interface GeminiEmbeddingConfig {
     model: string;
-    apiKey: string;
+    apiKey?: string; // Gemini API key; omit when using Vertex AI with Application Default Credentials
     baseURL?: string; // Optional custom API endpoint URL
     outputDimensionality?: number; // Optional dimension override
+    vertexai?: boolean; // Optional: call Gemini through Vertex AI instead of the Gemini Developer API
+    project?: string; // Google Cloud project ID (Vertex AI)
+    location?: string; // Google Cloud location, e.g. us-central1 (Vertex AI)
 }
 
 export class GeminiEmbedding extends Embedding {
@@ -25,7 +28,10 @@ export class GeminiEmbedding extends Embedding {
         super();
         this.config = config;
         this.client = new GoogleGenAI({
-            apiKey: config.apiKey,
+            ...(config.apiKey !== undefined && { apiKey: config.apiKey }),
+            ...(config.vertexai !== undefined && { vertexai: config.vertexai }),
+            ...(config.project && { project: config.project }),
+            ...(config.location && { location: config.location }),
             ...(config.baseURL && {
                 httpOptions: {
                     baseUrl: config.baseURL

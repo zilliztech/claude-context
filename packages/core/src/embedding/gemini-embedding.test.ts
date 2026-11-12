@@ -119,4 +119,45 @@ describe('GeminiEmbedding', () => {
         await expect(embedding.embedBatch([])).resolves.toEqual([]);
         expect(mockEmbedContent).not.toHaveBeenCalled();
     });
+
+    it('passes only the API key to the GoogleGenAI client for API-key configs', () => {
+        new GeminiEmbedding({
+            apiKey: 'test-api-key',
+            model: 'gemini-embedding-001',
+        });
+
+        const constructorArgs = (GoogleGenAI as unknown as jest.Mock).mock.calls[0][0];
+        expect(constructorArgs.apiKey).toBe('test-api-key');
+        expect(constructorArgs).not.toHaveProperty('vertexai');
+        expect(constructorArgs).not.toHaveProperty('project');
+        expect(constructorArgs).not.toHaveProperty('location');
+    });
+
+    it('passes vertexai, project and location to the GoogleGenAI client without an API key', () => {
+        new GeminiEmbedding({
+            model: 'gemini-embedding-001',
+            vertexai: true,
+            project: 'test-project',
+            location: 'us-central1',
+        });
+
+        const constructorArgs = (GoogleGenAI as unknown as jest.Mock).mock.calls[0][0];
+        expect(constructorArgs).toEqual({
+            vertexai: true,
+            project: 'test-project',
+            location: 'us-central1',
+        });
+        expect(constructorArgs).not.toHaveProperty('apiKey');
+    });
+
+    it('still maps baseURL to httpOptions.baseUrl', () => {
+        new GeminiEmbedding({
+            apiKey: 'test-api-key',
+            model: 'gemini-embedding-001',
+            baseURL: 'https://example.com/custom',
+        });
+
+        const constructorArgs = (GoogleGenAI as unknown as jest.Mock).mock.calls[0][0];
+        expect(constructorArgs.httpOptions).toEqual({ baseUrl: 'https://example.com/custom' });
+    });
 });
