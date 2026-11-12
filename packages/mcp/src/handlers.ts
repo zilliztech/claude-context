@@ -7,6 +7,38 @@ import type { CodebaseIndexOptions, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, isRequestSplitterType } from "./splitter.js";
 import { ensureAbsolutePath, truncateContent, trackCodebasePath } from "./utils.js";
 
+function formatValidationError(err: any): string {
+    const usableString = (value: unknown): string | null => {
+        if (typeof value !== "string") return null;
+
+        const trimmed = value.trim();
+        if (!trimmed || trimmed === "[object Object]") return null;
+
+        return trimmed;
+    };
+
+    const directMessage = usableString(err?.message);
+    if (directMessage) return directMessage;
+
+    const responseMessage = usableString(err?.response?.data?.message);
+    if (responseMessage) return responseMessage;
+
+    const responseDetail = usableString(err?.response?.data?.detail);
+    if (responseDetail) return responseDetail;
+
+    const statusText = usableString(err?.response?.statusText);
+    if (statusText) return statusText;
+
+    try {
+        const json = JSON.stringify(err);
+        if (json && json !== "{}" && json !== "null") return json;
+    } catch {
+        // Fall through to String(err) for circular or otherwise unserializable values.
+    }
+
+    return String(err);
+}
+
 export class ToolHandlers {
     private context: Context;
     private snapshotManager: SnapshotManager;
@@ -206,7 +238,7 @@ export class ToolHandlers {
                             }
                         }
                     } catch (descError: any) {
-                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Failed to get description for collection ${collectionName}:`, descError.message || descError);
+                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Failed to get description for collection ${collectionName}:`, formatValidationError(descError));
                     }
 
                     // Fallback: query document metadata for old collections without new description format
@@ -242,11 +274,11 @@ export class ToolHandlers {
                                 console.log(`[SNAPSHOT-RECONCILE] ℹ️  Collection ${collectionName} is empty`);
                             }
                         } catch (queryError: any) {
-                            console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Fallback query failed for collection ${collectionName}:`, queryError.message || queryError);
+                            console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Fallback query failed for collection ${collectionName}:`, formatValidationError(queryError));
                         }
                     }
                 } catch (collectionError: any) {
-                    console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Error checking collection ${collectionName}:`, collectionError.message || collectionError);
+                    console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Error checking collection ${collectionName}:`, formatValidationError(collectionError));
                     // Continue with next collection
                 }
             }
@@ -276,7 +308,7 @@ export class ToolHandlers {
                     try {
                         await FileSynchronizer.deleteSnapshot(localCodebase);
                     } catch (error: any) {
-                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Failed to delete local merkle snapshot for removed codebase '${localCodebase}':`, error?.message || error);
+                        console.warn(`[SNAPSHOT-RECONCILE] ⚠️  Failed to delete local merkle snapshot for removed codebase '${localCodebase}':`, formatValidationError(error));
                     }
 
                     console.log(`[SNAPSHOT-RECONCILE] ➖ Removed local codebase (not in the vector database): ${localCodebase}`);
@@ -326,7 +358,7 @@ export class ToolHandlers {
 
             console.log(`[SNAPSHOT-RECONCILE] ✅ Snapshot reconciliation completed successfully`);
         } catch (error: any) {
-            console.error(`[SNAPSHOT-RECONCILE] ❌ Error reconciling snapshot entries with the vector database:`, error.message || error);
+            console.error(`[SNAPSHOT-RECONCILE] ❌ Error reconciling snapshot entries with the vector database:`, formatValidationError(error));
             // Don't throw - this is not critical for the main functionality
         }
     }
@@ -470,7 +502,7 @@ export class ToolHandlers {
                 return {
                     content: [{
                         type: "text",
-                        text: `Error validating collection creation: ${validationError.message || validationError}`
+                        text: `Error validating collection creation: ${formatValidationError(validationError)}`
                     }],
                     isError: true
                 };
@@ -543,7 +575,7 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Error starting indexing: ${error.message || error}`
+                    text: `Error starting indexing: ${formatValidationError(error)}`
                 }],
                 isError: true
             };
@@ -645,7 +677,7 @@ export class ToolHandlers {
             const lastProgress = this.snapshotManager.getIndexingProgress(absolutePath);
 
             // Set codebase to failed status with error information
-            const errorMessage = error.message || String(error);
+            const errorMessage = formatValidationError(error);
             this.snapshotManager.setCodebaseIndexFailed(absolutePath, errorMessage, lastProgress, indexOptions);
             this.snapshotManager.saveCodebaseSnapshot();
 
@@ -929,7 +961,7 @@ export class ToolHandlers {
                 } catch (waitError: any) {
                     // startBackgroundIndexing already logs and never re-throws,
                     // so this catch only guards against future refactors.
-                    console.warn(`[CLEAR] Background indexing wind-down reported: ${waitError?.message || waitError}`);
+                    console.warn(`[CLEAR] Background indexing wind-down reported: ${formatValidationError(waitError)}`);
                 }
                 this.indexingTasks.delete(absolutePath);
             }
@@ -1108,7 +1140,7 @@ export class ToolHandlers {
             return {
                 content: [{
                     type: "text",
-                    text: `Error getting indexing status: ${error.message || error}`
+                    text: `Error getting indexing status: ${formatValidationError(error)}`
                 }],
                 isError: true
             };
