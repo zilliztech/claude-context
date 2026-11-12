@@ -1,6 +1,6 @@
 {
     "name": "@zilliz/claude-context-mcp",
-    "version": "0.1.16",
+    "version": "0.1.17-rc.0",
     "description": "Model Context Protocol integration for Claude Context",
     "type": "module",
     "main": "dist/index.js",
