@@ -1,49 +1,127 @@
-name: Release
+name: Release npm packages
 
 on:
   push:
     tags:
-      - 'v*'
-      - 'c*'
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and validate packages without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm
+  cancel-in-progress: false
 
 jobs:
   release:
+    if: github.repository == 'zilliztech/claude-context' && (github.event_name != 'workflow_dispatch' || inputs.dry_run || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'pnpm'
-        
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-      
-    - name: Setup npm auth
-      run: |
-        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-      
-    - name: Build packages
-      run: pnpm build
-      
-    - name: Publish core package to npm
-      run: pnpm --filter @zilliz/claude-context-core publish --access public --no-git-checks
-        
-    - name: Publish mcp package to npm
-      run: pnpm --filter @zilliz/claude-context-mcp publish --access public --no-git-checks
-        
-    - name: Publish vscode extension
-      run: pnpm release:vscode
-      env:
-        VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        
-    
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11
+
+      - name: Validate release versions
+        id: release
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const version = require('./package.json').version;
+          for (const name of ['core', 'mcp']) {
+            if (require(`./packages/${name}/package.json`).version !== version) {
+              throw new Error(`The ${name} version must match the root version`);
+            }
+          }
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
+            throw new Error('The release tag must match the package version');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\ndist_tag=${version.includes('-') ? 'next' : 'latest'}\n`);
+          NODE
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: |
+          pnpm build:core
+          pnpm build:mcp
+
+      - name: Test packages
+        run: |
+          # Separate processes avoid tree-sitter native binding reuse across Jest suites.
+          pnpm --filter @zilliz/claude-context-core exec jest --listTests --runInBand > "$RUNNER_TEMP/core-tests.txt"
+          while IFS= read -r test_file; do
+            pnpm --filter @zilliz/claude-context-core exec jest --runInBand --runTestsByPath "$test_file"
+          done < "$RUNNER_TEMP/core-tests.txt"
+          pnpm --filter @zilliz/claude-context-mcp test
+
+      - name: Pack workspace dependencies into publishable archives
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-packages"
+          pnpm --filter @zilliz/claude-context-core pack --pack-destination "$RUNNER_TEMP/npm-packages"
+          pnpm --filter @zilliz/claude-context-mcp pack --pack-destination "$RUNNER_TEMP/npm-packages"
+
+      - name: Validate archives or publish Core, then MCP
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          for package in core mcp; do
+            archive="$RUNNER_TEMP/npm-packages/zilliz-claude-context-${package}-${VERSION}.tgz"
+            if [[ "$DRY_RUN" == true ]]; then
+              npm pack "$archive" --dry-run --ignore-scripts
+              continue
+            fi
+
+            url="https://registry.npmjs.org/@zilliz%2fclaude-context-${package}/${VERSION}"
+            status=$(curl --silent --show-error --retry 3 --output /dev/null --write-out '%{http_code}' "$url")
+            case "$status" in
+              200) echo "${package}@${VERSION} is already published"; continue ;;
+              404) npm publish "$archive" --access public --tag "$DIST_TAG" --ignore-scripts ;;
+              *) echo "Registry check failed with HTTP ${status}" >&2; exit 1 ;;
+            esac
+
+            # npm may accept an upload before the version is available to install.
+            for attempt in {1..30}; do
+              status=$(curl --silent --show-error --retry 3 --output /dev/null --write-out '%{http_code}' "$url")
+              case "$status" in
+                200) break ;;
+                404) sleep 10 ;;
+                *) echo "Registry check failed with HTTP ${status}" >&2; exit 1 ;;
+              esac
+            done
+            if [[ "$status" != 200 ]]; then
+              echo "${package}@${VERSION} is not available yet; retry this workflow after npm finishes processing" >&2
+              exit 1
+            fi
+          done
+
+      - name: Upload package archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages-${{ steps.release.outputs.version }}
+          path: ${{ runner.temp }}/npm-packages/*.tgz
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,70 @@
+name: Release VS Code extension
+
+on:
+  push:
+    tags:
+      - 'vscode-v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build a VSIX without publishing to the Marketplace
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-vscode
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'zilliztech/claude-context' && (github.event_name != 'workflow_dispatch' || inputs.dry_run || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Validate release tag
+        run: |
+          version=$(node -p "require('./packages/vscode-extension/package.json').version")
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "vscode-v${version}" ]]; then
+            echo 'The release tag must match the extension version' >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: |
+          pnpm build:core
+          pnpm --filter semanticcodesearch run webpack
+
+      - name: Package extension
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        run: pnpm --filter semanticcodesearch run package
+
+      - name: Publish extension
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+        run: pnpm --filter semanticcodesearch run release
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Upload VSIX
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: packages/vscode-extension/*.vsix
+          if-no-files-found: error
+          retention-days: 7
