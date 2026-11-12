@@ -8,6 +8,7 @@ import {
     EmbeddingVector,
     OpenAIEmbedding
 } from './embedding';
+import { Reranker } from './reranker';
 import {
     VectorDatabase,
     VectorDocument,
@@ -52,6 +53,14 @@ export class EmbeddingError extends Error {
         this.name = 'EmbeddingError';
     }
 }
+
+/**
+ * When a reranker is configured, semantic search retrieves this many times
+ * `topK` candidates from the vector database (capped at
+ * RERANK_MAX_CANDIDATES) and lets the reranker choose the final `topK`.
+ */
+const RERANK_CANDIDATE_MULTIPLIER = 3;
+const RERANK_MAX_CANDIDATES = 100;
 
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
@@ -121,6 +130,7 @@ export interface ContextConfig {
     embedding?: Embedding;
     vectorDatabase?: VectorDatabase;
     codeSplitter?: Splitter;
+    reranker?: Reranker; // Optional: rerank semantic search results
     supportedExtensions?: string[];
     ignorePatterns?: string[];
     customExtensions?: string[]; // New: custom extensions from MCP
@@ -134,6 +144,7 @@ export class Context {
     private embedding: Embedding;
     private vectorDatabase: VectorDatabase;
     private codeSplitter: Splitter;
+    private reranker?: Reranker;
     private supportedExtensions: string[];
     private baseIgnorePatterns: string[];
     private ignorePatterns: string[];
@@ -155,6 +166,7 @@ export class Context {
         this.vectorDatabase = config.vectorDatabase;
 
         this.codeSplitter = config.codeSplitter || new AstCodeSplitter(2500, 300);
+        this.reranker = config.reranker;
 
         // Load custom extensions from environment variables
         const envCustomExtensions = this.getCustomExtensionsFromEnv();
@@ -204,6 +216,13 @@ export class Context {
      */
     getVectorDatabase(): VectorDatabase {
         return this.vectorDatabase;
+    }
+
+    /**
+     * Get reranker instance, if one is configured
+     */
+    getReranker(): Reranker | undefined {
+        return this.reranker;
     }
 
     /**
@@ -522,7 +541,9 @@ export class Context {
     }
 
     /**
-     * Semantic search with unified implementation
+     * Semantic search with unified implementation.
+     * When a reranker is configured, a larger candidate pool is retrieved and
+     * reordered by the reranker before the top results are returned.
      * @param codebasePath Codebase path to search in
      * @param query Search query
      * @param topK Number of results to return
@@ -535,6 +556,8 @@ export class Context {
 
         const collectionName = this.getCollectionName(codebasePath);
         console.log(`[Context] 🔍 Using collection: ${collectionName}`);
+
+        const candidateLimit = this.getSearchCandidateLimit(topK);
 
         // Check if collection exists and has data
         const hasCollection = await this.vectorDatabase.hasCollection(collectionName);
@@ -564,13 +587,13 @@ export class Context {
                     data: queryEmbedding.vector,
                     anns_field: "vector",
                     param: { "nprobe": 10 },
-                    limit: topK
+                    limit: candidateLimit
                 },
                 {
                     data: query,
                     anns_field: "sparse_vector",
                     param: { "drop_ratio_search": 0.2 },
-                    limit: topK
+                    limit: candidateLimit
                 }
             ];
 
@@ -587,7 +610,7 @@ export class Context {
                         strategy: 'rrf',
                         params: { k: 100 }
                     },
-                    limit: topK,
+                    limit: candidateLimit,
                     filterExpr
                 }
             );
@@ -610,7 +633,7 @@ export class Context {
                 console.log(`[Context] 🔍 Top result score: ${dedupedResults[0].score}, path: ${dedupedResults[0].relativePath}`);
             }
 
-            return dedupedResults;
+            return await this.rerankResults(query, dedupedResults, topK);
         } else {
             // Regular semantic search
             // 1. Generate query vector
@@ -620,7 +643,7 @@ export class Context {
             const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(
                 collectionName,
                 queryEmbedding.vector,
-                { topK, threshold, filterExpr }
+                { topK: candidateLimit, threshold, filterExpr }
             );
 
             // 3. Convert to semantic search result format
@@ -635,7 +658,55 @@ export class Context {
 
             const dedupedResults = this.deduplicateResults(results);
             console.log(`[Context] ✅ Found ${results.length} results, ${dedupedResults.length} after dedup`);
-            return dedupedResults;
+            return await this.rerankResults(query, dedupedResults, topK);
+        }
+    }
+
+    /**
+     * Number of candidates to retrieve from the vector database for a search.
+     * Without a reranker this is just `topK`.
+     */
+    private getSearchCandidateLimit(topK: number): number {
+        if (!this.reranker) {
+            return topK;
+        }
+        return Math.max(topK, Math.min(topK * RERANK_CANDIDATE_MULTIPLIER, RERANK_MAX_CANDIDATES));
+    }
+
+    /**
+     * Reorder search results with the configured reranker and keep the top `topK`.
+     * Returns the results unchanged when no reranker is configured. If the
+     * reranker fails, falls back to the vector search order.
+     */
+    private async rerankResults(query: string, results: SemanticSearchResult[], topK: number): Promise<SemanticSearchResult[]> {
+        if (!this.reranker || results.length === 0) {
+            return results;
+        }
+
+        const reranker = this.reranker;
+        try {
+            const ranked = await reranker.rerank(query, results.map(result => result.content), topK);
+            const seen = new Set<number>();
+            const reranked: SemanticSearchResult[] = [];
+            for (const { index, score } of ranked) {
+                if (!Number.isInteger(index) || index < 0 || index >= results.length || seen.has(index)) {
+                    continue;
+                }
+                seen.add(index);
+                reranked.push({ ...results[index], score });
+                if (reranked.length >= topK) {
+                    break;
+                }
+            }
+            if (reranked.length === 0) {
+                throw new Error('reranker returned no usable results');
+            }
+            console.log(`[Context] ✅ Reranked ${results.length} candidates with ${reranker.getProvider()} (${reranker.getModel()}), returning ${reranked.length}`);
+            return reranked;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn(`[Context] ⚠️  Reranking with ${reranker.getProvider()} failed, using vector search order: ${message}`);
+            return results.slice(0, topK);
         }
     }
 
@@ -764,6 +835,15 @@ export class Context {
     updateSplitter(splitter: Splitter): void {
         this.codeSplitter = splitter;
         console.log(`[Context] 🔄 Updated splitter instance`);
+    }
+
+    /**
+     * Update or remove the reranker used by semantic search
+     * @param reranker New reranker instance, or undefined to disable reranking
+     */
+    updateReranker(reranker: Reranker | undefined): void {
+        this.reranker = reranker;
+        console.log(`[Context] 🔄 ${reranker ? `Updated reranker: ${reranker.getProvider()} (${reranker.getModel()})` : 'Disabled reranker'}`);
     }
 
     /**

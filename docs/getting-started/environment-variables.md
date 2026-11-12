@@ -56,6 +56,14 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 | `OLLAMA_MODEL`(alternative to `EMBEDDING_MODEL`) | Model name |  |
 
 
+### Reranker (Optional)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RERANKER_PROVIDER` | Rerank `search_code` results with this provider: `VoyageAI`. When unset, results are returned in vector search order as before | None |
+| `RERANKER_MODEL` | Reranker model name | `rerank-2.5` for VoyageAI |
+
+When a reranker is configured, `search_code` retrieves up to three times the requested number of candidates (at most 100) from the vector database, lets the reranker reorder them, and returns the top results with the reranker's relevance scores. The VoyageAI reranker uses `VOYAGEAI_API_KEY`, so it works with any embedding provider. If a rerank request fails, the search falls back to the vector search order and logs a warning. See `getSupportedModels` in [`voyageai-reranker.ts`](https://github.com/zilliztech/claude-context/blob/master/packages/core/src/reranker/voyageai-reranker.ts) for the known model names.
+
 ### Advanced Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|

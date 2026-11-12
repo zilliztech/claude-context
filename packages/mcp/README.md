@@ -175,6 +175,23 @@ You can set the embedding batch size to optimize the performance of the MCP serv
 EMBEDDING_BATCH_SIZE=512
 ```
 
+#### Search Reranker (Optional)
+
+You can rerank `search_code` results with a reranker model. The server retrieves up to three times the requested number of candidates (at most 100), the reranker reorders them by relevance to the query, and the top results are returned with the reranker's scores. When `RERANKER_PROVIDER` is not set, results are returned in vector search order as before.
+
+```bash
+# Supported providers: VoyageAI
+RERANKER_PROVIDER=VoyageAI
+
+# Required for the VoyageAI reranker, with any embedding provider
+VOYAGEAI_API_KEY=pa-your-voyageai-api-key
+
+# Optional: Specify reranker model (default: rerank-2.5)
+RERANKER_MODEL=rerank-2.5-lite
+```
+
+If a rerank request fails (for example, a rate limit), the search falls back to the vector search order and logs a warning.
+
 #### Custom File Processing (Optional)
 
 You can configure custom file extensions and ignore patterns globally via environment variables:
@@ -704,7 +721,7 @@ Index a codebase directory for hybrid search (BM25 + dense vector).
 
 ### 2. `search_code`
 
-Search the indexed codebase using natural language queries with hybrid search (BM25 + dense vector).
+Search the indexed codebase using natural language queries with hybrid search (BM25 + dense vector). When a [search reranker](#search-reranker-optional) is configured, results are reranked before they are returned.
 
 **Parameters:**
 
