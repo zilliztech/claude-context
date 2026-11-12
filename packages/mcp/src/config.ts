@@ -19,6 +19,9 @@ export interface ContextMcpConfig {
     ollamaModel?: string;
     ollamaHost?: string;
     ollamaDimension?: number;
+    // Optional reranker configuration (VoyageAI reuses voyageaiApiKey)
+    rerankerProvider?: string;
+    rerankerModel?: string;
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
@@ -159,6 +162,8 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   RERANKER_PROVIDER: ${envManager.get('RERANKER_PROVIDER') || 'NOT SET'}`);
+    console.log(`[DEBUG]   RERANKER_MODEL: ${envManager.get('RERANKER_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   CODE_CHUNKS_COLLECTION_NAME_OVERRIDE: ${envManager.get('CODE_CHUNKS_COLLECTION_NAME_OVERRIDE') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
@@ -181,6 +186,9 @@ export function createMcpConfig(): ContextMcpConfig {
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
         ollamaDimension: getPositiveIntegerFromEnv('EMBEDDING_DIMENSION'),
+        // Reranker configuration (optional; search is not reranked when unset)
+        rerankerProvider: envManager.get('RERANKER_PROVIDER')?.trim() || undefined,
+        rerankerModel: envManager.get('RERANKER_MODEL')?.trim() || undefined,
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN'),
@@ -231,6 +239,12 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             break;
     }
 
+    if (config.rerankerProvider) {
+        console.log(`[MCP]   Reranker: ${config.rerankerProvider}${config.rerankerModel ? ` (${config.rerankerModel})` : ''}`);
+    } else {
+        console.log(`[MCP]   Reranker: Disabled`);
+    }
+
     console.log(`[MCP] 🔧 Initializing server components...`);
 }
 
@@ -263,6 +277,12 @@ Environment Variables:
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
+
+  Reranker Configuration (optional):
+  RERANKER_PROVIDER       Rerank search_code results with this provider: VoyageAI
+                          (default: not set, results are not reranked).
+                          Uses VOYAGEAI_API_KEY with any embedding provider.
+  RERANKER_MODEL          Reranker model name (default: rerank-2.5 for VoyageAI)
   
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
@@ -311,6 +331,9 @@ Examples:
   
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with OpenAI embeddings and a VoyageAI reranker for search_code
+  OPENAI_API_KEY=sk-xxx RERANKER_PROVIDER=VoyageAI VOYAGEAI_API_KEY=pa-xxx MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
 
   # Start MCP server with a human-readable collection name override
   OPENAI_API_KEY=sk-xxx MILVUS_TOKEN=your-token CODE_CHUNKS_COLLECTION_NAME_OVERRIDE=my_project npx @zilliz/claude-context-mcp@latest
