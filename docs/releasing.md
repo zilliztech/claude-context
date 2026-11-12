@@ -3,8 +3,8 @@
 ## Core and MCP packages
 
 The `release.yml` workflow publishes Core first, waits for it to become available
-on npm, and then publishes MCP. It uses GitHub Actions OIDC trusted publishing;
-no `NPM_TOKEN`, local npm login, or per-release OTP is needed.
+on npm (up to ten minutes), and then publishes MCP. It uses GitHub Actions OIDC
+trusted publishing; no `NPM_TOKEN`, local npm login, or per-release OTP is needed.
 
 Configure a GitHub trusted publisher on **each** npm package:
 

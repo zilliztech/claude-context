@@ -104,11 +104,11 @@ jobs:
             esac
 
             # npm may accept an upload before the version is available to install.
-            for attempt in {1..30}; do
+            for attempt in {1..60}; do
               status=$(curl --silent --show-error --retry 3 --output /dev/null --write-out '%{http_code}' "$url")
               case "$status" in
                 200) break ;;
-                404) sleep 10 ;;
+                404) echo "${package}@${VERSION} is still processing (${attempt}/60)"; sleep 10 ;;
                 *) echo "Registry check failed with HTTP ${status}" >&2; exit 1 ;;
               esac
             done
