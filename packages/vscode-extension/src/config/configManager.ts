@@ -19,6 +19,9 @@ export type EmbeddingProviderConfig = {
 } | {
     provider: 'Gemini';
     config: GeminiEmbeddingConfig;
+} | {
+    provider: 'OpenRouter';
+    config: OpenAIEmbeddingConfig;
 };
 
 export type SplitterProviderConfig = {
@@ -102,6 +105,25 @@ const EMBEDDING_PROVIDERS = {
         ] as FieldDefinition[],
         defaultConfig: {
             model: 'gemini-embedding-001'
+        }
+    },
+    'OpenRouter': {
+        name: 'OpenRouter',
+        class: OpenAIEmbedding,
+        requiredFields: [
+            { name: 'model', type: 'string', description: 'Model name to use', inputType: 'select-with-custom', required: true },
+            { name: 'apiKey', type: 'string', description: 'OpenRouter API key', inputType: 'password', required: true }
+        ] as FieldDefinition[],
+        optionalFields: [] as FieldDefinition[],
+        defaultConfig: {
+            model: 'openai/text-embedding-3-small',
+            baseURL: 'https://openrouter.ai/api/v1'
+        },
+        models: {
+            'openai/text-embedding-3-small': {
+                dimension: 1536,
+                description: 'OpenRouter-hosted OpenAI text embedding model (recommended)'
+            }
         }
     }
 } as const;
@@ -205,7 +227,7 @@ export class ConfigManager {
         if (!configObject) return undefined;
 
         return {
-            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini',
+            provider: provider as 'OpenAI' | 'VoyageAI' | 'Ollama' | 'Gemini' | 'OpenRouter',
             config: configObject
         };
     }
@@ -274,8 +296,11 @@ export class ConfigManager {
         const result: any = {};
 
         for (const [providerKey, providerInfo] of Object.entries(EMBEDDING_PROVIDERS)) {
-            // Ollama doesn't have getSupportedModels since users input model names manually
-            const models = providerKey === 'Ollama' ? {} : (providerInfo.class as any).getSupportedModels();
+            // Ollama doesn't have getSupportedModels since users input model names manually.
+            // OpenRouter reuses OpenAIEmbedding internally, but its public model ids include the
+            // provider prefix, so expose the OpenRouter-specific default list when present.
+            const models = providerKey === 'Ollama' ? {} :
+                ('models' in providerInfo ? providerInfo.models : (providerInfo.class as any).getSupportedModels());
 
             result[providerKey] = {
                 name: providerInfo.name,
