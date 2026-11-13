@@ -4,7 +4,7 @@ import { SearchCommand } from '../commands/searchCommand';
 import { IndexCommand } from '../commands/indexCommand';
 import { SyncCommand } from '../commands/syncCommand';
 import { ConfigManager, EmbeddingProviderConfig } from '../config/configManager';
-import * as path from 'path';
+import { resolveWorkspaceFilePath } from './pathUtils';
 
 export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'semanticSearchView';
@@ -130,7 +130,13 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         try {
                             const workspaceFolders = vscode.workspace.workspaceFolders;
                             const workspaceRoot = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
-                            const absPath = path.join(workspaceRoot, message.relativePath);
+                            const absPath = resolveWorkspaceFilePath(workspaceRoot, message.relativePath);
+
+                            if (!absPath) {
+                                vscode.window.showErrorMessage(`Cannot open file outside the workspace: ${message.relativePath || ''}`);
+                                return;
+                            }
+
                             const uri = vscode.Uri.file(absPath);
                             const document = await vscode.workspace.openTextDocument(uri);
                             const editor = await vscode.window.showTextDocument(document);
