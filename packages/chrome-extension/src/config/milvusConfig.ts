@@ -22,9 +22,9 @@ export class MilvusConfigManager {
      */
     static async getMilvusConfig(): Promise<MilvusConfig | null> {
         return new Promise((resolve) => {
-            chrome.storage.sync.get([
+            chrome.storage.local.get([
                 'milvusAddress',
-                'milvusToken', 
+                'milvusToken',
                 'milvusUsername',
                 'milvusPassword',
                 'milvusDatabase'
@@ -36,7 +36,55 @@ export class MilvusConfigManager {
                 }
 
                 if (!items.milvusAddress) {
-                    resolve(null);
+                    chrome.storage.sync.get([
+                        'milvusAddress',
+                        'milvusToken',
+                        'milvusUsername',
+                        'milvusPassword',
+                        'milvusDatabase'
+                    ], (syncItems: ChromeStorageConfig) => {
+                        if (chrome.runtime.lastError) {
+                            console.error('Error loading Milvus config:', chrome.runtime.lastError);
+                            resolve(null);
+                            return;
+                        }
+
+                        if (!syncItems.milvusAddress) {
+                            resolve(null);
+                            return;
+                        }
+
+                        chrome.storage.local.set({
+                            milvusAddress: syncItems.milvusAddress,
+                            milvusToken: syncItems.milvusToken,
+                            milvusUsername: syncItems.milvusUsername,
+                            milvusPassword: syncItems.milvusPassword,
+                            milvusDatabase: syncItems.milvusDatabase || 'default'
+                        }, () => {
+                            if (chrome.runtime.lastError) {
+                                console.error('Error migrating Milvus config:', chrome.runtime.lastError);
+                                return;
+                            }
+
+                            chrome.storage.sync.remove([
+                                'milvusAddress',
+                                'milvusToken',
+                                'milvusUsername',
+                                'milvusPassword',
+                                'milvusDatabase'
+                            ]);
+                        });
+
+                        const config: MilvusConfig = {
+                            address: syncItems.milvusAddress,
+                            token: syncItems.milvusToken,
+                            username: syncItems.milvusUsername,
+                            password: syncItems.milvusPassword,
+                            database: syncItems.milvusDatabase || 'default'
+                        };
+
+                        resolve(config);
+                    });
                     return;
                 }
 
@@ -58,7 +106,7 @@ export class MilvusConfigManager {
      */
     static async saveMilvusConfig(config: MilvusConfig): Promise<void> {
         return new Promise((resolve, reject) => {
-            chrome.storage.sync.set({
+            chrome.storage.local.set({
                 milvusAddress: config.address,
                 milvusToken: config.token,
                 milvusUsername: config.username,
@@ -68,7 +116,15 @@ export class MilvusConfigManager {
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
                 } else {
-                    resolve();
+                    chrome.storage.sync.remove([
+                        'milvusAddress',
+                        'milvusToken',
+                        'milvusUsername',
+                        'milvusPassword',
+                        'milvusDatabase'
+                    ], () => {
+                        resolve();
+                    });
                 }
             });
         });
@@ -79,9 +135,32 @@ export class MilvusConfigManager {
      */
     static async getOpenAIConfig(): Promise<{ apiKey: string; model: string } | null> {
         return new Promise((resolve) => {
-            chrome.storage.sync.get(['openaiToken'], (items: ChromeStorageConfig) => {
-                if (chrome.runtime.lastError || !items.openaiToken) {
+            chrome.storage.local.get(['openaiToken'], (items: ChromeStorageConfig) => {
+                if (chrome.runtime.lastError) {
                     resolve(null);
+                    return;
+                }
+
+                if (!items.openaiToken) {
+                    chrome.storage.sync.get(['openaiToken'], (syncItems: ChromeStorageConfig) => {
+                        if (chrome.runtime.lastError || !syncItems.openaiToken) {
+                            resolve(null);
+                            return;
+                        }
+
+                        chrome.storage.local.set({ openaiToken: syncItems.openaiToken }, () => {
+                            if (chrome.runtime.lastError) {
+                                return;
+                            }
+
+                            chrome.storage.sync.remove(['openaiToken']);
+                        });
+
+                        resolve({
+                            apiKey: syncItems.openaiToken,
+                            model: 'text-embedding-3-small' // Default model
+                        });
+                    });
                     return;
                 }
 
