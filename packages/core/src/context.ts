@@ -504,8 +504,8 @@ export class Context {
     }
 
     private async deleteFileChunks(collectionName: string, relativePath: string): Promise<void> {
-        // Escape backslashes for Milvus query expression (Windows path compatibility)
-        const escapedPath = relativePath.replace(/\\/g, '\\\\');
+        // Escape backslashes (Windows paths) and double quotes, which would otherwise end the string literal
+        const escapedPath = relativePath.replace(/[\\"]/g, '\\$&');
         const results = await this.vectorDatabase.query(
             collectionName,
             `relativePath == "${escapedPath}"`,
