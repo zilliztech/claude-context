@@ -191,6 +191,13 @@ export class FileSynchronizer {
         return this.fileHashes.get(filePath);
     }
 
+    /**
+     * Number of files tracked by the latest scan (supported, non-ignored files).
+     */
+    public getFileCount(): number {
+        return this.fileHashes.size;
+    }
+
     private async saveSnapshot(): Promise<void> {
         const merkleDir = path.dirname(this.snapshotPath);
         await fs.mkdir(merkleDir, { recursive: true });
