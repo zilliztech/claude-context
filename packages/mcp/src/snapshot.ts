@@ -12,13 +12,38 @@ import {
     CodebaseInfoIndexFailed
 } from "./config.js";
 
+/** Whether two snapshot entries hold the same values, in any key order. */
+function isSameInfo(a: CodebaseInfo, b: CodebaseInfo): boolean {
+    const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort();
+    return JSON.stringify(a, keys) === JSON.stringify(b, keys);
+}
+
+// Delay before retrying a save that could not lock or write the snapshot file,
+// doubled after each further failure up to the maximum.
+const SAVE_RETRY_MIN_DELAY_MS = 1000;
+const SAVE_RETRY_MAX_DELAY_MS = 60_000;
+
 export class SnapshotManager {
     private snapshotFilePath: string;
     private indexedCodebases: string[] = [];
     private indexingCodebases: Map<string, number> = new Map(); // Map of codebase path to progress percentage
     private codebaseFileCount: Map<string, number> = new Map(); // Map of codebase path to indexed file count
     private codebaseInfoMap: Map<string, CodebaseInfo> = new Map(); // Map of codebase path to complete info
-    private recentlyRemoved: Set<string> = new Set(); // Tracks codebases removed since last save
+    // Codebases this process set or removed and has not settled on disk yet. Every
+    // MCP server process shares the snapshot file, so a save writes only these
+    // entries and keeps all others as they are on disk, and reading the file never
+    // replaces them: a removed codebase stays removed even while the file lists it.
+    // A save settles them, except an index this process is running.
+    private pendingChanges: Set<string> = new Set();
+    // The loader's cleanups among the pending changes (an interrupted index marked
+    // failed, a deleted codebase removed), each with the entry it replaces. Another
+    // process may save that entry after the load read it, e.g. complete the index, so
+    // a cleanup applies only while the file still holds the entry it replaces.
+    private loadCleanups: Map<string, CodebaseInfo> = new Map();
+    // A save that cannot lock or write the file keeps its changes pending and
+    // retries from this timer, which does not keep the process alive.
+    private saveRetryTimer: ReturnType<typeof setTimeout> | undefined;
+    private saveRetryDelayMs = SAVE_RETRY_MIN_DELAY_MS;
 
     constructor() {
         // Initialize snapshot file path
@@ -40,13 +65,15 @@ export class SnapshotManager {
 
         // Validate that the codebases still exist
         const validCodebases: string[] = [];
+        // Removals to save, recorded once the whole snapshot is loaded
+        const removedCodebases: string[] = [];
         for (const codebasePath of snapshot.indexedCodebases) {
             if (fs.existsSync(codebasePath)) {
                 validCodebases.push(codebasePath);
                 console.log(`[SNAPSHOT-DEBUG] Validated codebase: ${codebasePath}`);
             } else {
                 console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
-                this.recentlyRemoved.add(codebasePath);
+                removedCodebases.push(codebasePath);
             }
         }
 
@@ -68,7 +95,7 @@ export class SnapshotManager {
                 // Don't add to validIndexingCodebases - treat as not indexed
             } else {
                 console.warn(`[SNAPSHOT-DEBUG] Interrupted indexing codebase no longer exists: ${codebasePath}`);
-                this.recentlyRemoved.add(codebasePath);
+                removedCodebases.push(codebasePath);
             }
         }
 
@@ -90,6 +117,7 @@ export class SnapshotManager {
             };
             this.codebaseInfoMap.set(codebasePath, info);
         }
+        removedCodebases.forEach(codebasePath => this.pendingChanges.add(codebasePath));
     }
 
     /**
@@ -102,11 +130,13 @@ export class SnapshotManager {
         const validIndexingCodebases = new Map<string, number>();
         const validFileCount = new Map<string, number>();
         const validCodebaseInfoMap = new Map<string, CodebaseInfo>();
+        // Cleanups to save, with the entry each replaces, recorded once the whole snapshot is loaded
+        const cleanups = new Map<string, CodebaseInfo>();
 
         for (const [codebasePath, info] of Object.entries(snapshot.codebases)) {
             if (!fs.existsSync(codebasePath)) {
                 console.warn(`[SNAPSHOT-DEBUG] Codebase no longer exists, removing: ${codebasePath}`);
-                this.recentlyRemoved.add(codebasePath);
+                cleanups.set(codebasePath, info);
                 continue;
             }
 
@@ -129,6 +159,7 @@ export class SnapshotManager {
                     lastUpdated: new Date().toISOString()
                 };
                 validCodebaseInfoMap.set(codebasePath, failedInfo);
+                cleanups.set(codebasePath, info);
             } else if (info.status === 'indexfailed') {
                 console.warn(`[SNAPSHOT-DEBUG] Found failed indexing codebase: ${codebasePath}. Error: ${info.errorMessage}`);
                 // Failed indexing codebases are not added to indexed or indexing lists
@@ -141,6 +172,10 @@ export class SnapshotManager {
         this.indexingCodebases = new Map(); // Reset indexing codebases since they were interrupted
         this.codebaseFileCount = validFileCount;
         this.codebaseInfoMap = validCodebaseInfoMap;
+        for (const [codebasePath, info] of cleanups) {
+            this.pendingChanges.add(codebasePath);
+            this.loadCleanups.set(codebasePath, info);
+        }
     }
 
     public getIndexedCodebases(): string[] {
@@ -251,6 +286,7 @@ export class SnapshotManager {
     }
 
     public findTrackedCodebasePath(codebasePath: string): string | undefined {
+        this.refreshFromDisk();
         return this.findBestMatchingCodebasePath(codebasePath, Array.from(this.codebaseInfoMap.keys()));
     }
 
@@ -308,7 +344,7 @@ export class SnapshotManager {
             indexingPercentage: progress,
             lastUpdated: new Date().toISOString()
         };
-        this.codebaseInfoMap.set(codebasePath, info);
+        this.setInfo(codebasePath, info);
     }
 
     /**
@@ -324,7 +360,7 @@ export class SnapshotManager {
                 indexingPercentage: progress,
                 lastUpdated: new Date().toISOString()
             };
-            this.codebaseInfoMap.set(codebasePath, info);
+            this.setInfo(codebasePath, info);
         }
     }
 
@@ -334,7 +370,7 @@ export class SnapshotManager {
     public removeIndexingCodebase(codebasePath: string): void {
         this.indexingCodebases.delete(codebasePath);
         // Also remove from codebaseInfoMap for v2 compatibility
-        this.codebaseInfoMap.delete(codebasePath);
+        this.deleteInfo(codebasePath);
     }
 
     /**
@@ -356,7 +392,7 @@ export class SnapshotManager {
             indexStatus: 'completed',
             lastUpdated: new Date().toISOString()
         };
-        this.codebaseInfoMap.set(codebasePath, info);
+        this.setInfo(codebasePath, info);
     }
 
     /**
@@ -366,7 +402,7 @@ export class SnapshotManager {
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
         this.codebaseFileCount.delete(codebasePath);
         // Also remove from codebaseInfoMap for v2 compatibility
-        this.codebaseInfoMap.delete(codebasePath);
+        this.deleteInfo(codebasePath);
     }
 
     /**
@@ -410,7 +446,7 @@ export class SnapshotManager {
             ...resolvedIndexOptions,
             lastUpdated: new Date().toISOString()
         };
-        this.codebaseInfoMap.set(codebasePath, info);
+        this.setInfo(codebasePath, info);
     }
 
     /**
@@ -452,16 +488,19 @@ export class SnapshotManager {
             ...resolvedIndexOptions,
             lastUpdated: new Date().toISOString()
         };
-        this.codebaseInfoMap.set(codebasePath, info);
+        this.setInfo(codebasePath, info);
     }
 
     /**
      * Refresh the stats of an indexed codebase after an incremental sync.
-     * Memory always takes the new stats. On disk, only this entry is patched,
+     * Memory takes the new stats at once. On disk, only this entry is patched,
      * under the snapshot lock, and only while no other process has replaced it
      * since `expected` was read: it must still be indexed and not be newer than
-     * `expected`. Unlike saveCodebaseSnapshot(), no other entry is rewritten, so
-     * this cannot undo another process's clear or re-index.
+     * `expected`. The stats are not left to saveCodebaseSnapshot(), which writes
+     * pending changes without that check, so this cannot undo another process's
+     * clear or re-index; stats that are not written give way to the file at its
+     * next read. A change to the entry that was already pending stays pending,
+     * and the next save writes it with the new stats.
      * @returns Whether the entry on disk was updated
      */
     public updateIndexedStats(
@@ -469,7 +508,11 @@ export class SnapshotManager {
         expected: CodebaseInfoIndexed,
         stats: { indexedFiles: number; totalChunks: number }
     ): boolean {
+        const wasPending = this.pendingChanges.has(codebasePath);
         this.setCodebaseIndexed(codebasePath, { ...stats, status: expected.indexStatus });
+        if (!wasPending) {
+            this.pendingChanges.delete(codebasePath);
+        }
         const updated = this.codebaseInfoMap.get(codebasePath);
         if (updated === expected || updated?.status !== 'indexed') {
             return false; // setCodebaseIndexed() refused the stats
@@ -536,22 +579,24 @@ export class SnapshotManager {
             ...resolvedIndexOptions,
             lastUpdated: new Date().toISOString()
         };
-        this.codebaseInfoMap.set(codebasePath, info);
+        this.setInfo(codebasePath, info);
     }
 
     /**
      * Get codebase status
      */
     public getCodebaseStatus(codebasePath: string): 'indexed' | 'indexing' | 'indexfailed' | 'not_found' {
-        const info = this.codebaseInfoMap.get(codebasePath);
+        const info = this.getCodebaseInfo(codebasePath);
         if (!info) return 'not_found';
         return info.status;
     }
 
     /**
-     * Get complete codebase information
+     * Get complete codebase information, including changes other MCP processes
+     * saved. The object stays the same while the entry does not change.
      */
     public getCodebaseInfo(codebasePath: string): CodebaseInfo | undefined {
+        this.refreshFromDisk();
         return this.codebaseInfoMap.get(codebasePath);
     }
 
@@ -559,6 +604,7 @@ export class SnapshotManager {
      * Get all failed codebases
      */
     public getFailedCodebases(): string[] {
+        this.refreshFromDisk();
         return Array.from(this.codebaseInfoMap.entries())
             .filter(([_, info]) => info.status === 'indexfailed')
             .map(([path, _]) => path);
@@ -572,10 +618,8 @@ export class SnapshotManager {
         this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
         this.indexingCodebases.delete(codebasePath);
         this.codebaseFileCount.delete(codebasePath);
-        this.codebaseInfoMap.delete(codebasePath);
-
-        // Track removal so mergeExternalEntry won't re-add it from disk
-        this.recentlyRemoved.add(codebasePath);
+        // Recorded as a change, so reading the file does not bring it back before the save
+        this.deleteInfo(codebasePath);
 
         console.log(`[SNAPSHOT-DEBUG] Completely removed codebase from snapshot: ${codebasePath}`);
     }
@@ -600,7 +644,9 @@ export class SnapshotManager {
                 this.loadV1Format(snapshot);
             }
 
-            // Always save in v2 format after loading (migration)
+            // Always save in v2 format after loading (migration). The read above is not
+            // locked, so another process may save first; the save then keeps its entries
+            // over the cleanups above (see loadCleanups).
             this.saveCodebaseSnapshot();
 
         } catch (error: any) {
@@ -611,6 +657,10 @@ export class SnapshotManager {
 
     private acquireLock(maxRetries = 5, retryInterval = 100): boolean {
         const lockPath = this.snapshotFilePath + '.lock';
+        try {
+            // The lock sits next to the snapshot file, whose directory a new home lacks
+            fs.mkdirSync(path.dirname(this.snapshotFilePath), { recursive: true });
+        } catch { /* taking the lock below fails then */ }
         for (let i = 0; i < maxRetries; i++) {
             try {
                 fs.mkdirSync(lockPath);
@@ -638,21 +688,102 @@ export class SnapshotManager {
         } catch { /* already released */ }
     }
 
-    private mergeExternalEntry(codebasePath: string, info: CodebaseInfo): void {
-        if (this.codebaseInfoMap.has(codebasePath)) return; // we already know about it
-        if (this.recentlyRemoved.has(codebasePath)) return; // explicitly removed, don't re-add from disk
+    /** Set an entry as a change of this process, for the next save to write. */
+    private setInfo(codebasePath: string, info: CodebaseInfo): void {
         this.codebaseInfoMap.set(codebasePath, info);
-        if (info.status === 'indexed') {
-            if (!this.indexedCodebases.includes(codebasePath)) {
-                this.indexedCodebases.push(codebasePath);
+        this.pendingChanges.add(codebasePath);
+        this.loadCleanups.delete(codebasePath);
+    }
+
+    /** Remove an entry as a change of this process, for the next save to write. */
+    private deleteInfo(codebasePath: string): void {
+        this.codebaseInfoMap.delete(codebasePath);
+        this.pendingChanges.add(codebasePath);
+        this.loadCleanups.delete(codebasePath);
+    }
+
+    /**
+     * Read the entries of the snapshot file: none when there is no file, and
+     * undefined when it cannot be read or is not in v2 format.
+     */
+    private readDiskEntries(): Record<string, CodebaseInfo> | undefined {
+        try {
+            if (!fs.existsSync(this.snapshotFilePath)) {
+                return {};
             }
+            const snapshot = JSON.parse(fs.readFileSync(this.snapshotFilePath, 'utf8'));
+            if (this.isV2Format(snapshot) && snapshot.codebases && typeof snapshot.codebases === 'object') {
+                return snapshot.codebases;
+            }
+        } catch (error) {
+            console.warn('[SNAPSHOT-DEBUG] Error reading the snapshot file:', error);
+        }
+        return undefined;
+    }
+
+    /**
+     * Pick up what other MCP processes saved. Keeps the current state when the
+     * file cannot be read, e.g. while another process is writing it.
+     */
+    private refreshFromDisk(): void {
+        const diskEntries = this.readDiskEntries();
+        if (diskEntries) {
+            this.adoptDiskEntries(diskEntries);
+        }
+    }
+
+    /**
+     * Drop the loader's cleanups of entries that another process saved since the
+     * load read them: its entry is newer, e.g. an index it completed or resumed.
+     */
+    private dropOutdatedCleanups(diskEntries: Record<string, CodebaseInfo>): void {
+        for (const [codebasePath, loadedInfo] of this.loadCleanups) {
+            const diskInfo = diskEntries[codebasePath];
+            if (!diskInfo || typeof diskInfo !== 'object' || !isSameInfo(diskInfo, loadedInfo)) {
+                this.loadCleanups.delete(codebasePath);
+                this.pendingChanges.delete(codebasePath);
+            }
+        }
+    }
+
+    /**
+     * Take every entry from the snapshot file except this process's pending
+     * changes. An entry whose values did not change keeps its object, since
+     * callers compare these objects to detect state changes. Malformed entries
+     * are ignored.
+     */
+    private adoptDiskEntries(diskEntries: Record<string, CodebaseInfo>): void {
+        this.dropOutdatedCleanups(diskEntries);
+        const entries = new Map(Object.entries(diskEntries)
+            .filter(([, info]) => info !== null && typeof info === 'object'));
+        for (const codebasePath of Array.from(this.codebaseInfoMap.keys())) {
+            if (!entries.has(codebasePath) && !this.pendingChanges.has(codebasePath)) {
+                this.codebaseInfoMap.delete(codebasePath);
+                this.updateDerivedState(codebasePath, undefined);
+            }
+        }
+        for (const [codebasePath, diskInfo] of entries) {
+            const info = this.codebaseInfoMap.get(codebasePath);
+            if (this.pendingChanges.has(codebasePath) || (info && isSameInfo(info, diskInfo))) {
+                continue;
+            }
+            this.codebaseInfoMap.set(codebasePath, diskInfo);
+            this.updateDerivedState(codebasePath, diskInfo);
+        }
+    }
+
+    /** Keep the indexed, indexing and file count lists in line with an entry taken from disk. */
+    private updateDerivedState(codebasePath: string, info: CodebaseInfo | undefined): void {
+        this.indexedCodebases = this.indexedCodebases.filter(path => path !== codebasePath);
+        this.indexingCodebases.delete(codebasePath);
+        this.codebaseFileCount.delete(codebasePath);
+        if (info?.status === 'indexed') {
+            this.indexedCodebases.push(codebasePath);
             if (info.indexedFiles !== undefined) {
                 this.codebaseFileCount.set(codebasePath, info.indexedFiles);
             }
-        } else if (info.status === 'indexing') {
-            if (!this.indexingCodebases.has(codebasePath)) {
-                this.indexingCodebases.set(codebasePath, info.indexingPercentage || 0);
-            }
+        } else if (info?.status === 'indexing') {
+            this.indexingCodebases.set(codebasePath, info.indexingPercentage || 0);
         }
         // indexfailed entries only need codebaseInfoMap, no extra list
     }
@@ -660,40 +791,36 @@ export class SnapshotManager {
     public saveCodebaseSnapshot(): void {
         console.log('[SNAPSHOT-DEBUG] Saving codebase snapshot to:', this.snapshotFilePath);
 
-        const locked = this.acquireLock();
-        if (!locked) {
-            console.warn('[SNAPSHOT-DEBUG] Failed to acquire lock, saving without lock');
+        // Never write without the lock: another process could save between this
+        // save's read and its write, and one of the two would lose its changes.
+        // They stay pending instead, for a retry or the next save to write.
+        if (!this.acquireLock()) {
+            console.warn('[SNAPSHOT-DEBUG] Failed to acquire lock, keeping the changes for a later save');
+            this.scheduleSaveRetry();
+            return;
         }
 
         try {
-            // Ensure directory exists
-            const snapshotDir = path.dirname(this.snapshotFilePath);
-            if (!fs.existsSync(snapshotDir)) {
-                fs.mkdirSync(snapshotDir, { recursive: true });
-                console.log('[SNAPSHOT-DEBUG] Created snapshot directory:', snapshotDir);
-            }
-
-            // Read-merge: merge entries from disk that we don't have in memory
-            try {
-                if (fs.existsSync(this.snapshotFilePath)) {
-                    const diskData = fs.readFileSync(this.snapshotFilePath, 'utf8');
-                    const diskSnapshot = JSON.parse(diskData);
-                    if (this.isV2Format(diskSnapshot)) {
-                        for (const [diskPath, diskInfo] of Object.entries(diskSnapshot.codebases)) {
-                            this.mergeExternalEntry(diskPath, diskInfo as CodebaseInfo);
-                        }
+            // Other MCP processes save to this file too. Write only this process's
+            // pending changes and keep all other entries as they are on disk, so an
+            // entry this process loaded and did not touch never reverts another
+            // process's clear or re-index. A file that cannot be read, or is still in
+            // v1 format, is replaced with this process's state.
+            const diskEntries = this.readDiskEntries();
+            let codebases: Record<string, CodebaseInfo>;
+            if (diskEntries) {
+                this.dropOutdatedCleanups(diskEntries);
+                codebases = diskEntries;
+                for (const codebasePath of this.pendingChanges) {
+                    const info = this.codebaseInfoMap.get(codebasePath);
+                    if (info) {
+                        codebases[codebasePath] = info;
+                    } else {
+                        delete codebases[codebasePath];
                     }
                 }
-            } catch (mergeError) {
-                console.warn('[SNAPSHOT-DEBUG] Error reading disk snapshot for merge, continuing with in-memory state:', mergeError);
-            }
-
-            // Build v2 format snapshot using the complete info map
-            const codebases: Record<string, CodebaseInfo> = {};
-
-            // Add all codebases from the info map
-            for (const [codebasePath, info] of this.codebaseInfoMap) {
-                codebases[codebasePath] = info;
+            } else {
+                codebases = Object.fromEntries(this.codebaseInfoMap);
             }
 
             const snapshot: CodebaseSnapshotV2 = {
@@ -703,22 +830,64 @@ export class SnapshotManager {
             };
 
             fs.writeFileSync(this.snapshotFilePath, JSON.stringify(snapshot, null, 2));
+            this.cancelSaveRetry();
 
-            // Clear recently removed set after successful save
-            this.recentlyRemoved.clear();
+            // The changes are on disk now. An index this process runs stays pending
+            // until it ends: reading the file never replaces its progress, and every
+            // save writes it back, e.g. after a starting process marked it interrupted.
+            this.loadCleanups.clear();
+            for (const codebasePath of this.pendingChanges) {
+                if (this.codebaseInfoMap.get(codebasePath)?.status !== 'indexing') {
+                    this.pendingChanges.delete(codebasePath);
+                }
+            }
+            // Take on what other processes saved meanwhile.
+            this.adoptDiskEntries(codebases);
 
             const indexedCount = this.indexedCodebases.length;
             const indexingCount = this.indexingCodebases.size;
-            const failedCount = this.getFailedCodebases().length;
+            const failedCount = Array.from(this.codebaseInfoMap.values())
+                .filter(info => info.status === 'indexfailed').length;
 
             console.log(`[SNAPSHOT-DEBUG] Snapshot saved successfully in v2 format. Indexed: ${indexedCount}, Indexing: ${indexingCount}, Failed: ${failedCount}`);
 
         } catch (error: any) {
             console.error('[SNAPSHOT-DEBUG] Error saving snapshot:', error);
+            this.scheduleSaveRetry();
         } finally {
-            if (locked) {
-                this.releaseLock();
-            }
+            this.releaseLock();
         }
+    }
+
+    /**
+     * Save now if an earlier save failed and its retry is still waiting, e.g.
+     * before the process exits, since the retry timer does not keep the process
+     * alive. Does nothing otherwise.
+     */
+    public flushDeferredSave(): void {
+        if (this.saveRetryTimer) {
+            this.saveCodebaseSnapshot();
+        }
+    }
+
+    /** Retry a failed save later, waiting longer while saves keep failing. */
+    private scheduleSaveRetry(): void {
+        if (this.saveRetryTimer) {
+            return;
+        }
+        const delay = this.saveRetryDelayMs;
+        this.saveRetryDelayMs = Math.min(delay * 2, SAVE_RETRY_MAX_DELAY_MS);
+        this.saveRetryTimer = setTimeout(() => {
+            this.saveRetryTimer = undefined;
+            this.saveCodebaseSnapshot();
+        }, delay);
+        this.saveRetryTimer.unref();
+    }
+
+    /** A save went through, so no retry is needed. */
+    private cancelSaveRetry(): void {
+        clearTimeout(this.saveRetryTimer);
+        this.saveRetryTimer = undefined;
+        this.saveRetryDelayMs = SAVE_RETRY_MIN_DELAY_MS;
     }
 }

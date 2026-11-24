@@ -143,18 +143,11 @@ test("recovery adopts an existing collection with no local snapshot", async t =>
 
 test("stale indexing imported from another process does not block recovery", async t => {
     await withFixture(t, async (codebasePath, localSnapshot) => {
+        // The other process saved its progress, then exited before finishing.
         const ownerSnapshot = new SnapshotManager();
         ownerSnapshot.setCodebaseIndexing(codebasePath, 25);
         ownerSnapshot.saveCodebaseSnapshot();
-        localSnapshot.saveCodebaseSnapshot(); // Imports the other process's progress.
-
-        ownerSnapshot.setCodebaseIndexed(codebasePath, {
-            indexedFiles: 12, totalChunks: 24, status: "completed"
-        });
-        ownerSnapshot.saveCodebaseSnapshot();
         assert.equal(localSnapshot.getCodebaseStatus(codebasePath), "indexing");
-        assert.deepEqual(localSnapshot.getIndexedCodebases(), [codebasePath]);
-        localSnapshot.saveCodebaseSnapshot(); // Reproduces the existing stale writeback.
         assert.deepEqual(localSnapshot.getIndexedCodebases(), []);
 
         const harness = createHarness(codebasePath, localSnapshot);

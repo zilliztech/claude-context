@@ -177,9 +177,10 @@ export class SyncManager {
                 console.warn(`[SYNC-DEBUG] Failed to read the row count for '${codebasePath}':`, error);
             }
 
-            // clear_index or a forced re-index in this process replaces the entry; never
-            // resurrect or overwrite a state that changed while the sync awaited I/O.
-            // updateIndexedStats() runs the same check against other processes' writes.
+            // clear_index or a forced re-index, here or saved by another process, replaces
+            // the entry; never resurrect or overwrite a state that changed while the sync
+            // awaited I/O. updateIndexedStats() checks other processes' writes again
+            // under the snapshot lock.
             const info = this.snapshotManager.getCodebaseInfo(codebasePath);
             if (info !== infoBeforeSync || info?.status !== 'indexed') {
                 console.log(`[SYNC-DEBUG] Snapshot entry for '${codebasePath}' changed during sync. Skipping stats refresh.`);
@@ -199,8 +200,8 @@ export class SyncManager {
                 return;
             }
 
-            // Not saveCodebaseSnapshot(): it rewrites every entry from this process's
-            // memory, which would undo other processes' clears and re-indexes.
+            // Not saveCodebaseSnapshot(): it would write this entry without checking
+            // whether another process cleared or re-indexed it during the sync.
             const written = this.snapshotManager.updateIndexedStats(codebasePath, info, { indexedFiles, totalChunks });
             console.log(`[SYNC] Updated stats for '${codebasePath}': ${indexedFiles} files, ${totalChunks} chunks${written ? '' : ' (not written to disk)'}`);
         } catch (error) {

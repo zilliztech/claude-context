@@ -79,6 +79,9 @@ class ContextMcpServer {
 
         // Load existing codebase snapshot on startup
         this.snapshotManager.loadCodebaseSnapshot();
+        // A save that could not lock the snapshot file waits for a retry that does
+        // not keep the process alive, so write it before the process exits.
+        process.on('exit', () => this.snapshotManager.flushDeferredSave());
 
         this.setupTools();
     }
