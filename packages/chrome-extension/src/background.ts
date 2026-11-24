@@ -190,7 +190,8 @@ function splitCode(content: string, language: string = '', chunkSize: number = 1
             );
 
             const newStartLine = startLine + currentChunk.length - overlapLines;
-            currentChunk = currentChunk.slice(-overlapLines);
+            // slice(-0) would keep every line, so the chunk would never be emptied
+            currentChunk = overlapLines > 0 ? currentChunk.slice(-overlapLines) : [];
             currentSize = currentChunk.join('\n').length;
             startLine = newStartLine;
         }
