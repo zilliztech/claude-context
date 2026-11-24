@@ -3,7 +3,7 @@ import * as os from "os";
 import * as path from "path";
 import { Context, FileSynchronizer, envManager } from "@zilliz/claude-context-core";
 import { SnapshotManager } from "./snapshot.js";
-import type { RequestSplitterType } from "./config.js";
+import type { CodebaseInfo, RequestSplitterType } from "./config.js";
 import { createRequestSplitter, resolveRequestSplitterType } from "./splitter.js";
 
 const DEFAULT_INITIAL_SYNC_DELAY_MS = 5_000;
@@ -156,6 +156,59 @@ export class SyncManager {
         }
     }
 
+    /**
+     * reindexByChange() reports only how many files changed, so the snapshot
+     * stats from the last full index go stale after a sync that changed files.
+     * Recompute them: files from the synchronizer, chunks from the vector
+     * database. A value that cannot be determined keeps its previous value.
+     * Only this codebase's entry is written to disk, so other MCP processes'
+     * entries are left alone. Never throws, so a failed refresh cannot fail
+     * the sync itself.
+     */
+    private async refreshIndexedStats(codebasePath: string, infoBeforeSync: CodebaseInfo | undefined): Promise<void> {
+        try {
+            const collectionName = this.context.getCollectionName(codebasePath);
+            const fileCount = this.context.getSynchronizers().get(collectionName)?.getFileCount();
+
+            let rowCount = -1;
+            try {
+                rowCount = await this.context.getVectorDatabase().getCollectionRowCount(collectionName);
+            } catch (error) {
+                console.warn(`[SYNC-DEBUG] Failed to read the row count for '${codebasePath}':`, error);
+            }
+
+            // clear_index or a forced re-index, here or saved by another process, replaces
+            // the entry; never resurrect or overwrite a state that changed while the sync
+            // awaited I/O. updateIndexedStats() checks other processes' writes again
+            // under the snapshot lock.
+            const info = this.snapshotManager.getCodebaseInfo(codebasePath);
+            if (info !== infoBeforeSync || info?.status !== 'indexed') {
+                console.log(`[SYNC-DEBUG] Snapshot entry for '${codebasePath}' changed during sync. Skipping stats refresh.`);
+                return;
+            }
+
+            // A limit_reached index holds only part of the tracked files, so the
+            // synchronizer's count would overstate it.
+            const indexedFiles = info.indexStatus === 'completed' && fileCount !== undefined
+                ? fileCount
+                : info.indexedFiles;
+            const totalChunks = rowCount >= 0 ? rowCount : info.totalChunks;
+
+            if (indexedFiles === 0 && totalChunks === 0) {
+                // setCodebaseIndexed() refuses 0/0 (Issue #295), so keep the previous stats.
+                console.warn(`[SYNC] '${codebasePath}' has no files or chunks left after sync. Keeping the previous stats.`);
+                return;
+            }
+
+            // Not saveCodebaseSnapshot(): it would write this entry without checking
+            // whether another process cleared or re-indexed it during the sync.
+            const written = this.snapshotManager.updateIndexedStats(codebasePath, info, { indexedFiles, totalChunks });
+            console.log(`[SYNC] Updated stats for '${codebasePath}': ${indexedFiles} files, ${totalChunks} chunks${written ? '' : ' (not written to disk)'}`);
+        } catch (error) {
+            console.warn(`[SYNC-DEBUG] Failed to refresh snapshot stats for '${codebasePath}':`, error);
+        }
+    }
+
     public async handleSyncIndex(): Promise<void> {
         const syncStartTime = Date.now();
         console.log(`[SYNC-DEBUG] handleSyncIndex() called at ${new Date().toISOString()}`);
@@ -229,6 +282,7 @@ export class SyncManager {
 
                     if (stats.added > 0 || stats.removed > 0 || stats.modified > 0) {
                         console.log(`[SYNC] Sync complete for '${codebasePath}'. Added: ${stats.added}, Removed: ${stats.removed}, Modified: ${stats.modified} (${codebaseElapsed}ms)`);
+                        await this.refreshIndexedStats(codebasePath, codebaseInfo);
                     } else {
                         console.log(`[SYNC] No changes detected for '${codebasePath}' (${codebaseElapsed}ms)`);
                     }
