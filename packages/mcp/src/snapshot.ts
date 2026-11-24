@@ -456,6 +456,63 @@ export class SnapshotManager {
     }
 
     /**
+     * Refresh the stats of an indexed codebase after an incremental sync.
+     * Memory always takes the new stats. On disk, only this entry is patched,
+     * under the snapshot lock, and only while no other process has replaced it
+     * since `expected` was read: it must still be indexed and not be newer than
+     * `expected`. Unlike saveCodebaseSnapshot(), no other entry is rewritten, so
+     * this cannot undo another process's clear or re-index.
+     * @returns Whether the entry on disk was updated
+     */
+    public updateIndexedStats(
+        codebasePath: string,
+        expected: CodebaseInfoIndexed,
+        stats: { indexedFiles: number; totalChunks: number }
+    ): boolean {
+        this.setCodebaseIndexed(codebasePath, { ...stats, status: expected.indexStatus });
+        const updated = this.codebaseInfoMap.get(codebasePath);
+        if (updated === expected || updated?.status !== 'indexed') {
+            return false; // setCodebaseIndexed() refused the stats
+        }
+
+        if (!this.acquireLock()) {
+            console.warn(`[SNAPSHOT-DEBUG] Failed to acquire lock, not writing the stats of '${codebasePath}' to disk`);
+            return false;
+        }
+
+        try {
+            const diskSnapshot: CodebaseSnapshot = JSON.parse(fs.readFileSync(this.snapshotFilePath, 'utf8'));
+            if (!this.isV2Format(diskSnapshot)) {
+                return false;
+            }
+
+            // A clear, re-index or refresh by another process since `expected` was
+            // read removes the entry or gives it a later timestamp. NaN fails too.
+            const diskInfo = diskSnapshot.codebases[codebasePath];
+            if (diskInfo?.status !== 'indexed'
+                || !(Date.parse(diskInfo.lastUpdated) <= Date.parse(expected.lastUpdated))) {
+                console.log(`[SNAPSHOT-DEBUG] '${codebasePath}' changed on disk during the sync, not writing its stats`);
+                return false;
+            }
+
+            diskSnapshot.codebases[codebasePath] = {
+                ...diskInfo,
+                indexedFiles: updated.indexedFiles,
+                totalChunks: updated.totalChunks,
+                lastUpdated: updated.lastUpdated
+            };
+            diskSnapshot.lastUpdated = new Date().toISOString();
+            fs.writeFileSync(this.snapshotFilePath, JSON.stringify(diskSnapshot, null, 2));
+            return true;
+        } catch (error) {
+            console.warn(`[SNAPSHOT-DEBUG] Failed to write the stats of '${codebasePath}' to disk:`, error);
+            return false;
+        } finally {
+            this.releaseLock();
+        }
+    }
+
+    /**
      * Set codebase to failed status
      */
     public setCodebaseIndexFailed(
