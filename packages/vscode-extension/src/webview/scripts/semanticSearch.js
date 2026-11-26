@@ -184,7 +184,8 @@ class SemanticSearchController {
                 { value: 'OpenAI', text: 'OpenAI' },
                 { value: 'VoyageAI', text: 'VoyageAI' },
                 { value: 'Ollama', text: 'Ollama' },
-                { value: 'Gemini', text: 'Gemini' }
+                { value: 'Gemini', text: 'Gemini' },
+                { value: 'GeminiVertexAI', text: 'Gemini (Vertex AI)' }
             ];
 
             defaultProviders.forEach(provider => {

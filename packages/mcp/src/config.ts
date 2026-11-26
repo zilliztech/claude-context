@@ -13,6 +13,9 @@ export interface ContextMcpConfig {
     voyageaiApiKey?: string;
     geminiApiKey?: string;
     geminiBaseUrl?: string;
+    geminiUseVertexAI?: boolean;
+    googleCloudProject?: string;
+    googleCloudLocation?: string;
     // OpenRouter configuration
     openrouterApiKey?: string;
     // Ollama configuration
@@ -150,6 +153,16 @@ function getPositiveIntegerFromEnv(name: string): number | undefined {
     return undefined;
 }
 
+function getBooleanFromEnv(name: string): boolean {
+    const rawValue = envManager.get(name);
+    if (!rawValue) {
+        return false;
+    }
+
+    const normalizedValue = rawValue.trim().toLowerCase();
+    return normalizedValue === 'true' || normalizedValue === '1';
+}
+
 export function createMcpConfig(): ContextMcpConfig {
     // Debug: Print all environment variables related to Context
     console.log(`[DEBUG] 🔍 Environment Variables Debug:`);
@@ -158,6 +171,9 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   EMBEDDING_DIMENSION: ${envManager.get('EMBEDDING_DIMENSION') || 'NOT SET'}`);
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   GOOGLE_GENAI_USE_VERTEXAI: ${envManager.get('GOOGLE_GENAI_USE_VERTEXAI') || 'NOT SET'}`);
+    console.log(`[DEBUG]   GOOGLE_CLOUD_PROJECT: ${envManager.get('GOOGLE_CLOUD_PROJECT') || 'NOT SET'}`);
+    console.log(`[DEBUG]   GOOGLE_CLOUD_LOCATION: ${envManager.get('GOOGLE_CLOUD_LOCATION') || 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
     console.log(`[DEBUG]   CODE_CHUNKS_COLLECTION_NAME_OVERRIDE: ${envManager.get('CODE_CHUNKS_COLLECTION_NAME_OVERRIDE') || 'NOT SET'}`);
@@ -175,6 +191,9 @@ export function createMcpConfig(): ContextMcpConfig {
         voyageaiApiKey: envManager.get('VOYAGEAI_API_KEY'),
         geminiApiKey: envManager.get('GEMINI_API_KEY'),
         geminiBaseUrl: envManager.get('GEMINI_BASE_URL'),
+        geminiUseVertexAI: getBooleanFromEnv('GOOGLE_GENAI_USE_VERTEXAI'),
+        googleCloudProject: envManager.get('GOOGLE_CLOUD_PROJECT'),
+        googleCloudLocation: envManager.get('GOOGLE_CLOUD_LOCATION'),
         // OpenRouter configuration
         openrouterApiKey: envManager.get('OPENROUTER_API_KEY'),
         // Ollama configuration
@@ -214,9 +233,13 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             console.log(`[MCP]   VoyageAI API Key: ${config.voyageaiApiKey ? '✅ Configured' : '❌ Missing'}`);
             break;
         case 'Gemini':
-            console.log(`[MCP]   Gemini API Key: ${config.geminiApiKey ? '✅ Configured' : '❌ Missing'}`);
-            if (config.geminiBaseUrl) {
-                console.log(`[MCP]   Gemini Base URL: ${config.geminiBaseUrl}`);
+            if (config.geminiUseVertexAI) {
+                console.log(`[MCP]   Gemini auth: Vertex AI (Application Default Credentials), Project: ${config.googleCloudProject || '❌ Missing'}, Location: ${config.googleCloudLocation || '❌ Missing'}`);
+            } else {
+                console.log(`[MCP]   Gemini API Key: ${config.geminiApiKey ? '✅ Configured' : '❌ Missing'}`);
+                if (config.geminiBaseUrl) {
+                    console.log(`[MCP]   Gemini Base URL: ${config.geminiBaseUrl}`);
+                }
             }
             break;
         case 'OpenRouter':
@@ -256,8 +279,13 @@ Environment Variables:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
-  GEMINI_API_KEY          Google AI API key (required for Gemini provider)
+  GEMINI_API_KEY          Google AI API key (required for Gemini provider unless GOOGLE_GENAI_USE_VERTEXAI=true)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
+  GOOGLE_GENAI_USE_VERTEXAI
+                          Set to true to call Gemini through Vertex AI with
+                          Application Default Credentials (no API key)
+  GOOGLE_CLOUD_PROJECT    Google Cloud project ID (required when GOOGLE_GENAI_USE_VERTEXAI=true)
+  GOOGLE_CLOUD_LOCATION   Google Cloud region, e.g. us-central1 (required when GOOGLE_GENAI_USE_VERTEXAI=true)
   OPENROUTER_API_KEY      OpenRouter API key (required for OpenRouter provider)
 
   Ollama Configuration:
@@ -305,6 +333,9 @@ Examples:
   
   # Start MCP server with Gemini and specific model
   EMBEDDING_PROVIDER=Gemini GEMINI_API_KEY=xxx EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+  
+  # Start MCP server with Gemini on Vertex AI using Application Default Credentials
+  EMBEDDING_PROVIDER=Gemini GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=your-project GOOGLE_CLOUD_LOCATION=us-central1 EMBEDDING_MODEL=gemini-embedding-001 MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
   
   # Start MCP server with Ollama and specific model (using OLLAMA_MODEL)
   EMBEDDING_PROVIDER=Ollama OLLAMA_MODEL=mxbai-embed-large MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest

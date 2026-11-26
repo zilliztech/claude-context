@@ -48,8 +48,17 @@ Configure your embedding provider to convert code into semantic vectors.
 
 **Other Supported Providers:**
 - **Gemini**: Google's state-of-the-art embedding model with Matryoshka representation learning
+- **Gemini (Vertex AI)**: Same Gemini embedding models, authenticated through Vertex AI instead of an API key
 - **VoyageAI**: Alternative embedding provider with competitive performance  
 - **Ollama**: For local embedding models
+
+**Gemini (Vertex AI) Configuration:**
+- `Embedding Provider`: Select "Gemini (Vertex AI)" from the dropdown
+- `Model name`: Choose the embedding model (default `gemini-embedding-001`)
+- `Google Cloud project ID`: Your GCP project ID
+- `Google Cloud region`: e.g. `us-central1`
+- No API key needed. Run `gcloud auth application-default login` locally (on GCP the attached service account is used automatically)
+- Enable the Vertex AI API in the project and grant the principal `roles/aiplatform.user`
 
 #### Code Splitter Configuration
 Configure how your code is split into chunks for indexing.
@@ -106,11 +115,13 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 
 ## Configuration
 
-- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama)
+- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/GeminiVertexAI/Ollama)
 - `semanticCodeSearch.embeddingProvider.model` - Embedding model to use
 - `semanticCodeSearch.embeddingProvider.apiKey` - API key for embedding provider
 - `semanticCodeSearch.embeddingProvider.baseURL` - Custom API endpoint URL (optional, for OpenAI and Gemini)
 - `semanticCodeSearch.embeddingProvider.outputDimensionality` - Output dimension for Gemini (supports 3072, 1536, 768, 256)
+- `semanticCodeSearch.embeddingProvider.project` - Google Cloud project ID (for Gemini Vertex AI)
+- `semanticCodeSearch.embeddingProvider.location` - Google Cloud region, e.g. us-central1 (for Gemini Vertex AI)
 - `semanticCodeSearch.milvus.address` - Milvus server address
 
 ## Contributing

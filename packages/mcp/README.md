@@ -97,7 +97,7 @@ See `getSupportedModels` in [`voyageai-embedding.ts`](https://github.com/zillizt
 Google's Gemini provides competitive embeddings with good multilingual support.
 
 ```bash
-# Required: Your Gemini API key
+# Required: Your Gemini API key (unless using Vertex AI, see below)
 GEMINI_API_KEY=your-gemini-api-key
 
 # Optional: Specify embedding model (default: gemini-embedding-001; supports gemini-embedding-2)
@@ -116,6 +116,21 @@ See `getSupportedModels` in [`gemini-embedding.ts`](https://github.com/zilliztec
 2. Sign in with your Google account
 3. Go to "Get API key" section
 4. Create a new API key
+
+**Using Vertex AI with Application Default Credentials:**
+
+You can skip the API key and authenticate through Vertex AI using [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials) instead.
+
+```bash
+# Use Vertex AI with Application Default Credentials instead of an API key
+GOOGLE_GENAI_USE_VERTEXAI=true
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
+```
+
+- Run `gcloud auth application-default login` locally (on GCP the attached service account is used automatically)
+- Enable the Vertex AI API in the project and grant the principal `roles/aiplatform.user`
+- `GEMINI_API_KEY` and `GEMINI_BASE_URL` are ignored in this mode
 
 </details>
 
