@@ -20,6 +20,23 @@ export class OpenAIEmbedding extends Embedding {
             apiKey: config.apiKey,
             baseURL: config.baseURL,
         });
+
+        // Set dimension and context length based on model
+        this.updateModelSettings(config.model || 'text-embedding-3-small');
+    }
+
+    private updateModelSettings(model: string): void {
+        const supportedModels = OpenAIEmbedding.getSupportedModels();
+        const modelInfo = supportedModels[model];
+
+        if (modelInfo) {
+            this.dimension = modelInfo.dimension;
+            this.maxTokens = modelInfo.contextLength;
+        } else {
+            // Use default dimension and context length for unknown models
+            this.dimension = 1536;
+            this.maxTokens = 8192;
+        }
     }
 
     async detectDimension(testText: string = "test"): Promise<number> {
@@ -143,8 +160,11 @@ export class OpenAIEmbedding extends Embedding {
         const knownModels = OpenAIEmbedding.getSupportedModels();
         if (knownModels[model]) {
             this.dimension = knownModels[model].dimension;
+            this.maxTokens = knownModels[model].contextLength;
         } else {
             this.dimension = await this.detectDimension();
+            // Use default maxTokens for unknown models
+            this.maxTokens = 8192;
         }
     }
 
@@ -158,19 +178,37 @@ export class OpenAIEmbedding extends Embedding {
     /**
      * Get list of supported models
      */
-    static getSupportedModels(): Record<string, { dimension: number; description: string }> {
+    static getSupportedModels(): Record<string, { dimension: number; contextLength: number; description: string }> {
         return {
             'text-embedding-3-small': {
                 dimension: 1536,
+                contextLength: 8192,
                 description: 'High performance and cost-effective embedding model (recommended)'
             },
             'text-embedding-3-large': {
                 dimension: 3072,
+                contextLength: 8192,
                 description: 'Highest performance embedding model with larger dimensions'
             },
             'text-embedding-ada-002': {
                 dimension: 1536,
+                contextLength: 8192,
                 description: 'Legacy model (use text-embedding-3-small instead)'
+            },
+            'Qwen/Qwen3-Embedding-8B': {
+                dimension: 4096,
+                contextLength: 32000,
+                description: 'Qwen3 8B embedding model with 4096 dimensions (32k context)'
+            },
+            'Qwen/Qwen3-Embedding-4B': {
+                dimension: 2560,
+                contextLength: 32000,
+                description: 'Qwen3 4B embedding model with 2560 dimensions (32k context)'
+            },
+            'Qwen/Qwen3-Embedding-0.6B': {
+                dimension: 1024,
+                contextLength: 32000,
+                description: 'Qwen3 0.6B embedding model with 1024 dimensions (32k context)'
             }
         };
     }
