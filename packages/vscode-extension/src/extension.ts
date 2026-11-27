@@ -28,8 +28,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize providers and commands
     searchCommand = new SearchCommand(codeContext);
     indexCommand = new IndexCommand(codeContext);
-    syncCommand = new SyncCommand(codeContext);
-    semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri, searchCommand, indexCommand, syncCommand, configManager);
+    syncCommand = new SyncCommand(codeContext, context);
+    semanticSearchProvider = new SemanticSearchViewProvider(context.extensionUri, searchCommand, indexCommand, syncCommand, configManager, context);
 
     // Register command handlers
     const disposables = [

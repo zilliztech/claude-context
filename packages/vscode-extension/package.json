@@ -171,6 +171,7 @@
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
         "typecheck": "tsc --noEmit",
+        "test": "jest --runInBand",
         "package": "vsce package --no-dependencies",
         "release": "vsce publish --no-dependencies"
     },
@@ -179,6 +180,7 @@
         "web-tree-sitter": "^0.25.6"
     },
     "devDependencies": {
+        "@types/jest": "^30.0.0",
         "@types/node": "20.x",
         "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^8.31.1",
@@ -186,7 +188,9 @@
         "@vscode/vsce": "^3.4.0",
         "copy-webpack-plugin": "^12.0.2",
         "eslint": "^9.25.1",
+        "jest": "^30.0.0",
         "source-map-loader": "^5.0.0",
+        "ts-jest": "^29.4.0",
         "ts-loader": "^9.5.2",
         "typescript": "^5.8.3",
         "webpack": "^5.99.9",
