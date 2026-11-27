@@ -56,7 +56,7 @@ export class EmbeddingError extends Error {
 const DEFAULT_SUPPORTED_EXTENSIONS = [
     // Programming languages
     '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp',
-    '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.m', '.mm',
+    '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.ex', '.exs', '.m', '.mm',
     '.dart', '.sol',
     // Text and markup files
     '.md', '.markdown', '.ipynb',
@@ -1121,6 +1121,8 @@ export class Context {
             '.swift': 'swift',
             '.kt': 'kotlin',
             '.scala': 'scala',
+            '.ex': 'elixir',
+            '.exs': 'elixir',
             '.m': 'objective-c',
             '.mm': 'objective-c',
             '.dart': 'dart',

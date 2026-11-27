@@ -192,4 +192,31 @@ describe('Context request-scoped splitters', () => {
         expect(insertedDocuments).toHaveLength(1);
         expect(insertedDocuments[0].relativePath).toBe('Token.sol');
     });
+
+    it('indexes Elixir files by default and maps them to the elixir language', async () => {
+        const project = path.join(tempRoot, 'project');
+        await fs.mkdir(project);
+        await fs.writeFile(path.join(project, 'greeter.ex'), 'defmodule Greeter do\n  def hello, do: :world\nend');
+
+        const vectorDatabase = createVectorDatabase();
+        const splitter = new RecordingSplitter('context');
+        const context = new Context({
+            embedding: new TestEmbedding(),
+            vectorDatabase,
+            codeSplitter: splitter,
+        });
+
+        await context.indexCodebase(project);
+
+        expect(splitter.calls).toHaveLength(1);
+        expect(splitter.calls[0]).toMatchObject({
+            language: 'elixir',
+            filePath: path.join(project, 'greeter.ex'),
+        });
+
+        const insertedDocuments = vectorDatabase.insert.mock.calls
+            .flatMap(([, documents]) => documents);
+        expect(insertedDocuments).toHaveLength(1);
+        expect(insertedDocuments[0].relativePath).toBe('greeter.ex');
+    });
 });
