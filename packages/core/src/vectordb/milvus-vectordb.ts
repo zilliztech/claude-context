@@ -1,4 +1,4 @@
-import { MilvusClient, DataType, MetricType, FunctionType, LoadState } from '@zilliz/milvus2-sdk-node';
+import { MilvusClient, DataType, MetricType, FunctionType, LoadState, ErrorCode, type ResStatus } from '@zilliz/milvus2-sdk-node';
 import {
     VectorDocument,
     SearchOptions,
@@ -104,6 +104,21 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
     }
 
+    private validateIndexCreationStatus(
+        status: ResStatus,
+        collectionName: string,
+        fieldName: string,
+    ): void {
+        if (!this.isSuccessfulStatus(status)) {
+            const reason = status.reason || `Milvus returned ${status.error_code}`;
+            throw new Error(`Failed to create index for field '${fieldName}' in collection '${collectionName}': ${reason}`);
+        }
+    }
+
+    private isSuccessfulStatus(status: ResStatus): boolean {
+        return status.error_code === ErrorCode.SUCCESS || status.error_code === 0;
+    }
+
     /**
      * Wait for an index to be ready before proceeding
      * Polls index build progress with exponential backoff up to 60 seconds
@@ -136,14 +151,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 console.log(`[MilvusDB] 📊 Index build progress for '${fieldName}': indexed_rows=${indexBuildProgress.indexed_rows}, total_rows=${indexBuildProgress.total_rows}`);
                 console.log(`[MilvusDB] 📊 Full response:`, JSON.stringify(indexBuildProgress));
 
-                // Check if index building is complete
-                if (indexBuildProgress.indexed_rows === indexBuildProgress.total_rows) {
-                    console.log(`[MilvusDB] ✅ Index on field '${fieldName}' is ready! (${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed)`);
-                    return;
-                }
-
                 // Check for error status
-                if (indexBuildProgress.status && indexBuildProgress.status.error_code !== 'Success') {
+                if (indexBuildProgress.status && !this.isSuccessfulStatus(indexBuildProgress.status)) {
                     // Handle known issue with older Milvus versions where sparse vector index progress returns incorrect error
                     if (indexBuildProgress.status.reason && indexBuildProgress.status.reason.includes('index duplicates[indexName=]')) {
                         console.log(`[MilvusDB] ⚠️  Index progress check returned known older Milvus issue: ${indexBuildProgress.status.reason}`);
@@ -151,6 +160,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
                         return; // Treat as ready since this is a false error
                     }
                     throw new Error(`Index creation failed for field '${fieldName}' in collection '${collectionName}': ${indexBuildProgress.status.reason}`);
+                }
+
+                // Check if index building is complete
+                if (indexBuildProgress.indexed_rows === indexBuildProgress.total_rows) {
+                    console.log(`[MilvusDB] ✅ Index on field '${fieldName}' is ready! (${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed)`);
+                    return;
                 }
 
                 console.log(`[MilvusDB] 📊 Index building in progress: ${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed`);
@@ -570,7 +585,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
             metric_type: MetricType.COSINE,
         };
         console.log(`[MilvusDB] 🔧 Creating dense vector index for field 'vector' in collection '${collectionName}'...`);
-        await this.client.createIndex(denseIndexParams);
+        const denseIndexStatus = await this.client.createIndex(denseIndexParams);
+        this.validateIndexCreationStatus(denseIndexStatus, collectionName, 'vector');
 
         // Wait for dense vector index to be ready
         await this.waitForIndexReady(collectionName, 'vector');
@@ -585,7 +601,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
         };
         console.log(`[MilvusDB] 🔧 Creating sparse vector index for field 'sparse_vector' in collection '${collectionName}'...`);
 
-        await this.client.createIndex(sparseIndexParams);
+        const sparseIndexStatus = await this.client.createIndex(sparseIndexParams);
+        this.validateIndexCreationStatus(sparseIndexStatus, collectionName, 'sparse_vector');
 
         // Wait for sparse vector index to be ready
         await this.waitForIndexReady(collectionName, 'sparse_vector');
