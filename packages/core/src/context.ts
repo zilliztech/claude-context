@@ -206,6 +206,15 @@ export class Context {
         return this.vectorDatabase;
     }
 
+    private logSearchDimensionContext(actualDimension: number): void {
+        const provider = this.embedding.getProvider();
+        const expectedDimension = this.embedding.getDimension();
+        console.log(`[Context] 🔍 Search embedding dimensions: provider=${provider}, expected=${expectedDimension}, actual=${actualDimension}`);
+        if (expectedDimension !== actualDimension) {
+            console.warn(`[Context] ⚠️  Search embedding dimension mismatch: provider=${provider}, expected=${expectedDimension}, actual=${actualDimension}`);
+        }
+    }
+
     /**
      * Get code splitter instance
      */
@@ -555,6 +564,7 @@ export class Context {
             // 1. Generate query vector
             console.log(`[Context] 🔍 Generating embeddings for query: "${query}"`);
             const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+            this.logSearchDimensionContext(queryEmbedding.vector.length);
             console.log(`[Context] ✅ Generated embedding vector with dimension: ${queryEmbedding.vector.length}`);
             console.log(`[Context] 🔍 First 5 embedding values: [${queryEmbedding.vector.slice(0, 5).join(', ')}]`);
 
@@ -615,6 +625,7 @@ export class Context {
             // Regular semantic search
             // 1. Generate query vector
             const queryEmbedding: EmbeddingVector = await this.embedding.embed(query);
+            this.logSearchDimensionContext(queryEmbedding.vector.length);
 
             // 2. Search in vector database
             const searchResults: VectorSearchResult[] = await this.vectorDatabase.search(

@@ -15,6 +15,11 @@ export {
 export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
 export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
 export {
+    VectorSearchResultValidationError,
+    isVectorSearchResultValidationError,
+    validateMilvusSearchResultRow
+} from './search-result-validation';
+export {
     ClusterManager,
     ZillizConfig,
     Project,
