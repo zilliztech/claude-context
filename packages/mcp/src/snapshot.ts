@@ -428,6 +428,15 @@ export class SnapshotManager {
         if (stats.indexedFiles === 0 && stats.totalChunks === 0 && stats.status === 'completed') {
             console.error(`[SNAPSHOT] Refusing to write 0/0+completed for '${codebasePath}' — invalid state. Stack trace:`);
             console.trace();
+            // Do NOT just return: leaving the entry in indexingCodebases pinned the
+            // codebase at "currently being indexed, 100%" forever (across restarts,
+            // where it reappears as "interrupted"). Record it as failed instead —
+            // that clears the indexing pin and gives the user something actionable.
+            this.setCodebaseIndexFailed(
+                codebasePath,
+                'Indexer reported 0 files and 0 chunks — refusing to record as indexed. Check ignore files for an over-broad pattern.',
+                100
+            );
             return;
         }
 
