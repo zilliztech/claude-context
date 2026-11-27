@@ -23,6 +23,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { FileSynchronizer } from './sync/synchronizer';
 import { IgnoreMatcher } from './utils/ignore-matcher';
+import { parseExtraIgnoreFiles, selectIgnoreFiles } from './ignore-files';
 
 /**
  * Thrown by indexCodebase / processFileList when an AbortSignal fires
@@ -1214,28 +1215,28 @@ export class Context {
     }
 
     /**
-     * Find all .xxxignore files in the codebase directory
+     * Find the ignore files in the codebase root that are allowed to shape the
+     * index. Only search-relevant ignore files count (see INDEX_IGNORE_FILENAMES);
+     * build-tool filters such as .dockerignore are skipped unless explicitly
+     * opted back in via CUSTOM_IGNORE_FILES.
      * @param codebasePath Path to the codebase
      * @returns Array of ignore file paths
      */
     private async findIgnoreFiles(codebasePath: string): Promise<string[]> {
         try {
             const entries = await fs.promises.readdir(codebasePath, { withFileTypes: true });
-            const ignoreFiles: string[] = [];
+            const fileNames = entries.filter(entry => entry.isFile()).map(entry => entry.name);
+            const extraNames = parseExtraIgnoreFiles(envManager.get('CUSTOM_IGNORE_FILES'));
+            const { selected, skipped } = selectIgnoreFiles(fileNames, extraNames);
 
-            for (const entry of entries) {
-                if (entry.isFile() &&
-                    entry.name.startsWith('.') &&
-                    entry.name.endsWith('ignore')) {
-                    ignoreFiles.push(path.join(codebasePath, entry.name));
-                }
+            if (selected.length > 0) {
+                console.log(`📄 Found ignore files: ${selected.join(', ')}`);
+            }
+            if (skipped.length > 0) {
+                console.log(`[Context] 📄 Skipping non-index ignore files: ${skipped.join(', ')} (set CUSTOM_IGNORE_FILES to honor them)`);
             }
 
-            if (ignoreFiles.length > 0) {
-                console.log(`📄 Found ignore files: ${ignoreFiles.map(f => path.basename(f)).join(', ')}`);
-            }
-
-            return ignoreFiles;
+            return selected.map(name => path.join(codebasePath, name));
         } catch (error) {
             console.warn(`[Context] ⚠️ Failed to scan for ignore files: ${error}`);
             return [];
