@@ -9,7 +9,8 @@ import {
     CodebaseIndexOptions,
     CodebaseInfoIndexing,
     CodebaseInfoIndexed,
-    CodebaseInfoIndexFailed
+    CodebaseInfoIndexFailed,
+    CodebaseIncrementalSyncStats
 } from "./config.js";
 
 export class SnapshotManager {
@@ -444,15 +445,48 @@ export class SnapshotManager {
 
         const resolvedIndexOptions = this.resolveIndexOptions(codebasePath, indexOptions);
 
+        const now = new Date().toISOString();
         const info: CodebaseInfoIndexed = {
             status: 'indexed',
             indexedFiles: stats.indexedFiles,
             totalChunks: stats.totalChunks,
             indexStatus: stats.status,
             ...resolvedIndexOptions,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: now,
+            lastFullIndexAt: now,
         };
         this.codebaseInfoMap.set(codebasePath, info);
+    }
+
+    /**
+     * Record a successful incremental sync without replacing full-index stats.
+     * The vector row count is the authoritative chunk count after reindexing.
+     */
+    public recordIncrementalSyncSuccess(
+        codebasePath: string,
+        syncStats: CodebaseIncrementalSyncStats,
+        totalChunks?: number
+    ): boolean {
+        const existing = this.codebaseInfoMap.get(codebasePath);
+        if (!existing || existing.status !== 'indexed') {
+            console.warn(`[SNAPSHOT] Skipping incremental sync metadata for '${codebasePath}': not indexed`);
+            return false;
+        }
+
+        const now = new Date().toISOString();
+        const indexedFiles = Math.max(0, existing.indexedFiles + syncStats.added - syncStats.removed);
+        const info: CodebaseInfoIndexed = {
+            ...existing,
+            indexedFiles,
+            totalChunks: totalChunks !== undefined && totalChunks > 0 ? totalChunks : existing.totalChunks,
+            lastUpdated: now,
+            lastFullIndexAt: existing.lastFullIndexAt ?? existing.lastUpdated,
+            lastIncrementalSyncAt: now,
+            lastSyncStats: { ...syncStats },
+        };
+        this.codebaseInfoMap.set(codebasePath, info);
+        this.codebaseFileCount.set(codebasePath, indexedFiles);
+        return true;
     }
 
     /**

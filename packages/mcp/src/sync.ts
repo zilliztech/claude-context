@@ -222,6 +222,23 @@ export class SyncManager {
                     console.log(`[SYNC-DEBUG] Reindex stats for '${codebasePath}':`, stats);
                     console.log(`[SYNC-DEBUG] Codebase sync completed in ${codebaseElapsed}ms`);
 
+                    let totalChunks: number | undefined;
+                    try {
+                        const collectionName = this.context.getCollectionName(codebasePath);
+                        const rowCount = await this.context.getVectorDatabase().getCollectionRowCount(collectionName);
+                        if (rowCount > 0) {
+                            totalChunks = rowCount;
+                        } else {
+                            console.warn(`[SYNC-DEBUG] Could not refresh chunk count for '${codebasePath}': row count=${rowCount}`);
+                        }
+                    } catch (error: any) {
+                        console.warn(`[SYNC-DEBUG] Failed to refresh chunk count for '${codebasePath}':`, error?.message || error);
+                    }
+
+                    if (this.snapshotManager.recordIncrementalSyncSuccess(codebasePath, stats, totalChunks)) {
+                        this.snapshotManager.saveCodebaseSnapshot();
+                    }
+
                     // Accumulate total stats
                     totalStats.added += stats.added;
                     totalStats.removed += stats.removed;
