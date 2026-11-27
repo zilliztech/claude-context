@@ -92,7 +92,7 @@ Index a codebase directory to enable semantic search using a configurable code s
 
 ✨ **Usage Guidance**:
 - This tool is typically used when search fails due to an unindexed codebase.
-- If indexing is attempted on an already indexed path, and a conflict is detected, you MUST prompt the user to confirm whether to proceed with a force index (i.e., re-indexing and overwriting the previous index).
+- If a codebase is already indexed, the background sync keeps it current automatically. Do not force-reindex unless the user explicitly reports corrupt or missing search results.
 `;
 
 
@@ -133,7 +133,7 @@ This tool is versatile and can be used before completing various tasks to retrie
                                 },
                                 force: {
                                     type: "boolean",
-                                    description: "Force re-indexing even if already indexed",
+                                    description: "Destructive: deletes the existing index and rebuilds it from scratch, which takes minutes on large codebases. The background sync already keeps the index current — only use this if the index is confirmed corrupt.",
                                     default: false
                                 },
                                 splitter: {
