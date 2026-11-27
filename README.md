@@ -100,6 +100,23 @@ startup_timeout_ms = 20000
 </details>
 
 <details>
+<summary><strong>Autohand Code</strong></summary>
+
+Add Claude Context from the command line with the same environment used by the other clients:
+
+```bash
+autohand mcp add claude-context env \
+  OPENAI_API_KEY=sk-your-openai-api-key \
+  MILVUS_ADDRESS=your-zilliz-cloud-public-endpoint \
+  MILVUS_TOKEN=your-zilliz-cloud-api-key \
+  npx -y @zilliz/claude-context-mcp@latest
+```
+
+Add `--scope project` after `add` to keep the server configuration in the current project. See [Autohand Code](https://github.com/autohandai/code-cli/) for current installation and CLI details.
+
+</details>
+
+<details>
 <summary><strong>Gemini CLI</strong></summary>
 
 Gemini CLI requires manual configuration through a JSON file:
