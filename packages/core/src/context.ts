@@ -284,13 +284,25 @@ export class Context {
     }
 
     /**
-     * Generate collection name based on codebase path and hybrid mode
+     * Generate collection name based on codebase path (or git remote identity) and hybrid mode
      */
     public getCollectionName(codebasePath: string): string {
         const isHybrid = this.getIsHybrid();
         const prefix = isHybrid === true ? 'hybrid_code_chunks' : 'code_chunks';
-        const normalizedPath = path.resolve(codebasePath);
-        const pathHash = crypto.createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
+
+        // Default identity is the absolute path, so distinct checkouts of the same
+        // repo get distinct collections. Opting into CODE_CHUNKS_COLLECTION_KEY_SOURCE=git-remote
+        // switches to the repo's remote URL instead, so every checkout of the same
+        // repo (CI, every teammate's laptop, etc.) converges on the same collection.
+        let hashInput = path.resolve(codebasePath);
+        const keySource = envManager.get('CODE_CHUNKS_COLLECTION_KEY_SOURCE');
+        if (keySource?.trim().toLowerCase() === 'git-remote') {
+            const remoteIdentity = this.getGitRemoteIdentity(codebasePath);
+            if (remoteIdentity) {
+                hashInput = remoteIdentity;
+            }
+        }
+        const pathHash = crypto.createHash('md5').update(hashInput).digest('hex').substring(0, 8);
 
         // Overrides always keep the per-codebase `_<pathHash>` suffix so that multiple
         // codebases indexed by the same MCP server can't collapse into one collection.
@@ -307,6 +319,60 @@ export class Context {
         }
 
         return `${prefix}_${pathHash}`;
+    }
+
+    /**
+     * Resolve a repo-stable identity string (e.g. "github.com/org/repo") from the
+     * codebase's git remote "origin", or undefined if it can't be determined
+     * (not a git repo, no origin remote, unreadable config, etc).
+     */
+    private getGitRemoteIdentity(codebasePath: string): string | undefined {
+        try {
+            const gitConfigPath = path.join(path.resolve(codebasePath), '.git', 'config');
+            if (!fs.existsSync(gitConfigPath) || !fs.statSync(gitConfigPath).isFile()) {
+                return undefined;
+            }
+            const configContent = fs.readFileSync(gitConfigPath, 'utf-8');
+            const originMatch = configContent.match(/\[remote "origin"\][^[]*/);
+            if (!originMatch) {
+                return undefined;
+            }
+            const urlMatch = originMatch[0].match(/url\s*=\s*(.+)/);
+            if (!urlMatch) {
+                return undefined;
+            }
+            return this.normalizeGitRemoteUrl(urlMatch[1].trim());
+        } catch (error) {
+            console.warn(`[Context] ⚠️ Failed to read git remote for ${codebasePath}: ${error}`);
+            return undefined;
+        }
+    }
+
+    /**
+     * Normalize a git remote URL (SSH, HTTPS, or git protocol, with or without a
+     * trailing ".git") into a host-agnostic "<host>/<path>" identity string, so
+     * that different clone styles of the same repo hash to the same value.
+     */
+    private normalizeGitRemoteUrl(url: string): string | undefined {
+        let normalized = url.trim();
+        if (normalized.length === 0) {
+            return undefined;
+        }
+
+        // scp-like SSH syntax: git@host:org/repo(.git)
+        const scpMatch = normalized.match(/^(?:[^@]+@)?([^:/]+):(.+)$/);
+        if (!normalized.includes('://') && scpMatch) {
+            normalized = `${scpMatch[1]}/${scpMatch[2]}`;
+        } else {
+            // URL syntax: scheme://[user@]host/path(.git)
+            normalized = normalized.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '');
+            normalized = normalized.replace(/^[^@/]+@/, '');
+        }
+
+        normalized = normalized.replace(/\.git\/?$/, '');
+        normalized = normalized.replace(/\/+$/, '');
+
+        return normalized.toLowerCase();
     }
 
     private getValidOverrideValue(value?: string): string | undefined {

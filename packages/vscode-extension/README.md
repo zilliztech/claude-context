@@ -14,7 +14,7 @@ A code indexing and semantic search VSCode extension powered by [Claude Context]
 - 🔍 **Semantic Search**: Intelligent code search based on semantic understanding, not just keyword matching
 - 📁 **Codebase Indexing**: Automatically index entire codebase and build semantic vector database
 - 🎯 **Context Search**: Search related code by selecting code snippets
-- 🔧 **Multi-platform Support**: Support for OpenAI, VoyageAI, Gemini, and Ollama as embedding providers
+- 🔧 **Multi-platform Support**: Support for OpenAI, VoyageAI, Gemini, Ollama, and Bedrock as embedding providers
 - 💾 **Vector Storage**: Integrated with Milvus vector database for efficient storage and retrieval
 
 ## Requirements
@@ -50,6 +50,7 @@ Configure your embedding provider to convert code into semantic vectors.
 - **Gemini**: Google's state-of-the-art embedding model with Matryoshka representation learning
 - **VoyageAI**: Alternative embedding provider with competitive performance  
 - **Ollama**: For local embedding models
+- **Bedrock**: Amazon Bedrock (Titan, Cohere embedding models), using your own AWS account/VPC. Requires a `Region`, and optionally static AWS credentials (falls back to the default AWS credential chain if omitted)
 
 #### Code Splitter Configuration
 Configure how your code is split into chunks for indexing.
@@ -106,11 +107,17 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 
 ## Configuration
 
-- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama)
+- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama/Bedrock)
 - `semanticCodeSearch.embeddingProvider.model` - Embedding model to use
 - `semanticCodeSearch.embeddingProvider.apiKey` - API key for embedding provider
 - `semanticCodeSearch.embeddingProvider.baseURL` - Custom API endpoint URL (optional, for OpenAI and Gemini)
 - `semanticCodeSearch.embeddingProvider.outputDimensionality` - Output dimension for Gemini (supports 3072, 1536, 768, 256)
+- `semanticCodeSearch.embeddingProvider.region` - AWS region for Bedrock
+- `semanticCodeSearch.embeddingProvider.accessKeyId` - AWS access key ID for Bedrock (optional; uses the default AWS credential chain if omitted)
+- `semanticCodeSearch.embeddingProvider.secretAccessKey` - AWS secret access key for Bedrock (required if access key ID is set)
+- `semanticCodeSearch.embeddingProvider.sessionToken` - AWS session token for Bedrock temporary credentials (optional)
+- `semanticCodeSearch.embeddingProvider.endpoint` - Custom Bedrock endpoint URL, e.g. a VPC interface endpoint (optional)
+- `semanticCodeSearch.embeddingProvider.dimension` - Embedding dimension override for Bedrock (only honored by amazon.titan-embed-text-v2:0: 256, 512, or 1024)
 - `semanticCodeSearch.milvus.address` - Milvus server address
 
 ## Contributing

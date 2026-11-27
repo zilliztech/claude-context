@@ -1,8 +1,8 @@
-import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding } from "@zilliz/claude-context-core";
+import { OpenAIEmbedding, VoyageAIEmbedding, GeminiEmbedding, OllamaEmbedding, BedrockEmbedding } from "@zilliz/claude-context-core";
 import { ContextMcpConfig } from "./config.js";
 
 // Helper function to create embedding instance based on provider
-export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding  {
+export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding | BedrockEmbedding  {
     console.log(`[EMBEDDING] Creating ${config.embeddingProvider} embedding instance...`);
 
     switch (config.embeddingProvider) {
@@ -73,13 +73,35 @@ export function createEmbeddingInstance(config: ContextMcpConfig): OpenAIEmbeddi
             console.log(`[EMBEDDING] ✅ Ollama embedding instance created successfully`);
             return ollamaEmbedding;
 
+        case 'Bedrock':
+            if (!config.bedrockRegion) {
+                console.error(`[EMBEDDING] ❌ Bedrock region is required but not provided`);
+                throw new Error('BEDROCK_REGION (or AWS_REGION) is required for Bedrock embedding provider');
+            }
+            if (config.bedrockAccessKeyId && !config.bedrockSecretAccessKey) {
+                console.error(`[EMBEDDING] ❌ BEDROCK_ACCESS_KEY_ID was provided without BEDROCK_SECRET_ACCESS_KEY`);
+                throw new Error('BEDROCK_SECRET_ACCESS_KEY is required when BEDROCK_ACCESS_KEY_ID is set');
+            }
+            console.log(`[EMBEDDING] 🔧 Configuring Bedrock with model: ${config.embeddingModel}, region: ${config.bedrockRegion}`);
+            const bedrockEmbedding = new BedrockEmbedding({
+                model: config.embeddingModel,
+                region: config.bedrockRegion,
+                ...(config.bedrockAccessKeyId && { accessKeyId: config.bedrockAccessKeyId }),
+                ...(config.bedrockSecretAccessKey && { secretAccessKey: config.bedrockSecretAccessKey }),
+                ...(config.bedrockSessionToken && { sessionToken: config.bedrockSessionToken }),
+                ...(config.bedrockEndpoint && { endpoint: config.bedrockEndpoint }),
+                ...(config.bedrockDimension && { dimension: config.bedrockDimension })
+            });
+            console.log(`[EMBEDDING] ✅ Bedrock embedding instance created successfully`);
+            return bedrockEmbedding;
+
         default:
             console.error(`[EMBEDDING] ❌ Unsupported embedding provider: ${config.embeddingProvider}`);
             throw new Error(`Unsupported embedding provider: ${config.embeddingProvider}`);
     }
 }
 
-export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding): void {
+export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: OpenAIEmbedding | VoyageAIEmbedding | GeminiEmbedding | OllamaEmbedding | BedrockEmbedding): void {
     console.log(`[EMBEDDING] ✅ Successfully initialized ${config.embeddingProvider} embedding provider`);
     console.log(`[EMBEDDING] Provider details - Model: ${config.embeddingModel}, Dimension: ${embedding.getDimension()}`);
 
@@ -99,6 +121,9 @@ export function logEmbeddingProviderInfo(config: ContextMcpConfig, embedding: Op
             break;
         case 'Ollama':
             console.log(`[EMBEDDING] Ollama configuration - Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}, Model: ${config.embeddingModel}${config.ollamaDimension ? `, Dimension: ${config.ollamaDimension}` : ''}`);
+            break;
+        case 'Bedrock':
+            console.log(`[EMBEDDING] Bedrock configuration - Region: ${config.bedrockRegion}, Credentials: ${config.bedrockAccessKeyId ? 'Explicit keys' : 'Default AWS credential chain'}${config.bedrockEndpoint ? `, Endpoint: ${config.bedrockEndpoint}` : ''}`);
             break;
     }
 }

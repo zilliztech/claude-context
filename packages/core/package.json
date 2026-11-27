@@ -14,6 +14,7 @@
         "test": "jest --runInBand"
     },
     "dependencies": {
+        "@aws-sdk/client-bedrock-runtime": "^3.700.0",
         "@google/genai": "^1.9.0",
         "@zilliz/milvus2-sdk-node": "^2.5.10",
         "faiss-node": "^0.5.1",
