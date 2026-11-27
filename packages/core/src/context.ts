@@ -1180,6 +1180,17 @@ export class Context {
                 fileBasedPatterns.push(...patterns);
             }
 
+            // Git repositories can keep local, uncommitted ignore rules in
+            // .git/info/exclude. These rules apply to the repository root in
+            // the same way as .gitignore rules, but the file is outside the
+            // codebase's normal top-level ignore-file scan.
+            const gitInfoExclude = path.join(codebasePath, '.git', 'info', 'exclude');
+            const gitInfoExcludePatterns = await this.loadIgnoreFile(
+                gitInfoExclude,
+                '.git/info/exclude'
+            );
+            fileBasedPatterns.push(...gitInfoExcludePatterns);
+
             // Load global ~/.context/.contextignore
             const globalIgnorePatterns = await this.loadGlobalIgnoreFile();
             fileBasedPatterns.push(...globalIgnorePatterns);
