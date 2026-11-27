@@ -27,6 +27,7 @@ import { MilvusVectorDatabase } from "@zilliz/claude-context-core";
 // Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
 import { createEmbeddingInstance, logEmbeddingProviderInfo } from "./embedding.js";
+import { createRerankerInstance } from "./reranker.js";
 import { SnapshotManager } from "./snapshot.js";
 import { SyncManager } from "./sync.js";
 import { ToolHandlers } from "./handlers.js";
@@ -59,6 +60,9 @@ class ContextMcpServer {
         const embedding = createEmbeddingInstance(config);
         logEmbeddingProviderInfo(config, embedding);
 
+        // Initialize optional reranker for search results
+        const reranker = createRerankerInstance(config);
+
         // Initialize vector database
         const vectorDatabase = new MilvusVectorDatabase({
             address: config.milvusAddress,
@@ -69,6 +73,7 @@ class ContextMcpServer {
         this.context = new Context({
             embedding,
             vectorDatabase,
+            reranker,
             collectionNameOverride: config.collectionNameOverride
         });
 

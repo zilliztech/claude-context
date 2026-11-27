@@ -127,6 +127,7 @@ interface ContextConfig {
   embedding?: Embedding;           // Embedding provider
   vectorDatabase?: VectorDatabase; // Vector database instance (required)
   codeSplitter?: Splitter;        // Code splitting strategy
+  reranker?: Reranker;            // Optional: rerank semantic search results
   supportedExtensions?: string[]; // File extensions to index
   ignorePatterns?: string[];      // Patterns to ignore
   customExtensions?: string[];    // Custom extensions from MCP
@@ -174,6 +175,7 @@ interface ContextConfig {
 - `updateEmbedding(embedding)` - Switch embedding provider
 - `updateVectorDatabase(vectorDB)` - Switch vector database
 - `updateSplitter(splitter)` - Switch code splitter
+- `updateReranker(reranker?)` - Set or remove (with `undefined`) the search reranker
 
 ### Search Results
 
@@ -184,7 +186,7 @@ interface SemanticSearchResult {
   startLine: number;    // Starting line number
   endLine: number;      // Ending line number
   language: string;     // Programming language
-  score: number;        // Similarity score (0-1)
+  score: number;        // Similarity score (0-1), or the reranker's relevance score when a reranker is configured
 }
 ```
 
@@ -210,6 +212,23 @@ const vectorDatabase = new MilvusVectorDatabase({
 const context = new Context({
   embedding,
   vectorDatabase
+});
+```
+
+### Reranking Search Results
+
+Pass a reranker to have `semanticSearch` retrieve up to three times `topK` candidates (at most 100), reorder them with the reranker, and return the top `topK`. If the rerank request fails, the results fall back to the vector search order.
+
+```typescript
+import { Context, MilvusVectorDatabase, OpenAIEmbedding, VoyageAIReranker } from '@zilliz/claude-context-core';
+
+const context = new Context({
+  embedding: new OpenAIEmbedding({ apiKey: process.env.OPENAI_API_KEY!, model: 'text-embedding-3-small' }),
+  vectorDatabase: new MilvusVectorDatabase({ address: 'localhost:19530' }),
+  reranker: new VoyageAIReranker({
+    apiKey: process.env.VOYAGEAI_API_KEY!,
+    model: 'rerank-2.5' // default
+  })
 });
 ```
 

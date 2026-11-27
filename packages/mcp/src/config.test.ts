@@ -42,3 +42,22 @@ test("allows MCP_SERVER_VERSION to override the package default", () => {
         assert.equal(config.version, "custom-test-version");
     });
 });
+
+test("reads the optional reranker provider and model from the environment", () => {
+    withEnvOverride("RERANKER_PROVIDER", "VoyageAI", () => {
+        withEnvOverride("RERANKER_MODEL", "rerank-2.5-lite", () => {
+            const config = createMcpConfig();
+
+            assert.equal(config.rerankerProvider, "VoyageAI");
+            assert.equal(config.rerankerModel, "rerank-2.5-lite");
+        });
+    });
+});
+
+test("treats a blank RERANKER_PROVIDER as not configured", () => {
+    withEnvOverride("RERANKER_PROVIDER", "  ", () => {
+        const config = createMcpConfig();
+
+        assert.equal(config.rerankerProvider, undefined);
+    });
+});
