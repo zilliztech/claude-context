@@ -83,7 +83,8 @@
                         "OpenAI",
                         "VoyageAI",
                         "Ollama",
-                        "Gemini"
+                        "Gemini",
+                        "OpenRouter"
                     ],
                     "description": "Embedding service provider"
                 },

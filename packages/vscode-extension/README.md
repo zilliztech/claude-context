@@ -14,7 +14,7 @@ A code indexing and semantic search VSCode extension powered by [Claude Context]
 - 🔍 **Semantic Search**: Intelligent code search based on semantic understanding, not just keyword matching
 - 📁 **Codebase Indexing**: Automatically index entire codebase and build semantic vector database
 - 🎯 **Context Search**: Search related code by selecting code snippets
-- 🔧 **Multi-platform Support**: Support for OpenAI, VoyageAI, Gemini, and Ollama as embedding providers
+- 🔧 **Multi-platform Support**: Support for OpenAI, VoyageAI, Gemini, Ollama, and OpenRouter as embedding providers
 - 💾 **Vector Storage**: Integrated with Milvus vector database for efficient storage and retrieval
 
 ## Requirements
@@ -50,6 +50,7 @@ Configure your embedding provider to convert code into semantic vectors.
 - **Gemini**: Google's state-of-the-art embedding model with Matryoshka representation learning
 - **VoyageAI**: Alternative embedding provider with competitive performance  
 - **Ollama**: For local embedding models
+- **OpenRouter**: OpenAI-compatible embedding access through OpenRouter
 
 #### Code Splitter Configuration
 Configure how your code is split into chunks for indexing.
@@ -106,10 +107,10 @@ MILVUS_TOKEN=your-zilliz-cloud-api-key
 
 ## Configuration
 
-- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama)
+- `semanticCodeSearch.embeddingProvider.provider` - Embedding provider (OpenAI/VoyageAI/Gemini/Ollama/OpenRouter)
 - `semanticCodeSearch.embeddingProvider.model` - Embedding model to use
 - `semanticCodeSearch.embeddingProvider.apiKey` - API key for embedding provider
-- `semanticCodeSearch.embeddingProvider.baseURL` - Custom API endpoint URL (optional, for OpenAI and Gemini)
+- `semanticCodeSearch.embeddingProvider.baseURL` - Custom API endpoint URL (optional, for OpenAI and Gemini; OpenRouter uses https://openrouter.ai/api/v1)
 - `semanticCodeSearch.embeddingProvider.outputDimensionality` - Output dimension for Gemini (supports 3072, 1536, 768, 256)
 - `semanticCodeSearch.milvus.address` - Milvus server address
 
@@ -129,7 +130,7 @@ This VSCode extension is part of the Claude Context monorepo. Please see:
 - TypeScript
 - VSCode Extension API  
 - Milvus Vector Database
-- OpenAI/VoyageAI Embeddings
+- OpenAI/VoyageAI/Gemini/Ollama/OpenRouter Embeddings
 
 ## License
 
