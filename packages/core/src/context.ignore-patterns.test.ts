@@ -181,6 +181,36 @@ describe('Context ignore pattern isolation', () => {
         }
     });
 
+    it('does not load tool-specific ignore files such as .prettierignore', async () => {
+        const project = path.join(tempRoot, 'project-with-prettierignore');
+        await fs.mkdir(project);
+        // prettier's allowlist idiom: deny everything, then re-allow specific paths via `!`.
+        // Loading this as a flat exclude list (without negation support) would ignore the
+        // entire codebase, so the indexer must skip `.prettierignore` entirely.
+        await fs.writeFile(path.join(project, '.prettierignore'), '*\n!app/**\n');
+        await fs.writeFile(path.join(project, 'a.ts'), 'export const a = 1;');
+
+        const context = new Context({ vectorDatabase: createVectorDatabase() });
+
+        const patterns = await context.getEffectiveIgnorePatterns(project);
+        expect(patterns).not.toContain('*');
+        expect(patterns).not.toContain('!app/**');
+
+        const files = await (context as any).getCodeFiles(project, patterns, ['.ts']);
+        expect(files.map((p: string) => path.relative(project, p))).toEqual(['a.ts']);
+    });
+
+    it('still loads .contextignore from the codebase root', async () => {
+        const project = path.join(tempRoot, 'project-with-contextignore');
+        await fs.mkdir(project);
+        await fs.writeFile(path.join(project, '.contextignore'), '*.md\n');
+
+        const context = new Context({ vectorDatabase: createVectorDatabase() });
+
+        const patterns = await context.getEffectiveIgnorePatterns(project);
+        expect(patterns).toContain('*.md');
+    });
+
     it('treats leading-slash directory ignore patterns as root-anchored and recursive during indexing', async () => {
         const project = path.join(tempRoot, 'project');
         await fs.mkdir(path.join(project, 'Library'), { recursive: true });
