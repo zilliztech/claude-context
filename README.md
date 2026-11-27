@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/zilliztech-claude-context-badge.png)](https://mseep.ai/app/zilliztech-claude-context)
+
 ![](assets/claude-context.png)
 
 > 🆕 **Looking for persistent memory for Claude Code?** Check out [memsearch Claude Code plugin](https://github.com/zilliztech/memsearch#for-claude-code-users) — a markdown-first memory system that gives your AI agent long-term memory across sessions.
