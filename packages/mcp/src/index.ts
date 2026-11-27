@@ -75,7 +75,7 @@ class ContextMcpServer {
         // Initialize managers
         this.snapshotManager = new SnapshotManager();
         this.syncManager = new SyncManager(this.context, this.snapshotManager);
-        this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager);
+        this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager, this.syncManager);
 
         // Load existing codebase snapshot on startup
         this.snapshotManager.loadCodebaseSnapshot();
@@ -222,6 +222,25 @@ This tool is versatile and can be used before completing various tasks to retrie
                             required: ["path"]
                         }
                     },
+                    {
+                        name: "sync_index",
+                        description: `Incrementally refresh existing index(es) using file-change detection (reindexByChange). Does not clear collections or force a full reindex. Uses the same global sync lock as background and trigger-file sync. Omit path to sync all indexed codebases.`,
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                path: {
+                                    type: "string",
+                                    description: "Optional ABSOLUTE path to one indexed codebase. If omitted, all indexed codebases are synced."
+                                },
+                                wait: {
+                                    type: "boolean",
+                                    description: "If true (default), wait for sync to finish and return stats. If false, start sync in the background and return immediately.",
+                                    default: true
+                                }
+                            },
+                            required: []
+                        }
+                    },
                 ]
             };
         });
@@ -239,6 +258,8 @@ This tool is versatile and can be used before completing various tasks to retrie
                     return await this.toolHandlers.handleClearIndex(args);
                 case "get_indexing_status":
                     return await this.toolHandlers.handleGetIndexingStatus(args);
+                case "sync_index":
+                    return await this.toolHandlers.handleSyncIndex(args);
 
                 default:
                     throw new Error(`Unknown tool: ${name}`);
