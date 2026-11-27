@@ -90,7 +90,7 @@ Codex CLI uses TOML configuration files:
 [mcp_servers.claude-context]
 command = "npx"
 args = ["@zilliz/claude-context-mcp@latest"]
-env = { "OPENAI_API_KEY" = "your-openai-api-key", "MILVUS_TOKEN" = "your-zilliz-cloud-api-key" }
+env = { "OPENAI_API_KEY" = "your-openai-api-key", "MILVUS_ADDRESS" = "your-zilliz-cloud-public-endpoint", "MILVUS_TOKEN" = "your-zilliz-cloud-api-key" }
 # Optional: override the default 10s startup timeout
 startup_timeout_ms = 20000
 ```
@@ -115,6 +115,7 @@ Gemini CLI requires manual configuration through a JSON file:
       "args": ["@zilliz/claude-context-mcp@latest"],
       "env": {
         "OPENAI_API_KEY": "your-openai-api-key",
+        "MILVUS_ADDRESS": "your-zilliz-cloud-public-endpoint",
         "MILVUS_TOKEN": "your-zilliz-cloud-api-key"
       }
     }
